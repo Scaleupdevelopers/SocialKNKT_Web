@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import './VerifyCode.css'
 
 export function VerifyCode({ title = 'Verify Code', description }) {
   const { state } = useLocation()
@@ -23,14 +24,14 @@ export function VerifyCode({ title = 'Verify Code', description }) {
     <main className="verify-page">
       <header className="verify-header">
         <div className="brand-mark" aria-label="SocialKNKT logo">
-          <img src="/assets/logo_icons/app_logo-optimized.png" alt="SocialKNKT" />
+          <img src="/assets/logo_icons/app_logo.png" alt="SocialKNKT" />
         </div>
       </header>
 
       <section className="verify-card" aria-labelledby="verify-title">
         <img
           className="verify-icon"
-          src="/assets/logo_icons/verify_code_icon-optimized.png"
+          src="/assets/logo_icons/verify_code_icon.png"
           alt=""
         />
         <h1 id="verify-title">{title}</h1>

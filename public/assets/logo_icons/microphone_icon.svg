@@ -1,0 +1,5 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="11" y="3" width="10" height="18" rx="5" fill="url(#micGradient)"/>
+  <path d="M7 15a9 9 0 0 0 18 0M16 24v5M11 29h10" stroke="url(#micGradient)" stroke-width="2.5" stroke-linecap="round"/>
+  <defs><linearGradient id="micGradient" x1="7" y1="4" x2="25" y2="29" gradientUnits="userSpaceOnUse"><stop stop-color="#ff4e5b"/><stop offset=".5" stop-color="#ff11b4"/><stop offset="1" stop-color="#a640d7"/></linearGradient></defs>
+</svg>

@@ -1,0 +1,14 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="upload-gradient" x1="2" y1="18" x2="30" y2="18" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF5B4D" />
+      <stop offset="0.52" stop-color="#F715A8" />
+      <stop offset="1" stop-color="#A444D3" />
+    </linearGradient>
+  </defs>
+  <path d="M16 3L8.5 10.5L10.35 12.35L14.7 8V21H17.3V8L21.65 12.35L23.5 10.5L16 3Z" fill="#F725B7" />
+  <path
+    d="M5 16.5C5 15.67 5.67 15 6.5 15H12V18H8V25H24V18H20V15H25.5C26.33 15 27 15.67 27 16.5V26.5C27 27.33 26.33 28 25.5 28H6.5C5.67 28 5 27.33 5 26.5V16.5Z"
+    fill="url(#upload-gradient)"
+  />
+</svg>

@@ -11,7 +11,7 @@ export function SignIn() {
     <main className="auth-page">
       <header className="auth-header">
         <div className="brand-mark" aria-label="SocialKNKT logo placeholder">
-          <img src="/assets/logo_icons/app_logo-optimized.png" alt="SocialKNKT" />
+          <img src="/assets/logo_icons/app_logo.png" alt="SocialKNKT" />
         </div>
 
         <p className="register-prompt">
@@ -46,7 +46,19 @@ export function SignIn() {
               aria-label="Toggle password visibility"
               onClick={() => setShowPassword((visible) => !visible)}
             >
-              {showPassword ? '◉' : '◉'}
+              {showPassword ? (
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M3 3l18 18" />
+                  <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
+                  <path d="M9.9 4.2A10.8 10.8 0 0 1 12 4c5.2 0 8.6 4 9.8 6a11.8 11.8 0 0 1-3.2 3.5" />
+                  <path d="M6.2 6.2A11.8 11.8 0 0 0 2.2 10c1.2 2 4.6 6 9.8 6 1 0 2-.2 2.8-.5" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M2.2 12s3.4-6 9.8-6 9.8 6 9.8 6-3.4 6-9.8 6-9.8-6-9.8-6Z" />
+                  <circle cx="12" cy="12" r="2.5" />
+                </svg>
+              )}
             </button>
           </div>
 
@@ -72,7 +84,7 @@ export function SignIn() {
           <button className="social-button" type="button">
             <img
               className="social-icon google-social-icon"
-              src="/assets/logo_icons/google_icon-optimized.png"
+              src="/assets/logo_icons/google_icon.png"
               alt=""
             />
             Sign in with Google

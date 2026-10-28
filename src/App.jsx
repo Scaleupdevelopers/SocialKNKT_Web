@@ -1,26 +1,21 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 
 import { SignIn } from './pages/signin/SignIn'
-import { ForgotPassword } from './pages/auth/ForgotPassword'
-import { VerifyCode } from './pages/auth/VerifyCode'
-import ResetPassword from './pages/auth/ResetPassword'
-import PasswordSuccess from './pages/auth/PasswordSuccess'
-import { ContactUs } from './pages/auth/ContactUs'
+import { ForgotPassword } from './pages/password/ForgotPassword'
+import { VerifyCode } from './pages/verification/VerifyCode'
+import ResetPassword from './pages/password/ResetPassword'
+import PasswordSuccess from './pages/password/PasswordSuccess'
+import { ContactUs } from './pages/support/ContactUs'
 import { SignUp } from './pages/signup/SignUp'
-import { VerifyAccount } from './pages/auth/VerifyAccount'
-import { AccountCreated } from './pages/auth/AccountCreated'
-import { WorkExperience } from './pages/auth/WorkExperience'
+import { VerifyAccount } from './pages/verification/VerifyAccount'
+import { AccountCreated } from './pages/signup/AccountCreated'
+import { WorkExperience } from './pages/onboarding/WorkExperience'
+import { Education } from './pages/onboarding/Education'
+import { Location } from './pages/onboarding/Location'
+import { Pronunciation } from './pages/onboarding/Pronunciation'
+import { AddMedia } from './pages/onboarding/AddMedia'
 
 import './styles/globals.css'
-import './pages/signin/SignIn.css'
-import './pages/auth/ForgotPassword.css'
-import './pages/auth/VerifyCode.css'
-import './pages/auth/PasswordPages.css'
-import './pages/auth/ContactUs.css'
-import './pages/signup/SignUp.css'
-import './pages/auth/VerifyAccount.css'
-import './pages/auth/AccountCreated.css'
-import './pages/auth/WorkExperience.css'
 
 function App() {
   return (
@@ -36,6 +31,10 @@ function App() {
         <Route path="/verify-account" element={<VerifyAccount />} />
         <Route path="/account-created" element={<AccountCreated />} />
         <Route path="/work-experience" element={<WorkExperience />} />
+        <Route path="/education" element={<Education />} />
+        <Route path="/location" element={<Location />} />
+        <Route path="/pronunciation" element={<Pronunciation />} />
+        <Route path="/add-media" element={<AddMedia />} />
       </Routes>
     </BrowserRouter>
   )

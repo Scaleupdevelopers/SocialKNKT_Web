@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import './WorkExperience.css'
 
 export function WorkExperience() {
   const navigate = useNavigate()
   const [hasExperience, setHasExperience] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
 
   const handleSubmit = (event) => {
     event.preventDefault()
@@ -14,7 +16,7 @@ export function WorkExperience() {
     <main className="work-page">
       <header className="work-header">
         <button type="button" onClick={() => navigate('/')}>
-          <img src="/assets/logo_icons/app_logo-optimized.png" alt="SocialKNKT" />
+          <img src="/assets/logo_icons/app_logo.png" alt="SocialKNKT" />
         </button>
       </header>
 
@@ -55,7 +57,14 @@ export function WorkExperience() {
           <div className="saved-work">
             <div className="saved-work-heading">
               <span>Work Experience</span>
-              <span>✎ &nbsp;▥</span>
+              <span className="saved-work-actions">
+                <button type="button" aria-label="Edit work experience">
+                  <img src="/assets/logo_icons/edit_icon.svg" alt="" />
+                </button>
+                <button type="button" aria-label="Delete work experience" onClick={() => setShowDeleteModal(true)}>
+                  <img src="/assets/logo_icons/delete_icon.svg" alt="" />
+                </button>
+              </span>
             </div>
             <div className="saved-work-card">
               Product Designer<br />
@@ -66,12 +75,34 @@ export function WorkExperience() {
             <button className="work-primary-button" type="button" onClick={() => setHasExperience(false)}>
               Add New Work Experience
             </button>
-            <button className="continue-button" type="button" onClick={() => navigate('/')}>
+            <button className="continue-button" type="button" onClick={() => navigate('/education')}>
               Continue
             </button>
           </div>
         )}
       </section>
+
+      {showDeleteModal && (
+        <div className="delete-modal-backdrop" role="presentation">
+          <div className="delete-modal" role="dialog" aria-modal="true" aria-labelledby="delete-title">
+            <button className="delete-modal-close" type="button" aria-label="Close" onClick={() => setShowDeleteModal(false)}>
+              ×
+            </button>
+            <h2 id="delete-title">Delete Experience</h2>
+            <p>This action will permanently remove this entry from<br />your profile.</p>
+            <button
+              className="delete-confirm-button"
+              type="button"
+              onClick={() => {
+                setHasExperience(false)
+                setShowDeleteModal(false)
+              }}
+            >
+              Delete Work Experience
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   )
 }

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import './PasswordPages.css'
 
 function ResetPassword() {
   const navigate = useNavigate()
@@ -17,12 +18,12 @@ function ResetPassword() {
     <main className="password-page">
       <header className="password-header">
         <div className="brand-mark" aria-label="SocialKNKT logo">
-          <img src="/assets/logo_icons/app_logo-optimized.png" alt="SocialKNKT" />
+          <img src="/assets/logo_icons/app_logo.png" alt="SocialKNKT" />
         </div>
       </header>
 
       <section className="password-card">
-        <img className="password-page-icon" src="/assets/logo_icons/create_password_icon-optimized.png" alt="" />
+        <img className="password-page-icon" src="/assets/logo_icons/create_password_icon.png" alt="" />
         <h1>Create New Password</h1>
         <p>Go ahead and create a unique password</p>
 
