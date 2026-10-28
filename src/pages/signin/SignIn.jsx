@@ -11,7 +11,7 @@ export function SignIn() {
     <main className="auth-page">
       <header className="auth-header">
         <div className="brand-mark" aria-label="SocialKNKT logo placeholder">
-          <img src="/assets/logo_icons/app_logo-transparent.png" alt="SocialKNKT" />
+          <img src="/assets/logo_icons/app_logo-optimized.png" alt="SocialKNKT" />
         </div>
 
         <p className="register-prompt">
@@ -72,7 +72,7 @@ export function SignIn() {
           <button className="social-button" type="button">
             <img
               className="social-icon google-social-icon"
-              src="/assets/logo_icons/google_icon-clean.png"
+              src="/assets/logo_icons/google_icon-optimized.png"
               alt=""
             />
             Sign in with Google

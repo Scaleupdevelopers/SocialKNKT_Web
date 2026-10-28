@@ -12,14 +12,14 @@ export function ContactUs() {
           aria-label="Back to login"
           onClick={() => navigate('/')}
         >
-          <img src="/assets/logo_icons/app_logo-transparent.png" alt="SocialKNKT" />
+          <img src="/assets/logo_icons/app_logo-optimized.png" alt="SocialKNKT" />
         </button>
       </header>
 
       <section className="contact-card" aria-labelledby="contact-title">
         <img
           className="contact-icon"
-          src="/assets/logo_icons/create_password_icon.png"
+          src="/assets/logo_icons/create_password_icon-optimized.png"
           alt=""
         />
         <h1 id="contact-title">Contact Us</h1>

@@ -9,14 +9,14 @@ export function ForgotPassword() {
     <main className="forgot-page">
       <header className="forgot-header">
         <div className="brand-mark" aria-label="SocialKNKT logo">
-          <img src="/assets/logo_icons/app_logo-transparent.png" alt="SocialKNKT" />
+          <img src="/assets/logo_icons/app_logo-optimized.png" alt="SocialKNKT" />
         </div>
       </header>
 
       <section className="forgot-card" aria-labelledby="forgot-title">
         <img
           className="forgot-icon"
-          src="/assets/logo_icons/forgot_password_icon.png"
+          src="/assets/logo_icons/forgot_password_icon-optimized.png"
           alt=""
         />
         <h1 id="forgot-title">Forgot password?</h1>

@@ -23,14 +23,14 @@ export function VerifyCode({ title = 'Verify Code', description }) {
     <main className="verify-page">
       <header className="verify-header">
         <div className="brand-mark" aria-label="SocialKNKT logo">
-          <img src="/assets/logo_icons/app_logo-transparent.png" alt="SocialKNKT" />
+          <img src="/assets/logo_icons/app_logo-optimized.png" alt="SocialKNKT" />
         </div>
       </header>
 
       <section className="verify-card" aria-labelledby="verify-title">
         <img
           className="verify-icon"
-          src="/assets/logo_icons/verify_code_icon.png"
+          src="/assets/logo_icons/verify_code_icon-optimized.png"
           alt=""
         />
         <h1 id="verify-title">{title}</h1>

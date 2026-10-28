@@ -27,20 +27,20 @@ jobs:
 
       - name: Prepare SSH
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/server_key
-          chmod 600 ~/.ssh/server_key
-          ssh-keyscan -H "${{ secrets.SERVER_HOST }}" >> ~/.ssh/known_hosts
+          mkdir -p "${HOME}/.ssh"
+          echo "${{ secrets.SERVER_SSH_KEY }}" > "${HOME}/.ssh/server_key"
+          chmod 600 "${HOME}/.ssh/server_key"
+          ssh-keyscan -H "${{ secrets.SERVER_HOST }}" >> "${HOME}/.ssh/known_hosts"
 
       - name: Upload build to server
         run: |
           rsync -avz --delete \
-            -e "ssh -i ~/.ssh/server_key" \
+            -e "ssh -i ${HOME}/.ssh/server_key" \
             dist/ \
             "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/var/www/html/"
 
       - name: Reload Nginx
         run: |
-          ssh -i ~/.ssh/server_key \
+          ssh -i "${HOME}/.ssh/server_key" \
             "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}" \
             "sudo systemctl reload nginx"

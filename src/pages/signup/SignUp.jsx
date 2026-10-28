@@ -10,7 +10,7 @@ export function SignUp() {
     <main className="signup-page">
       <header className="signup-header">
         <button className="signup-logo" type="button" onClick={() => navigate('/')}>
-          <img src="/assets/logo_icons/app_logo-transparent.png" alt="SocialKNKT" />
+          <img src="/assets/logo_icons/app_logo-optimized.png" alt="SocialKNKT" />
         </button>
         <p className="signup-login-prompt">
           Already have an account?{' '}

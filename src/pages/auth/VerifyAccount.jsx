@@ -21,12 +21,12 @@ export function VerifyAccount() {
     <main className="verify-page">
       <header className="verify-header">
         <div className="brand-mark" aria-label="SocialKNKT logo">
-          <img src="/assets/logo_icons/app_logo-transparent.png" alt="SocialKNKT" />
+          <img src="/assets/logo_icons/app_logo-optimized.png" alt="SocialKNKT" />
         </div>
       </header>
 
       <section className="verify-card" aria-labelledby="verify-account-title">
-        <img className="verify-icon" src="/assets/logo_icons/verify_code_icon.png" alt="" />
+        <img className="verify-icon" src="/assets/logo_icons/verify_code_icon-optimized.png" alt="" />
         <h1 id="verify-account-title">Verify Your Account</h1>
         <p className="verify-description">
           We have sent you a verification code to verify your

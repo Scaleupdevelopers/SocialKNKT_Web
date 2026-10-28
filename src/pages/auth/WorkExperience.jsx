@@ -14,7 +14,7 @@ export function WorkExperience() {
     <main className="work-page">
       <header className="work-header">
         <button type="button" onClick={() => navigate('/')}>
-          <img src="/assets/logo_icons/app_logo-transparent.png" alt="SocialKNKT" />
+          <img src="/assets/logo_icons/app_logo-optimized.png" alt="SocialKNKT" />
         </button>
       </header>
 
