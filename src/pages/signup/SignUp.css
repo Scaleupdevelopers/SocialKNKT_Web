@@ -1,0 +1,219 @@
+.signup-page {
+  min-height: 100vh;
+  padding: 22px 5.5vw 32px;
+  background: #1b1b1b;
+  color: #f8f8f8;
+  font-family: "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+
+.signup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.signup-logo {
+  width: 88px;
+  height: 88px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.signup-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.signup-login-prompt {
+  margin: 0;
+  color: #c8c8c8;
+  font-size: clamp(14px, 1.35vw, 20px);
+  line-height: 1.5;
+}
+
+.signup-login-prompt button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #ff653d;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+}
+
+.signup-card {
+  width: min(650px, 100%);
+  margin: 46px auto 0;
+}
+
+.signup-card h1 {
+  margin: 0;
+  text-align: center;
+  font-size: 36px;
+  font-weight: 600;
+  letter-spacing: -1px;
+}
+
+.signup-subtitle {
+  margin: 12px 0 28px;
+  color: #adadad;
+  text-align: center;
+  font-size: 15px;
+}
+
+.signup-form {
+  display: grid;
+  gap: 14px;
+}
+
+.signup-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.signup-field {
+  display: grid;
+  gap: 6px;
+  color: #e1e1e1;
+  font-size: 13px;
+}
+
+.signup-field input {
+  width: 100%;
+  height: 48px;
+  padding: 0 16px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  outline: none;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+}
+
+.signup-field input::placeholder {
+  color: #999;
+}
+
+.signup-field input:focus {
+  border-color: #ff4f68;
+  box-shadow: 0 0 0 2px #ff4f6833;
+}
+
+.gender-field {
+  padding: 0;
+  border: 0;
+}
+
+.gender-field legend {
+  margin-bottom: 8px;
+  color: #e1e1e1;
+  font-size: 13px;
+}
+
+.gender-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  color: #c7c7c7;
+  font-size: 13px;
+}
+
+.gender-options label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.gender-options input {
+  accent-color: #ff654d;
+}
+
+.signup-password-input {
+  position: relative;
+}
+
+.signup-password-input input {
+  padding-right: 42px;
+}
+
+.signup-password-input button {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  transform: translateY(-50%);
+  border: 0;
+  background: transparent;
+  color: #bdbdbd;
+  cursor: pointer;
+}
+
+.terms-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #b8b8b8;
+  font-size: 13px;
+}
+
+.terms-checkbox input {
+  accent-color: #ff654d;
+}
+
+.terms-checkbox strong {
+  color: #e7e7e7;
+}
+
+.signup-submit {
+  height: 56px;
+  margin-top: 4px;
+  border: 0;
+  border-radius: 32px;
+  background: linear-gradient(100deg, #ff5b4d, #f715a8 53%, #a444d3);
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+
+@media (max-width: 640px) {
+  .signup-page {
+  padding: 20px;
+}
+
+  .signup-header {
+  align-items: flex-start;
+  gap: 14px;
+}
+
+  .signup-login-prompt {
+  text-align: right;
+  font-size: 13px;
+}
+
+  .signup-logo {
+    width: 68px;
+    height: 68px;
+  }
+
+  .signup-card {
+  margin-top: 42px;
+}
+
+  .signup-card h1 {
+  font-size: 32px;
+}
+
+  .signup-grid {
+  grid-template-columns: 1fr;
+}
+
+}
+
