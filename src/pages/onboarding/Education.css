@@ -5,40 +5,213 @@
   color: #f8f8f8;
   font-family: "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
-
-.education-header button { width: 88px; height: 88px; padding: 0; border: 0; background: transparent; cursor: pointer; }
-.education-header img { width: 100%; height: 100%; object-fit: contain; }
-.education-card { width: min(760px, 100%); margin: 34px auto 0; }
-.education-progress { height: 5px; margin-bottom: 24px; border-radius: 5px; background: #ddd; overflow: hidden; }
-.education-progress span { display: block; width: 66%; height: 100%; background: linear-gradient(90deg, #ff5b4d, #f715a8); }
-.education-card h1 { margin: 0; text-align: center; font-size: 32px; font-weight: 600; }
-.education-description { margin: 14px 0 28px; color: #adadad; text-align: center; font-size: 16px; line-height: 1.45; }
-.education-form, .saved-education { display: grid; gap: 14px; }
-.education-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-.education-field { display: grid; gap: 6px; color: #ddd; font-size: 15px; }
-.education-field input { height: 56px; padding: 0 18px; border: 1px solid #555; border-radius: 4px; outline: none; background: transparent; color: #fff; font: inherit; font-size: 15px; }
-.education-field input::placeholder { color: #999; }
-.education-checkbox { display: flex; align-items: center; gap: 6px; color: #bbb; font-size: 15px; }
-.education-checkbox input { accent-color: #ff654d; }
-.education-primary-button, .education-continue-button { height: 62px; border: 0; border-radius: 32px; color: #fff; cursor: pointer; font: inherit; font-size: 16px; font-weight: 600; }
-.education-primary-button { background: linear-gradient(100deg, #ff5b4d, #f715a8 53%, #a444d3); }
-.education-continue-button { background: #2b2b2b; }
-.education-skip-button { justify-self: center; border: 0; background: transparent; color: #ddd; cursor: pointer; font: inherit; font-size: 15px; }
-.saved-education-heading { display: flex; justify-content: space-between; color: #ddd; font-size: 15px; }
-.education-actions { display: flex; align-items: center; gap: 10px; }
-.education-actions button { display: grid; width: 24px; height: 24px; padding: 0; place-items: center; border: 0; background: transparent; cursor: pointer; }
-.education-actions img { width: 18px; height: 18px; }
-.saved-education-card { padding: 14px 16px; border: 1px solid #444; border-radius: 4px; color: #c5c5c5; font-size: 15px; line-height: 1.55; }
-.education-modal-backdrop { position: fixed; inset: 0; display: grid; z-index: 10; padding: 24px; place-items: center; background: #0008; backdrop-filter: blur(12px); }
-.education-modal { position: relative; width: min(604px, 100%); min-height: 320px; padding: 78px 42px 42px; border: 1px solid #4b4b4b; border-radius: 4px; background: #1b1b1b; text-align: center; }
-.education-modal-close { position: absolute; top: 14px; right: 14px; width: 42px; height: 42px; border: 0; background: #282828; color: #fff; cursor: pointer; font-size: 28px; }
-.education-modal h2 { margin: 0; font-size: 32px; font-weight: 600; }
-.education-modal p { margin: 12px 0 34px; color: #b0b0b0; font-size: 15px; line-height: 1.45; }
-.education-delete-button { width: min(420px, 100%); height: 62px; border: 0; border-radius: 32px; background: linear-gradient(100deg, #ff5b4d, #f715a8 53%, #a444d3); color: #fff; cursor: pointer; font: inherit; font-size: 16px; font-weight: 600; }
-
+.education-header button {
+  width: 88px;
+  height: 88px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.education-header img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.education-card {
+  width: min(760px, 100%);
+  margin: 34px auto 0;
+}
+.education-progress {
+  height: 5px;
+  margin-bottom: 24px;
+  border-radius: 5px;
+  background: #ddd;
+  overflow: hidden;
+}
+.education-progress span {
+  display: block;
+  width: 66%;
+  height: 100%;
+  background: linear-gradient(90deg, #ff5b4d, #f715a8);
+}
+.education-card h1 {
+  margin: 0;
+  text-align: center;
+  font-size: 32px;
+  font-weight: 600;
+}
+.education-description {
+  margin: 14px 0 28px;
+  color: #adadad;
+  text-align: center;
+  font-size: 16px;
+  line-height: 1.45;
+}
+.education-form, .saved-education {
+  display: grid;
+  gap: 14px;
+}
+.education-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.education-field {
+  display: grid;
+  gap: 6px;
+  color: #ddd;
+  font-size: 15px;
+}
+.education-field input {
+  height: 56px;
+  padding: 0 18px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  outline: none;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-size: 15px;
+}
+.education-field input::placeholder {
+  color: #999;
+}
+.education-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #bbb;
+  font-size: 15px;
+}
+.education-checkbox input {
+  accent-color: #ff654d;
+}
+.education-primary-button, .education-continue-button {
+  height: 62px;
+  border: 0;
+  border-radius: 32px;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+}
+.education-primary-button {
+  background: linear-gradient(100deg, #ff5b4d, #f715a8 53%, #a444d3);
+}
+.education-continue-button {
+  background: #2b2b2b;
+}
+.education-skip-button {
+  justify-self: center;
+  border: 0;
+  background: transparent;
+  color: #ddd;
+  cursor: pointer;
+  font: inherit;
+  font-size: 15px;
+}
+.saved-education-heading {
+  display: flex;
+  justify-content: space-between;
+  color: #ddd;
+  font-size: 15px;
+}
+.education-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.education-actions button {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.education-actions img {
+  width: 18px;
+  height: 18px;
+}
+.saved-education-card {
+  padding: 14px 16px;
+  border: 1px solid #444;
+  border-radius: 4px;
+  color: #c5c5c5;
+  font-size: 15px;
+  line-height: 1.55;
+}
+.education-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  z-index: 10;
+  padding: 24px;
+  place-items: center;
+  background: #0008;
+  backdrop-filter: blur(12px);
+}
+.education-modal {
+  position: relative;
+  width: min(604px, 100%);
+  min-height: 320px;
+  padding: 78px 42px 42px;
+  border: 1px solid #4b4b4b;
+  border-radius: 4px;
+  background: #1b1b1b;
+  text-align: center;
+}
+.education-modal-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 42px;
+  height: 42px;
+  border: 0;
+  background: #282828;
+  color: #fff;
+  cursor: pointer;
+  font-size: 28px;
+}
+.education-modal h2 {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 600;
+}
+.education-modal p {
+  margin: 12px 0 34px;
+  color: #b0b0b0;
+  font-size: 15px;
+  line-height: 1.45;
+}
+.education-delete-button {
+  width: min(420px, 100%);
+  height: 62px;
+  border: 0;
+  border-radius: 32px;
+  background: linear-gradient(100deg, #ff5b4d, #f715a8 53%, #a444d3);
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+}
 @media (max-width: 640px) {
-  .education-page { padding: 20px; }
-  .education-header button { width: 68px; height: 68px; }
-  .education-card { margin-top: 36px; }
-  .education-grid { grid-template-columns: 1fr; }
+  .education-page {
+  padding: 20px;
+}
+.education-header button {
+  width: 68px;
+  height: 68px;
+}
+.education-card {
+  margin-top: 36px;
+}
+.education-grid {
+  grid-template-columns: 1fr;
+}
 }

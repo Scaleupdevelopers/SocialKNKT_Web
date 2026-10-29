@@ -6,28 +6,23 @@
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
-
 * {
   box-sizing: border-box;
 }
-
 html,
 body,
 #root {
   min-height: 100vh;
   background: #1b1b1b;
 }
-
 html,
 body {
   overflow-x: hidden;
 }
-
 body {
   min-width: 320px;
   margin: 0;
 }
-
 button,
 input {
   font: inherit;

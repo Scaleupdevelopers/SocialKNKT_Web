@@ -5,7 +5,6 @@
   color: #f8f8f8;
   font-family: "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
-
 .work-header button {
   width: 88px;
   height: 88px;
@@ -14,18 +13,15 @@
   background: transparent;
   cursor: pointer;
 }
-
 .work-header img {
   width: 100%;
   height: 100%;
   object-fit: contain;
 }
-
 .work-card {
   width: min(760px, 100%);
   margin: 34px auto 0;
 }
-
 .progress-track {
   height: 5px;
   margin-bottom: 24px;
@@ -33,21 +29,18 @@
   background: #ddd;
   overflow: hidden;
 }
-
 .progress-track span {
   display: block;
   width: 33%;
   height: 100%;
   background: linear-gradient(90deg, #ff5b4d, #f715a8);
 }
-
 .work-card h1 {
   margin: 0;
   text-align: center;
   font-size: 32px;
   font-weight: 600;
 }
-
 .work-description {
   margin: 14px 0 28px;
   color: #adadad;
@@ -55,19 +48,16 @@
   font-size: 16px;
   line-height: 1.45;
 }
-
 .work-form,
 .saved-work {
   display: grid;
   gap: 14px;
 }
-
 .work-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
 }
-
 .work-field,
 .date-group {
   display: grid;
@@ -75,7 +65,6 @@
   color: #ddd;
   font-size: 15px;
 }
-
 .work-field input,
 .date-group input {
   height: 56px;
@@ -89,33 +78,27 @@
   font: inherit;
   font-size: 15px;
 }
-
 .work-field input::placeholder,
 .date-group input::placeholder {
   color: #999;
 }
-
 .date-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
 }
-
 .date-group {
   padding: 0;
   border: 0;
 }
-
 .date-group legend {
   padding: 0;
 }
-
 .date-group > div {
   display: grid;
   grid-template-columns: 1fr 1.25fr 1.25fr;
   gap: 6px;
 }
-
 .work-checkbox {
   display: flex;
   align-items: center;
@@ -123,11 +106,9 @@
   color: #bbb;
   font-size: 17px;
 }
-
 .work-checkbox input {
   accent-color: #ff654d;
 }
-
 .work-primary-button,
 .continue-button {
   height: 62px;
@@ -139,15 +120,12 @@
   font-size: 16px;
   font-weight: 600;
 }
-
 .work-primary-button {
   background: linear-gradient(100deg, #ff5b4d, #f715a8 53%, #a444d3);
 }
-
 .continue-button {
   background: #2b2b2b;
 }
-
 .skip-button {
   justify-self: center;
   border: 0;
@@ -157,7 +135,6 @@
   font: inherit;
   font-size: 15px;
 }
-
 .saved-work-heading {
   display: flex;
   align-items: center;
@@ -165,13 +142,11 @@
   color: #ddd;
   font-size: 13px;
 }
-
 .saved-work-actions {
   display: flex;
   align-items: center;
   gap: 10px;
 }
-
 .saved-work-actions button {
   display: grid;
   width: 24px;
@@ -182,12 +157,10 @@
   background: transparent;
   cursor: pointer;
 }
-
 .saved-work-actions img {
   width: 18px;
   height: 18px;
 }
-
 .saved-work-card {
   padding: 14px 16px;
   border: 1px solid #444;
@@ -196,7 +169,6 @@
   font-size: 13px;
   line-height: 1.55;
 }
-
 .delete-modal-backdrop {
   position: fixed;
   inset: 0;
@@ -207,7 +179,6 @@
   background: #0008;
   backdrop-filter: blur(12px);
 }
-
 .delete-modal {
   position: relative;
   width: min(604px, 100%);
@@ -218,7 +189,6 @@
   background: #1b1b1b;
   text-align: center;
 }
-
 .delete-modal-close {
   position: absolute;
   top: 14px;
@@ -232,20 +202,17 @@
   font-size: 28px;
   line-height: 1;
 }
-
 .delete-modal h2 {
   margin: 0;
   font-size: 36px;
   font-weight: 600;
 }
-
 .delete-modal p {
   margin: 12px 0 38px;
   color: #b0b0b0;
   font-size: 16px;
   line-height: 1.45;
 }
-
 .delete-confirm-button {
   width: min(420px, 100%);
   height: 62px;
@@ -258,24 +225,29 @@
   font-size: 18px;
   font-weight: 600;
 }
-
 @media (max-width: 640px) {
-  .work-page { padding: 20px; }
-  .work-header button { width: 68px; height: 68px; }
-  .work-card { margin-top: 36px; }
-  .work-grid,
-  .date-grid { grid-template-columns: 1fr; }
-
-  .delete-modal {
-    min-height: 320px;
-    padding: 78px 24px 30px;
-  }
-
-  .delete-modal h2 {
-    font-size: 30px;
-  }
-
-  .delete-modal p {
-    font-size: 14px;
-  }
+  .work-page {
+  padding: 20px;
+}
+.work-header button {
+  width: 68px;
+  height: 68px;
+}
+.work-card {
+  margin-top: 36px;
+}
+.work-grid,
+  .date-grid {
+  grid-template-columns: 1fr;
+}
+.delete-modal {
+  min-height: 320px;
+  padding: 78px 24px 30px;
+}
+.delete-modal h2 {
+  font-size: 30px;
+}
+.delete-modal p {
+  font-size: 14px;
+}
 }

@@ -97,7 +97,6 @@
 .password-field{
   position:relative
 }
-
 .password-field input{
   padding-right:66px
 }
@@ -112,7 +111,6 @@
   cursor:pointer;
   font-size:22px
 }
-
 .password-toggle svg {
   display: block;
   width: 21px;
@@ -123,7 +121,6 @@
   stroke-linejoin: round;
   stroke-width: 1.7;
 }
-
 .forgot-link{
   justify-self:end;
   margin:4px 0 12px;
@@ -188,7 +185,6 @@
   object-position:center;
   vertical-align:middle
 }
-
 .google-social-icon{
   object-fit:cover;
   object-position:left center
@@ -244,4 +240,3 @@
   font-size:13px
 }
 }
-
