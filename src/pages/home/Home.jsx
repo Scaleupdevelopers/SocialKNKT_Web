@@ -178,7 +178,7 @@ function PostCard({ post }) {
         className="post-image"
         src={post.image}
         alt={`${post.name}'s restaurant post`}
-        onError={(event) => { event.currentTarget.src = '/assets/home_food_post.png' }}
+        onError={(event) => { event.currentTarget.src = '/assets/home_food_post.jpg' }}
       />
       <div className="post-actions">
         <button type="button"><img src="/assets/logo_icons/like.svg" alt="" />{post.likes} Like</button>
@@ -202,7 +202,7 @@ function FlicksSection() {
             <img
               src={image}
               alt={`Restaurant flick ${index + 1}`}
-              onError={(event) => { event.currentTarget.src = '/assets/home_food_post.png' }}
+              onError={(event) => { event.currentTarget.src = '/assets/home_food_post.jpg' }}
             />
             <span>Flick {index + 1}</span>
           </button>
