@@ -121,6 +121,11 @@
 }
 .signup-password-input button {
   position: absolute;
+  display: grid;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  place-items: center;
   top: 50%;
   right: 14px;
   transform: translateY(-50%);
@@ -128,16 +133,17 @@
   background: transparent;
   color: #bdbdbd;
   cursor: pointer;
+  line-height: 0;
 }
 .signup-password-input button svg {
   display: block;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 1.7;
+  stroke-width: 1.8;
 }
 .terms-checkbox {
   display: flex;

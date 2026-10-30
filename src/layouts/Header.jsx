@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { AskShareModal } from '../components/modals/AskShareModal/AskShareModal'
 import './Header.css'
 
 const navigationItems = [
@@ -35,6 +36,8 @@ export function Header() {
   const navigate = useNavigate()
   const location = useLocation()
   const [openPanel, setOpenPanel] = useState(null)
+  const [isPostModalOpen, setIsPostModalOpen] = useState(false)
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false)
 
   const isActive = (path) => {
     return location.pathname === path
@@ -54,7 +57,7 @@ export function Header() {
       <button
         className="header-new-post"
         type="button"
-        onClick={() => navigate('/home')}
+        onClick={() => setIsPostModalOpen(true)}
       >
         <img src="/assets/logo_icons/addpost.svg" alt="" />
         <span>New Post</span>
@@ -98,16 +101,39 @@ export function Header() {
           onClick={() => setOpenPanel(openPanel === 'notifications' ? null : 'notifications')}
         />
 
-        <button className="header-account" type="button" aria-label="Open account menu">
+        <button className="header-account" type="button" aria-label="Open account menu" onClick={() => setIsAccountMenuOpen(!isAccountMenuOpen)}>
           <span className="header-account-avatar">
             <img src="/assets/logo_icons/profile_avatar.png" alt="" />
           </span>
           <img className="header-account-chevron" src="/assets/logo_icons/dropdownHeader.svg" alt="" />
         </button>
 
+        {isAccountMenuOpen && (
+          <div className="account-menu">
+            <div className="account-menu-profile">
+              <img src="/assets/logo_icons/profile_avatar.png" alt="Dianne Russell" />
+              <div>
+                <strong>Dianne Russell</strong>
+                <span>@Diane_R001</span>
+              </div>
+            </div>
+            <button className="account-view-profile" type="button" onClick={() => navigate('/profile')}>View Profile</button>
+            <button type="button">Privacy Policy</button>
+            <button type="button">Terms of Service</button>
+            <button className="account-logout" type="button" onClick={() => navigate('/')}>
+              <img src="/assets/logo_icons/logoutIcon.svg" alt="" />
+              <span>Log out</span>
+            </button>
+          </div>
+        )}
+
         {openPanel === 'notifications' && <NotificationsPanel />}
         {openPanel === 'connections' && <ConnectionsPanel />}
       </div>
+
+      {isPostModalOpen && (
+        <PostComposerModal onClose={() => setIsPostModalOpen(false)} />
+      )}
     </header>
   )
 }
@@ -121,6 +147,165 @@ function HeaderAction({ label, icon, count, onClick }) {
       </span>
     </button>
   )
+}
+
+function PostComposerModal({ onClose }) {
+  const [isAddMenuOpen, setIsAddMenuOpen] = useState(false)
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
+  const [profileType, setProfileType] = useState('Professional')
+  const [isEditorFocused, setIsEditorFocused] = useState(false)
+  const [postText, setPostText] = useState('')
+  const [isAskShareOpen, setIsAskShareOpen] = useState(false)
+  const modalRef = useRef(null)
+
+  const addOptions = [
+    ['post_card_img.svg', 'Add a photo'],
+    ['post_card_chat.svg', 'Create KNKT(n) Thread'],
+    ['post_card_video.svg', 'Add flicks'],
+    ['post_card_video.svg', 'Take a video'],
+    ['post_card_video_link.svg', 'Add Video Link'],
+    ['post_card_doc.svg', 'Add a document'],
+  ]
+
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (!modalRef.current?.contains(event.target)) {
+        return
+      }
+
+      if (event.target.closest('.post-profile-selector, .post-add-wrapper')) {
+        return
+      }
+
+      setIsProfileMenuOpen(false)
+      setIsAddMenuOpen(false)
+
+      if (!postText.trim()) {
+        setIsEditorFocused(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleOutsideClick)
+
+    return () => document.removeEventListener('mousedown', handleOutsideClick)
+  }, [postText])
+
+  return (
+    <div className="post-modal-backdrop" role="presentation" onClick={onClose}>
+      <section
+        ref={modalRef}
+        className="post-composer-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="post-modal-title"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="post-modal-heading">
+          <h2 id="post-modal-title">Post</h2>
+          <button type="button" aria-label="Close post modal" onClick={onClose}>
+            <img src="/assets/logo_icons/ci_close-big.svg" alt="" />
+          </button>
+        </div>
+
+        <div className="post-modal-user">
+          <img src="/assets/logo_icons/profile_avatar.png" alt="Dianne Russell" />
+          <div>
+            <h3>Dianne Russell</h3>
+            <div className="post-profile-selector">
+              <button
+                type="button"
+                onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+              >
+                <ProfileTypeIcon type={profileType} />
+                {profileType}
+                <img className="post-modal-caret" src="/assets/logo_icons/postadddropdown.svg" alt="" />
+              </button>
+
+              {isProfileMenuOpen && (
+                <div className="post-profile-menu">
+                  {['Both', 'Personal', 'Professional'].map((type) => (
+                    <button
+                      type="button"
+                      key={type}
+                      onClick={() => {
+                        setProfileType(type)
+                        setIsProfileMenuOpen(false)
+                      }}
+                    >
+                      <ProfileTypeIcon type={type} />
+                      {type}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="post-modal-editor">
+          <textarea
+            placeholder={isEditorFocused ? '' : 'What new with you?'}
+            aria-label="Post content"
+            value={postText}
+            onChange={(event) => setPostText(event.target.value)}
+            onFocus={() => setIsEditorFocused(true)}
+          />
+          {!isEditorFocused && <img src="/assets/logo_icons/editPost.svg" alt="" />}
+        </div>
+
+        <div className="post-modal-actions">
+          <div className="post-add-wrapper">
+            <button
+              className="post-modal-add"
+              type="button"
+              onClick={() => setIsAddMenuOpen(!isAddMenuOpen)}
+            >
+              Add
+              <img src="/assets/logo_icons/postadddropdown.svg" alt="" />
+            </button>
+
+            {isAddMenuOpen && (
+              <div className="post-add-menu">
+                {addOptions.map(([icon, label]) => (
+                  <button
+                    type="button"
+                    key={label}
+                    onClick={() => {
+                      if (label === 'Create KNKT(n) Thread') {
+                        setIsAddMenuOpen(false)
+                        setIsAskShareOpen(true)
+                      }
+                    }}
+                  >
+                    <img src={`/assets/logo_icons/${icon}`} alt="" />
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <button className="post-modal-submit" type="button">
+            <img src="/assets/logo_icons/Send.svg" alt="" />
+            Post
+          </button>
+        </div>
+      </section>
+      {isAskShareOpen && <AskShareModal onClose={() => setIsAskShareOpen(false)} />}
+    </div>
+  )
+}
+
+function ProfileTypeIcon({ type }) {
+  if (type === 'Both') {
+    return <img className="profile-type-icon" src="/assets/logo_icons/connection.svg" alt="" />
+  }
+
+  const icon = type === 'Personal'
+    ? '/assets/logo_icons/connection.svg'
+    : '/assets/logo_icons/Professional.svg'
+
+  return <img className="profile-type-icon" src={icon} alt="" />
 }
 
 const notificationItems = [

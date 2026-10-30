@@ -26,7 +26,13 @@ export function SignIn() {
         <h1 id="signin-title">Glad to see you, Again!</h1>
         <p className="signin-subtitle">Please Enter Your Details</p>
 
-        <form className="signin-form" onSubmit={(event) => event.preventDefault()}>
+        <form
+          className="signin-form"
+          onSubmit={(event) => {
+            event.preventDefault()
+            navigate('/home')
+          }}
+        >
           <label className="sr-only" htmlFor="email">Email Id</label>
           <input id="email" type="email" placeholder="Email Id" autoComplete="email" />
 
@@ -46,19 +52,11 @@ export function SignIn() {
               aria-label="Toggle password visibility"
               onClick={() => setShowPassword((visible) => !visible)}
             >
-              {showPassword ? (
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M3 3l18 18" />
-                  <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
-                  <path d="M9.9 4.2A10.8 10.8 0 0 1 12 4c5.2 0 8.6 4 9.8 6a11.8 11.8 0 0 1-3.2 3.5" />
-                  <path d="M6.2 6.2A11.8 11.8 0 0 0 2.2 10c1.2 2 4.6 6 9.8 6 1 0 2-.2 2.8-.5" />
-                </svg>
-              ) : (
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M2.2 12s3.4-6 9.8-6 9.8 6 9.8 6-3.4 6-9.8 6-9.8-6-9.8-6Z" />
-                  <circle cx="12" cy="12" r="2.5" />
-                </svg>
-              )}
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M2.2 12s3.4-6 9.8-6 9.8 6 9.8 6-3.4 6-9.8 6-9.8-6-9.8-6Z" />
+                <circle cx="12" cy="12" r="2.5" />
+                {showPassword && <path d="M3 3l18 18" />}
+              </svg>
             </button>
           </div>
 

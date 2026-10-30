@@ -1,8 +1,25 @@
+import { useEffect, useRef, useState } from 'react'
+import { AskShareModal } from '../../components/modals/AskShareModal/AskShareModal'
 import { Header } from '../../layouts/Header'
+import { FlicksSection } from './components/FlicksSection'
+import { PostCard } from './components/PostCard'
+import { ProfileCard } from './components/ProfileCard'
+import { SidebarMenu } from './components/SidebarMenu'
 import './Home.css'
 
 const profileIcon = '/assets/logo_icons/profile_avatar.png'
 const professionalIcon = '/assets/logo_icons/Professional.svg'
+const connectionIcon = '/assets/logo_icons/connection.svg'
+const dropdownIcon = '/assets/logo_icons/postadddropdown.svg'
+
+const addOptions = [
+  ['post_card_img.svg', 'Add a photo'],
+  ['post_card_chat.svg', 'Create KNKT(n) Thread'],
+  ['post_card_video.svg', 'Add flicks'],
+  ['post_card_video.svg', 'Take a video'],
+  ['post_card_video_link.svg', 'Add Video Link'],
+  ['post_card_doc.svg', 'Add a document'],
+]
 
 const restaurantImages = [
   '/assets/home/restaurant-01.jpg',
@@ -82,157 +99,148 @@ export function Home() {
               />
             ))}
           </div>
-          <FlicksSection />
+          <FlicksSection images={restaurantImages} />
         </section>
 
-        <aside className="home-right-column">
-          <WhoToFollow />
-        </aside>
       </div>
     </main>
   )
 }
 
-function ProfileCard() {
-  return (
-    <section className="profile-card">
-      <div className="profile-cover" />
-      <div className="profile-avatar">
-        <img src={profileIcon} alt="Dianne Russell" />
-      </div>
-      <div className="profile-card-content">
-        <h1>Dianne Russell</h1>
-        <p className="profile-role">UI UX Designer</p>
-        <p className="profile-bio">
-          Design, Art, photography, Dance, Creativity, Nature, Lifestyle
-          <span aria-hidden="true"> 💗🦋🌺</span>
-        </p>
-      </div>
-    </section>
-  )
-}
-
-function SidebarMenu() {
-  const items = [
-    ['saveIcon.svg', 'Saved Flicks'],
-    ['connection.svg', 'Connections'],
-    ['setting.svg', 'Settings'],
-  ]
-
-  return (
-    <nav className="sidebar-menu" aria-label="Profile menu">
-      {items.map(([icon, label]) => (
-        <button type="button" key={label}>
-          <img src={`/assets/logo_icons/${icon}`} alt="" />
-          <span>{label}</span>
-        </button>
-      ))}
-    </nav>
-  )
-}
-
 function CreatePost() {
+  const [profileType, setProfileType] = useState('Professional')
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
+  const [isAddMenuOpen, setIsAddMenuOpen] = useState(false)
+  const [isAskShareOpen, setIsAskShareOpen] = useState(false)
+  const [isEditorFocused, setIsEditorFocused] = useState(false)
+  const [postText, setPostText] = useState('')
+  const editorRef = useRef(null)
+  const createPostRef = useRef(null)
+
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (createPostRef.current?.contains(event.target)) {
+        return
+      }
+
+      setIsProfileMenuOpen(false)
+      setIsAddMenuOpen(false)
+
+      if (!postText.trim()) {
+        setIsEditorFocused(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleOutsideClick)
+
+    return () => document.removeEventListener('mousedown', handleOutsideClick)
+  }, [postText])
+
   return (
-    <section className="create-post">
+    <section ref={createPostRef} className="create-post">
       <div className="feed-user-row">
         <img src={profileIcon} alt="Dianne Russell" />
         <div>
           <h2>Dianne Russell</h2>
-          <p>
-            <img className="professional-icon" src={professionalIcon} alt="" />
-            Professional <span className="orange-caret"><img className="post-add-dropdown" src="/assets/logo_icons/postadddropdown.svg" alt="" /></span>
-          </p>
+          <ProfileTypeSelector
+            value={profileType}
+            isOpen={isProfileMenuOpen}
+            onToggle={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+            onSelect={(type) => {
+              setProfileType(type)
+              setIsProfileMenuOpen(false)
+            }}
+          />
         </div>
       </div>
       <div className="post-editor">
-        What new with you?
-        <img src="/assets/logo_icons/editPost.svg" alt="" />
+        <textarea
+          ref={editorRef}
+          placeholder={isEditorFocused ? '' : 'What new with you?'}
+          aria-label="Post content"
+          value={postText}
+          onChange={(event) => setPostText(event.target.value)}
+          onFocus={() => setIsEditorFocused(true)}
+        />
+        {!isEditorFocused && (
+          <button
+            className="post-editor-edit"
+            type="button"
+            aria-label="Edit post"
+            onClick={() => {
+              setIsEditorFocused(true)
+              editorRef.current?.focus()
+            }}
+          >
+            <img src="/assets/logo_icons/editPost.svg" alt="" />
+          </button>
+        )}
       </div>
       <div className="create-post-actions">
-        <button type="button">
-          Add
-          <img className="post-add-dropdown" src="/assets/logo_icons/postadddropdown.svg" alt="" />
-        </button>
+        <div className="home-add-wrapper">
+          <button
+            type="button"
+            onClick={() => setIsAddMenuOpen(!isAddMenuOpen)}
+          >
+            Add
+            <img className="post-add-dropdown" src={dropdownIcon} alt="" />
+          </button>
+          {isAddMenuOpen && (
+            <AddContentMenu
+              onCreateThread={() => {
+                setIsAddMenuOpen(false)
+                setIsAskShareOpen(true)
+              }}
+            />
+          )}
+        </div>
         <button className="post-button" type="button">
           <img src="/assets/logo_icons/Send.svg" alt="" />
           Post
         </button>
       </div>
+      {isAskShareOpen && <AskShareModal onClose={() => setIsAskShareOpen(false)} />}
     </section>
   )
 }
 
-function PostCard({ post }) {
+function ProfileTypeSelector({ value, isOpen, onToggle, onSelect }) {
   return (
-    <article className="feed-post">
-      <div className="post-author-row">
-        <img src={profileIcon} alt="Robert Jacob" />
-        <div>
-          <h2>{post.name}</h2>
-          <p>{post.hours} · {post.role}</p>
+    <div className="home-profile-selector">
+      <button type="button" onClick={onToggle}>
+        <img src={value === 'Professional' ? professionalIcon : connectionIcon} alt="" />
+        {value}
+        <img className="post-add-dropdown" src={dropdownIcon} alt="" />
+      </button>
+      {isOpen && (
+        <div className="home-profile-menu">
+          {['Both', 'Personal', 'Professional'].map((type) => (
+            <button type="button" key={type} onClick={() => onSelect(type)}>
+              <img src={type === 'Professional' ? professionalIcon : connectionIcon} alt="" />
+              {type}
+            </button>
+          ))}
         </div>
-        <button className="more-button" type="button" aria-label="More options">⋮</button>
-      </div>
-      <p className="post-copy">{post.content} <span>More</span></p>
-      <img
-        className="post-image"
-        src={post.image}
-        alt={`${post.name}'s restaurant post`}
-        onError={(event) => { event.currentTarget.src = '/assets/home_food_post.jpg' }}
-      />
-      <div className="post-actions">
-        <button type="button"><img src="/assets/logo_icons/like.svg" alt="" />{post.likes} Like</button>
-        <button type="button"><img src="/assets/logo_icons/comment.svg" alt="" />{post.comments} Comments</button>
-        <button type="button"><img src="/assets/logo_icons/report.svg" alt="" />Report</button>
-      </div>
-    </article>
+      )}
+    </div>
   )
 }
 
-function FlicksSection() {
+function AddContentMenu({ onCreateThread }) {
   return (
-    <section className="flicks-section">
-      <div className="section-heading">
-        <h2>Flicks</h2>
-        <button type="button">See All</button>
-      </div>
-      <div className="flicks-grid">
-        {restaurantImages.map((image, index) => (
-          <button className="flick-card" type="button" key={image}>
-            <img
-              src={image}
-              alt={`Restaurant flick ${index + 1}`}
-              onError={(event) => { event.currentTarget.src = '/assets/home_food_post.jpg' }}
-            />
-            <span>Flick {index + 1}</span>
-          </button>
-        ))}
-      </div>
-    </section>
-  )
-}
-
-function WhoToFollow() {
-  const users = [
-    ['Steve Jobs', 'CEO of Apple'],
-    ['Ryan Roslansky', 'CEO of Linkedin'],
-    ['Dylan Field', 'CEO of Figma'],
-  ]
-
-  return (
-    <section className="who-to-follow">
-      <h2>Who to follow</h2>
-      {users.map(([name, role]) => (
-        <div className="suggested-user" key={name}>
-          <img src={profileIcon} alt={name} />
-          <div>
-            <h3>{name}</h3>
-            <p>{role}</p>
-          </div>
-          <button type="button">Connect</button>
-        </div>
+    <div className="home-add-menu">
+      {addOptions.map(([icon, label]) => (
+        <button
+          type="button"
+          key={label}
+          onClick={label === 'Create KNKT(n) Thread' ? onCreateThread : undefined}
+        >
+          <img src={`/assets/logo_icons/${icon}`} alt="" />
+          {label}
+        </button>
       ))}
-      <button className="see-all-button" type="button">See All</button>
-    </section>
+    </div>
   )
 }
+
+

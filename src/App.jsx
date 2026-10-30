@@ -15,6 +15,7 @@ import { Location } from './pages/onboarding/Location'
 import { Pronunciation } from './pages/onboarding/Pronunciation'
 import { AddMedia } from './pages/onboarding/AddMedia'
 import { Home } from './pages/home/Home'
+import { Settings } from './pages/settings/Settings'
 
 import './styles/globals.css'
 
@@ -37,6 +38,7 @@ function App() {
         <Route path="/pronunciation" element={<Pronunciation />} />
         <Route path="/add-media" element={<AddMedia />} />
         <Route path="/home" element={<Home />} />
+        <Route path="/settings" element={<Settings />} />
       </Routes>
     </BrowserRouter>
   )
