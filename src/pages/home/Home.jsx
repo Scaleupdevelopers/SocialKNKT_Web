@@ -107,7 +107,7 @@ export function Home() {
   )
 }
 
-function CreatePost() {
+export function CreatePost() {
   const [profileType, setProfileType] = useState('Professional')
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false)
