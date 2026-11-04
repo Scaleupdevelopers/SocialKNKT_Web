@@ -1,10 +1,39 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { toast } from 'react-toastify'
+import { sendForgotPasswordOtp } from '../../action/action'
 import './ForgotPassword.css'
 
 export function ForgotPassword() {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [emailError, setEmailError] = useState('')
+
+  const handleSubmit = async (event) => {
+    event.preventDefault()
+
+    if (!email.trim()) {
+      setEmailError('Email is required')
+      return
+    }
+
+    setEmailError('')
+    setIsSubmitting(true)
+
+    try {
+      const response = await sendForgotPasswordOtp({ email })
+
+      if (response.status === true) {
+        toast.success(response.message || 'OTP sent successfully.')
+        navigate('/verify-code', { state: { email } })
+      }
+    } catch (error) {
+      toast.error(error.message || 'Unable to send OTP.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   return (
     <main className="forgot-page">
@@ -29,10 +58,8 @@ export function ForgotPassword() {
 
         <form
           className="forgot-form"
-          onSubmit={(event) => {
-            event.preventDefault()
-            navigate('/verify-code', { state: { email } })
-          }}
+          onSubmit={handleSubmit}
+          noValidate
         >
           <label className="sr-only" htmlFor="forgot-email">Email Id</label>
           <input
@@ -40,10 +67,16 @@ export function ForgotPassword() {
             type="email"
             placeholder="Email Id"
             value={email}
-            onChange={(event) => setEmail(event.target.value)}
+            onChange={(event) => {
+              setEmail(event.target.value)
+              setEmailError('')
+            }}
             required
           />
-          <button className="submit-button" type="submit">Submit</button>
+          {emailError && <p className="forgot-field-error">{emailError}</p>}
+          <button className="submit-button" type="submit" disabled={isSubmitting}>
+            {isSubmitting ? 'Sending...' : 'Submit'}
+          </button>
         </form>
 
         <button className="back-button" type="button" onClick={() => navigate('/')}>

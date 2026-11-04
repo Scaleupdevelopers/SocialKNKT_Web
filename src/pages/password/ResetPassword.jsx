@@ -1,17 +1,70 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { toast } from 'react-toastify'
+import { changePassword } from '../../action/action'
 import './PasswordPages.css'
 
 function ResetPassword() {
   const navigate = useNavigate()
+  const { state } = useLocation()
+  const email = state?.email || ''
+  const resetToken = state?.verificationToken || ''
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState({})
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault()
-    navigate('/password-success')
+
+    const nextErrors = {}
+
+    if (!password.trim()) {
+      nextErrors.password = 'Password is required'
+    }
+
+    if (!confirmPassword.trim()) {
+      nextErrors.confirmPassword = 'Confirm Password is required'
+    }
+
+    if (Object.keys(nextErrors).length > 0) {
+      setFieldErrors(nextErrors)
+      return
+    }
+
+    setFieldErrors({})
+
+    if (!email || !resetToken) {
+      toast.error('Reset session has expired. Please request a new OTP.')
+      navigate('/forgot-password', { replace: true })
+      return
+    }
+
+    if (password !== confirmPassword) {
+      toast.error('Passwords do not match.')
+      return
+    }
+
+    setIsSubmitting(true)
+
+    try {
+      const response = await changePassword({
+        email,
+        password,
+        token: resetToken,
+      })
+
+      if (response.status === true) {
+        toast.success(response.message || 'Password changed successfully.')
+        navigate('/password-success')
+      }
+    } catch (error) {
+      toast.error(error.message || 'Unable to change password.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -27,24 +80,34 @@ function ResetPassword() {
         <h1>Create New Password</h1>
         <p>Go ahead and create a unique password</p>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} noValidate>
           <PasswordInput
             id="new-password"
             placeholder="New Password"
             value={password}
             showPassword={showPassword}
-            onChange={setPassword}
+            onChange={(value) => {
+              setPassword(value)
+              setFieldErrors((errors) => ({ ...errors, password: '' }))
+            }}
             onToggle={() => setShowPassword((visible) => !visible)}
           />
+          {fieldErrors.password && <p className="password-field-error">{fieldErrors.password}</p>}
           <PasswordInput
             id="confirm-password"
             placeholder="Confirm New Password"
             value={confirmPassword}
             showPassword={showConfirmPassword}
-            onChange={setConfirmPassword}
+            onChange={(value) => {
+              setConfirmPassword(value)
+              setFieldErrors((errors) => ({ ...errors, confirmPassword: '' }))
+            }}
             onToggle={() => setShowConfirmPassword((visible) => !visible)}
           />
-          <button className="password-submit" type="submit">Set Password</button>
+          {fieldErrors.confirmPassword && <p className="password-field-error">{fieldErrors.confirmPassword}</p>}
+          <button className="password-submit" type="submit" disabled={isSubmitting}>
+            {isSubmitting ? 'Saving...' : 'Set Password'}
+          </button>
         </form>
       </section>
     </main>

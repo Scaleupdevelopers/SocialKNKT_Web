@@ -1,76 +1,39 @@
-import axios from 'axios';
-import Cookies from 'js-cookie';
-import config from './config';
+import config from './config'
 
-const serverPath = config.API_URL;
+const serverPath = config.API_URL
+export const AUTH_STORAGE_KEY = 'socialknkt_auth'
 
-export const request = async (path, data, method, isRetry = false) => {
-    try {
-        let loginData = Cookies.get('Inventory_Management') ? JSON.parse(Cookies.get('Inventory_Management')) : null;
-        const accessToken = loginData?.token;
-        const axiosOptions = {
-            method,
-            url: `${serverPath}/${path}`,
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: accessToken ? `Bearer ${accessToken}` : "",
-            },
-        };
+export const request = async (path, data, method) => {
+  const loginData = JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) || 'null')
+  const headers = { 'Content-Type': 'application/json' }
 
-        if (method === "GET") {
-            axiosOptions.params = data;
-        } else {
-            axiosOptions.data = data;
-        }
+  if (loginData?.token) {
+    headers.Authorization = `Bearer ${loginData.token}`
+  }
 
-        const response = await axios(axiosOptions);
-        return response.data;
+  const requestOptions = { method, headers }
 
-    } catch (error) {
-        if (
-            !isRetry &&
-            error.response &&
-            (error.response.status === 401 || error.response.status === 403)
-        ) {
-            const loginData = Cookies.get('Inventory_Management') ? JSON.parse(Cookies.get('Inventory_Management')) : null;
-            const refreshToken = loginData?.refreshToken;
+  if (method === 'GET') {
+    const query = new URLSearchParams(data || {}).toString()
+    path = query ? `${path}?${query}` : path
+  } else if (data !== undefined) {
+    requestOptions.body = JSON.stringify(data)
+  }
 
-            if (!refreshToken) {
-                Cookies.remove('Inventory_Token');
-                Cookies.remove('Inventory_Management');
-                window.location.href = "/login";
-                return;
-            }
+  const response = await fetch(`${serverPath}/${path}`, requestOptions)
 
-            try {
-                const refreshRes = await axios.post(`${serverPath}/auth/refreshToken`, { refreshToken });
-                if (refreshRes.data.success) {
-                    const newLoginData = {
-                        ...loginData,
-                        token: refreshRes.data.data.token,
-                        refreshToken: loginData.refreshToken, 
-                    };
-                    Cookies.set('Inventory_Management', JSON.stringify(newLoginData));
+  const responseData = await response.json().catch(() => ({}))
 
-                    return request(path, data, method, true);
-                } else {
-                    throw new Error("Refresh token failed");
-                }
-            } catch {
-                Cookies.remove('Inventory_Token');
-                Cookies.remove('Inventory_Management');
-                window.location.href = "/login";
-                return;
-            }
-        }
+  if (!response.ok || responseData.status === false) {
+    const message = responseData.message || 'Something went wrong.'
+    throw new Error(message)
+  }
 
-        throw error;
-    }
-};
+  return responseData
+}
 
-
-export const postRequest = async (path, data) => await request(path, data, 'POST');
-export const putRequest = async (path, data) => await request(path, data, 'PUT');
-export const PatchRequest = async (path, data) => await request(path, data, 'PATCH');
-export const deleteRequest = async (path, data) => await request(path, data, 'DELETE');
-export const getRequest = async (path, data) => await request(path, data, 'GET');
+export const postRequest = async (path, data) => request(path, data, 'POST')
+export const putRequest = async (path, data) => request(path, data, 'PUT')
+export const PatchRequest = async (path, data) => request(path, data, 'PATCH')
+export const deleteRequest = async (path, data) => request(path, data, 'DELETE')
+export const getRequest = async (path, data) => request(path, data, 'GET')

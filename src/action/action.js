@@ -1,26 +1,24 @@
-import {
-  getRequest,
-  postRequest,
-} from "../utils/helper";
+import { postRequest } from '../utils/helper'
 
 //------------------|| USER AUTH ||------------------//
 
 export const login = async (data) => {
-  const res = await postRequest("auth/login", data);
-  return res;
-};
+  return postRequest('login', data)
+}
 
-export const refreshToken = async (data) => {
-  const res = await postRequest("auth/refreshToken", data);
-  return res;
-};
+export const sendForgotPasswordOtp = async (data) => {
+  return postRequest('forget-password/send-otp', data)
+}
 
-export const logout = async (data) => {
-  const res = await postRequest("auth/logout", data);
-  return res;
-};
+export const verifyOtp = async (data) => {
+  return postRequest('user/verify-otp', data)
+}
 
-export const userList = async (data) => {
-  const res = await getRequest("userList", data);
-  return res;
-};
+export const resendOtp = async (data) => {
+  return postRequest('user/resend-otp', data)
+}
+
+export const changePassword = async (data) => {
+  return postRequest('forget-password/change-password', data)
+}
+

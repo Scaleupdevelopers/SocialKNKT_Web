@@ -17,14 +17,20 @@ import { AddMedia } from './pages/onboarding/AddMedia'
 import { Home } from './pages/home/Home'
 import { Settings } from './pages/settings/Settings'
 import { Profile } from './pages/profile/Profile'
+import { AppToast } from './components/common/AppToast'
+import { ProtectedRoute } from './components/common/ProtectedRoute'
+import { PublicOnlyRoute } from './components/common/PublicOnlyRoute'
 
 import './styles/globals.css'
 
 function App() {
   return (
     <BrowserRouter>
+      <AppToast />
       <Routes>
-        <Route path="/" element={<SignIn />} />
+        <Route element={<PublicOnlyRoute />}>
+          <Route path="/" element={<SignIn />} />
+        </Route>
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/verify-code" element={<VerifyCode />} />
         <Route path="/reset-password" element={<ResetPassword />} />
@@ -33,15 +39,18 @@ function App() {
         <Route path="/sign-up" element={<SignUp />} />
         <Route path="/verify-account" element={<VerifyAccount />} />
         <Route path="/account-created" element={<AccountCreated />} />
-        <Route path="/work-experience" element={<WorkExperience />} />
-        <Route path="/education" element={<Education />} />
-        <Route path="/location" element={<Location />} />
-        <Route path="/pronunciation" element={<Pronunciation />} />
-        <Route path="/add-media" element={<AddMedia />} />
-        <Route path="/home" element={<Home />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="/edit-profile" element={<Settings editProfile />} />
-        <Route path="/profile" element={<Profile />} />
+
+        <Route element={<ProtectedRoute />}>
+          <Route path="/work-experience" element={<WorkExperience />} />
+          <Route path="/education" element={<Education />} />
+          <Route path="/location" element={<Location />} />
+          <Route path="/pronunciation" element={<Pronunciation />} />
+          <Route path="/add-media" element={<AddMedia />} />
+          <Route path="/home" element={<Home />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/edit-profile" element={<Settings editProfile />} />
+          <Route path="/profile" element={<Profile />} />
+        </Route>
       </Routes>
     </BrowserRouter>
   )

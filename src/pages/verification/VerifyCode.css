@@ -72,6 +72,13 @@
   font-size: 18px;
   font-weight: 600;
 }
+
+.verify-field-error {
+  margin: 12px 0 0;
+  color: #ff6257;
+  font-size: 13px;
+  text-align: center;
+}
 .verify-timer {
   margin: 22px 0 0;
   color: #fff;
@@ -90,6 +97,11 @@
   cursor: pointer;
   font: inherit;
   font-weight: 600;
+}
+
+.resend-text button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 @media (max-width: 640px) {
   .verify-page {

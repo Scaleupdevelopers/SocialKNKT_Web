@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { AskShareModal } from '../components/modals/AskShareModal/AskShareModal'
+import { AUTH_STORAGE_KEY } from '../utils/helper'
 import './Header.css'
 
 const navigationItems = [
@@ -38,6 +39,12 @@ export function Header() {
   const [openPanel, setOpenPanel] = useState(null)
   const [isPostModalOpen, setIsPostModalOpen] = useState(false)
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false)
+
+  const logout = () => {
+    localStorage.removeItem(AUTH_STORAGE_KEY)
+    setIsAccountMenuOpen(false)
+    window.location.replace('/')
+  }
 
   const isActive = (path) => {
     return location.pathname === path
@@ -120,7 +127,11 @@ export function Header() {
             <button className="account-view-profile" type="button" onClick={() => navigate('/profile')}>View Profile</button>
             <button type="button">Privacy Policy</button>
             <button type="button">Terms of Service</button>
-            <button className="account-logout" type="button" onClick={() => navigate('/')}>
+            <button
+              className="account-logout"
+              type="button"
+              onClick={logout}
+            >
               <img src="/assets/logo_icons/logoutIcon.svg" alt="" />
               <span>Log out</span>
             </button>
