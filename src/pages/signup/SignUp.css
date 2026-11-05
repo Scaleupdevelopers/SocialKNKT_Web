@@ -89,6 +89,77 @@
   border-color: #ff4f68;
   box-shadow: 0 0 0 2px #ff4f6833;
 }
+
+.signup-field.has-error input,
+.signup-field.has-error .PhoneInput {
+  border-color: #ff4f4f;
+}
+
+.signup-field-error {
+  color: #ff4f4f;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.terms-checkbox.has-error {
+  color: #ff4f4f;
+}
+
+.terms-checkbox.has-error input {
+  outline: 1px solid #ff4f4f;
+  outline-offset: 2px;
+}
+
+.signup-field .PhoneInput {
+  display: flex;
+  width: 100%;
+  height: 52px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  background: transparent;
+  color: #fff;
+}
+
+.signup-field .PhoneInput:focus-within {
+  border-color: #ff4f68;
+  box-shadow: 0 0 0 2px #ff4f6833;
+}
+
+.signup-field .PhoneInputCountry {
+  margin: 0 8px 0 14px;
+}
+
+.signup-field .PhoneInputCountrySelect {
+  color: #fff;
+  background: #202020;
+}
+
+.signup-field .PhoneInputInput {
+  min-width: 0;
+  height: 100%;
+  padding: 0 16px 0 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-size: 15px;
+}
+
+.signup-field .PhoneInputInput::placeholder {
+  color: #999;
+}
+
+.signup-field input:-webkit-autofill,
+.signup-field input:-webkit-autofill:hover,
+.signup-field input:-webkit-autofill:focus,
+.signup-field input:-webkit-autofill:active {
+  -webkit-text-fill-color: #ffffff;
+  -webkit-box-shadow: 0 0 0 1000px #202020 inset;
+  box-shadow: 0 0 0 1000px #202020 inset;
+  caret-color: #ffffff;
+  transition: background-color 9999s ease-in-out 0s;
+}
 .gender-field {
   padding: 0;
   border: 0;

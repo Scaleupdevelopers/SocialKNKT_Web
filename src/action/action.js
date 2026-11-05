@@ -6,6 +6,18 @@ export const login = async (data) => {
   return postRequest('login', data)
 }
 
+export const signUp = async (data) => {
+  return postRequest('user/signup', data)
+}
+
+export const checkUser = async (data) => {
+  return postRequest('check-user', data)
+}
+
+export const completeProfile = async (data) => {
+  return postRequest('user/complete-profile', data)
+}
+
 export const sendForgotPasswordOtp = async (data) => {
   return postRequest('forget-password/send-otp', data)
 }
