@@ -1,4 +1,4 @@
-import { postRequest } from '../utils/helper'
+import { getRequest, postRequest } from '../utils/helper'
 
 //------------------|| USER AUTH ||------------------//
 
@@ -16,6 +16,22 @@ export const checkUser = async (data) => {
 
 export const completeProfile = async (data) => {
   return postRequest('user/complete-profile', data)
+}
+
+export const getCountries = async () => {
+  return getRequest('user/get-country')
+}
+
+export const getStates = async (data) => {
+  return postRequest('user/get-states', data)
+}
+
+export const getCities = async (data) => {
+  return postRequest('user/get-cities', data)
+}
+
+export const getProfileMedia = async (page = 0) => {
+  return getRequest('user/profile/media', { page })
 }
 
 export const sendForgotPasswordOtp = async (data) => {

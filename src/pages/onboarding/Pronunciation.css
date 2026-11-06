@@ -59,16 +59,36 @@
   color: #f1f1f1;
   font-size: 15px;
 }
-.pronunciation-field select {
+.pronunciation-field input {
+  appearance: none;
+  -webkit-appearance: none;
   height: 56px;
   padding: 0 18px;
   border: 1px solid #555;
   border-radius: 5px;
   outline: none;
-  background: #1b1b1b;
+  background: #1b1b1b !important;
   color: #a9a9a9;
+  -webkit-text-fill-color: #a9a9a9;
   font: inherit;
-  appearance: auto;
+}
+.pronunciation-field input:-webkit-autofill,
+.pronunciation-field input:-webkit-autofill:hover,
+.pronunciation-field input:-webkit-autofill:focus,
+.pronunciation-field input:-webkit-autofill:active {
+  -webkit-text-fill-color: #a9a9a9;
+  -webkit-box-shadow: 0 0 0 1000px #1b1b1b inset;
+  box-shadow: 0 0 0 1000px #1b1b1b inset;
+  caret-color: #a9a9a9;
+  transition: background-color 9999s ease-in-out 0s;
+}
+.pronunciation-field input::placeholder {
+  color: #a9a9a9;
+  opacity: 1;
+}
+.pronunciation-field input:focus {
+  border-color: #777;
+  box-shadow: 0 0 0 1px #777;
 }
 .record-box {
   position: relative;
@@ -92,6 +112,18 @@
   bottom: 22px;
   color: #ff5b7c;
   font-size: 14px;
+}
+.recorded-name {
+  position: absolute;
+  bottom: 20px;
+  max-width: 90%;
+  margin: 0;
+  overflow: hidden;
+  color: #b5b5b5;
+  font-size: 15px;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .recording {
   border-color: #ff3ba0;
@@ -141,7 +173,7 @@
 .pronunciation-field {
   font-size: 16px;
 }
-.pronunciation-field select {
+.pronunciation-field input {
   height: 58px;
   padding: 0 18px;
 }

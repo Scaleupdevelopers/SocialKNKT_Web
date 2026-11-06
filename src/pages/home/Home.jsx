@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { AskShareModal } from '../../components/modals/AskShareModal/AskShareModal'
+import { getProfileMedia } from '../../action/action'
+import { toast } from 'react-toastify'
 import { Header } from '../../layouts/Header'
 import { FlicksSection } from './components/FlicksSection'
 import { PostCard } from './components/PostCard'
@@ -12,15 +14,6 @@ const professionalIcon = '/assets/logo_icons/Professional.svg'
 const connectionIcon = '/assets/logo_icons/connection.svg'
 const dropdownIcon = '/assets/logo_icons/postadddropdown.svg'
 
-const addOptions = [
-  ['post_card_img.svg', 'Add a photo'],
-  ['post_card_chat.svg', 'Create KNKT(n) Thread'],
-  ['post_card_video.svg', 'Add flicks'],
-  ['post_card_video.svg', 'Take a video'],
-  ['post_card_video_link.svg', 'Add Video Link'],
-  ['post_card_doc.svg', 'Add a document'],
-]
-
 const restaurantImages = [
   '/assets/home/restaurant-01.jpg',
   '/assets/home/restaurant-02.jpg',
@@ -30,55 +23,34 @@ const restaurantImages = [
   '/assets/home/restaurant-06.jpg',
 ]
 
-const feedPosts = [
-  {
-    name: 'Robert Jacob',
-    role: 'Food Photographer',
-    hours: '16 h',
-    content: 'A warm table, good company, and a plate worth remembering. Some places just make every moment feel special.',
-    image: restaurantImages[0],
-    likes: 42,
-    comments: 18,
-  },
-  {
-    name: 'Maya Chen',
-    role: 'Creative Director',
-    hours: '12 h',
-    content: 'Found a beautiful little corner filled with natural light and thoughtful details. Inspiration is everywhere.',
-    image: restaurantImages[1],
-    likes: 36,
-    comments: 11,
-  },
-  {
-    name: 'Ethan Brooks',
-    role: 'Travel Creator',
-    hours: '8 h',
-    content: 'Weekend plans: discover a new neighbourhood, try something delicious, and take the long way home.',
-    image: restaurantImages[2],
-    likes: 58,
-    comments: 24,
-  },
-  {
-    name: 'Sofia Martinez',
-    role: 'Lifestyle Designer',
-    hours: '5 h',
-    content: 'The best memories are often made around a table. Sharing a few frames from today’s favourite spot.',
-    image: restaurantImages[3],
-    likes: 29,
-    comments: 9,
-  },
-  {
-    name: 'Noah Williams',
-    role: 'Community Builder',
-    hours: '2 h',
-    content: 'A little calm, a little colour, and a lot of character. This place deserves a spot on your list.',
-    image: restaurantImages[4],
-    likes: 47,
-    comments: 16,
-  },
+const addOptions = [
+  ['post_card_img.svg', 'Add a photo'],
+  ['post_card_chat.svg', 'Create KNKT(n) Thread'],
+  ['post_card_video.svg', 'Add flicks'],
+  ['post_card_video.svg', 'Take a video'],
+  ['post_card_video_link.svg', 'Add Video Link'],
+  ['post_card_doc.svg', 'Add a document'],
 ]
 
 export function Home() {
+  const [feedPosts, setFeedPosts] = useState([])
+  const [isLoadingFeed, setIsLoadingFeed] = useState(true)
+
+  useEffect(() => {
+    const loadProfileMedia = async () => {
+      try {
+        const response = await getProfileMedia(0)
+        setFeedPosts(response.data || [])
+      } catch (error) {
+        toast.error(error.message || 'Unable to load posts.')
+      } finally {
+        setIsLoadingFeed(false)
+      }
+    }
+
+    loadProfileMedia()
+  }, [])
+
   return (
     <main className="home-page">
       <Header />
@@ -92,13 +64,15 @@ export function Home() {
         <section className="home-feed" aria-label="Home feed">
           <CreatePost />
           <div className="feed-posts">
-            {feedPosts.map((post) => (
-              <PostCard
-                key={`${post.name}-${post.hours}`}
-                post={post}
-              />
+            {isLoadingFeed && <p className="feed-status">Loading posts...</p>}
+            {!isLoadingFeed && feedPosts.length === 0 && (
+              <p className="feed-status">No posts available yet.</p>
+            )}
+            {!isLoadingFeed && feedPosts.map((post) => (
+              <PostCard key={post._id} post={post} />
             ))}
           </div>
+
           <FlicksSection images={restaurantImages} />
         </section>
 

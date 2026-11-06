@@ -410,17 +410,28 @@
   line-height: 1.5;
 }
 
-.post-copy span {
+.post-copy-more {
+  margin-left: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: #d4d4d4;
+  cursor: pointer;
+  font: inherit;
 }
 
 .post-image {
   display: block;
   width: 100%;
+  margin-top: 26px;
   min-height: 0;
   aspect-ratio: 1.53;
   border-radius: 5px;
   object-fit: cover;
+}
+
+.post-video-embed {
+  border: 0;
 }
 
 .post-actions {

@@ -9,13 +9,7 @@ export function FlicksSection({ images }) {
       <div className="flicks-grid">
         {images.map((image, index) => (
           <button className="flick-card" type="button" key={image}>
-            <img
-              src={image}
-              alt={`Restaurant flick ${index + 1}`}
-              onError={(event) => {
-                event.currentTarget.src = '/assets/home_food_post.jpg'
-              }}
-            />
+            <img src={image} alt={`Restaurant flick ${index + 1}`} />
             <span>Flick {index + 1}</span>
           </button>
         ))}

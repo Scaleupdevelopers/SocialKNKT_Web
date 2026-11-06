@@ -77,6 +77,74 @@
 .location-field input::placeholder {
   color: #999;
 }
+.location-field.has-error input {
+  border-color: #ff5b4d;
+  box-shadow: 0 0 0 1px #ff5b4d;
+}
+.location-year-field {
+  position: relative;
+}
+.location-year-trigger {
+  display: flex;
+  width: 100%;
+  height: 56px;
+  padding: 0 18px;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid #555;
+  border-radius: 4px;
+  background: transparent;
+  color: #999;
+  cursor: pointer;
+  font: inherit;
+  font-size: 15px;
+  text-align: left;
+}
+.location-year-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+.location-year-arrow {
+  width: 0;
+  height: 0;
+  border-top: 6px solid #aaa;
+  border-right: 5px solid transparent;
+  border-left: 5px solid transparent;
+}
+.location-year-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  left: 0;
+  z-index: 20;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid #555;
+  border-radius: 4px;
+  background: #252525;
+  box-shadow: 0 12px 22px #0008;
+}
+.location-year-menu button {
+  display: block;
+  width: 100%;
+  padding: 12px 18px;
+  border: 0;
+  border-bottom: 1px solid #444;
+  background: transparent;
+  color: #ddd;
+  cursor: pointer;
+  font: inherit;
+  font-size: 15px;
+  text-align: left;
+}
+.location-year-menu button:last-child {
+  border-bottom: 0;
+}
+.location-year-menu button:hover,
+.location-year-menu button[aria-selected="true"] {
+  background: #343434;
+  color: #fff;
+}
 .location-checkbox {
   display: flex;
   align-items: center;
@@ -138,12 +206,27 @@
   height: 18px;
 }
 .saved-location-card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
   padding: 14px 16px;
   border: 1px solid #444;
   border-radius: 4px;
   color: #c5c5c5;
   font-size: 15px;
   line-height: 1.55;
+}
+.saved-location-content {
+  display: grid;
+  gap: 3px;
+}
+.saved-location-content strong {
+  color: #fff;
+  font-size: 16px;
+}
+.saved-location-content span {
+  color: #b8b8b8;
 }
 .location-modal-backdrop {
   position: fixed;
