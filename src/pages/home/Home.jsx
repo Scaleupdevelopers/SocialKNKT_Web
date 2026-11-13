@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { AskShareModal } from '../../components/modals/AskShareModal/AskShareModal'
-import { getProfileMedia } from '../../action/action'
+import { getFlicks, getProfileMedia } from '../../action/action'
 import { toast } from 'react-toastify'
 import { Header } from '../../layouts/Header'
 import { FlicksSection } from './components/FlicksSection'
@@ -9,19 +9,13 @@ import { ProfileCard } from './components/ProfileCard'
 import { SidebarMenu } from './components/SidebarMenu'
 import './Home.css'
 
+const FEED_PAGE_SIZE = 10
+
 const profileIcon = '/assets/logo_icons/profile_avatar.png'
 const professionalIcon = '/assets/logo_icons/Professional.svg'
 const connectionIcon = '/assets/logo_icons/connection.svg'
 const dropdownIcon = '/assets/logo_icons/postadddropdown.svg'
 
-const restaurantImages = [
-  '/assets/home/restaurant-01.jpg',
-  '/assets/home/restaurant-02.jpg',
-  '/assets/home/restaurant-03.jpg',
-  '/assets/home/restaurant-04.jpg',
-  '/assets/home/restaurant-05.jpg',
-  '/assets/home/restaurant-06.jpg',
-]
 
 const addOptions = [
   ['post_card_img.svg', 'Add a photo'],
@@ -32,15 +26,49 @@ const addOptions = [
   ['post_card_doc.svg', 'Add a document'],
 ]
 
+function PostSkeleton() {
+  return (
+    <article className="feed-post feed-post-skeleton" aria-label="Loading post">
+      <div className="post-skeleton-author">
+        <span className="post-skeleton-avatar" />
+
+        <div className="post-skeleton-author-copy">
+          <span className="post-skeleton-line post-skeleton-name" />
+          <span className="post-skeleton-line post-skeleton-meta" />
+        </div>
+      </div>
+
+      <span className="post-skeleton-line post-skeleton-content" />
+      <span className="post-skeleton-media" />
+
+      <div className="post-skeleton-actions">
+        <span className="post-skeleton-action" />
+        <span className="post-skeleton-action" />
+        <span className="post-skeleton-action" />
+      </div>
+    </article>
+  )
+}
+
 export function Home() {
   const [feedPosts, setFeedPosts] = useState([])
   const [isLoadingFeed, setIsLoadingFeed] = useState(true)
+  const [feedPage, setFeedPage] = useState(0)
+  const [hasMoreFeed, setHasMoreFeed] = useState(true)
+  const [isLoadingMoreFeed, setIsLoadingMoreFeed] = useState(false)
+  const [flicks, setFlicks] = useState([])
+  const [isLoadingFlicks, setIsLoadingFlicks] = useState(true)
+  const feedEndRef = useRef(null)
 
   useEffect(() => {
     const loadProfileMedia = async () => {
       try {
-        const response = await getProfileMedia(0)
-        setFeedPosts(response.data || [])
+        const response = await getProfileMedia(0, FEED_PAGE_SIZE)
+        const posts = response.data || []
+
+        setFeedPosts(posts)
+        setFeedPage(0)
+        setHasMoreFeed(posts.length >= FEED_PAGE_SIZE)
       } catch (error) {
         toast.error(error.message || 'Unable to load posts.')
       } finally {
@@ -49,6 +77,60 @@ export function Home() {
     }
 
     loadProfileMedia()
+  }, [])
+
+  useEffect(() => {
+    const loadMoreFeed = async () => {
+      if (isLoadingFeed || isLoadingMoreFeed || !hasMoreFeed) {
+        return
+      }
+
+      setIsLoadingMoreFeed(true)
+
+      try {
+        const nextPage = feedPage + 1
+        const response = await getProfileMedia(nextPage, FEED_PAGE_SIZE)
+        const nextPosts = response.data || []
+
+        setFeedPosts((currentPosts) => [...currentPosts, ...nextPosts])
+        setFeedPage(nextPage)
+        setHasMoreFeed(nextPosts.length >= FEED_PAGE_SIZE)
+      } catch (error) {
+        toast.error(error.message || 'Unable to load more posts.')
+      } finally {
+        setIsLoadingMoreFeed(false)
+      }
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          loadMoreFeed()
+        }
+      },
+      { rootMargin: '280px' },
+    )
+
+    if (feedEndRef.current) {
+      observer.observe(feedEndRef.current)
+    }
+
+    return () => observer.disconnect()
+  }, [feedPage, hasMoreFeed, isLoadingFeed, isLoadingMoreFeed])
+
+  useEffect(() => {
+    const loadFlicks = async () => {
+      try {
+        const response = await getFlicks(0)
+        setFlicks(response.data || [])
+      } catch (error) {
+        toast.error(error.message || 'Unable to load flicks.')
+      } finally {
+        setIsLoadingFlicks(false)
+      }
+    }
+
+    loadFlicks()
   }, [])
 
   return (
@@ -64,16 +146,21 @@ export function Home() {
         <section className="home-feed" aria-label="Home feed">
           <CreatePost />
           <div className="feed-posts">
-            {isLoadingFeed && <p className="feed-status">Loading posts...</p>}
+            {isLoadingFeed && <PostSkeleton />}
             {!isLoadingFeed && feedPosts.length === 0 && (
               <p className="feed-status">No posts available yet.</p>
             )}
             {!isLoadingFeed && feedPosts.map((post) => (
               <PostCard key={post._id} post={post} />
             ))}
+            <div ref={feedEndRef} className="feed-end-marker" aria-hidden="true" />
+            {isLoadingMoreFeed && <PostSkeleton />}
           </div>
 
-          <FlicksSection images={restaurantImages} />
+          <FlicksSection
+            flicks={flicks}
+            isLoading={isLoadingFlicks}
+          />
         </section>
 
       </div>

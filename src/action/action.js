@@ -30,8 +30,12 @@ export const getCities = async (data) => {
   return postRequest('user/get-cities', data)
 }
 
-export const getProfileMedia = async (page = 0) => {
-  return getRequest('user/profile/media', { page })
+export const getProfileMedia = async (page = 0, limit = 10) => {
+  return getRequest('user/profile/media', { page, limit })
+}
+
+export const getFlicks = async (page = 0, limit = 10) => {
+  return getRequest('user/flick', { page, limit })
 }
 
 export const sendForgotPasswordOtp = async (data) => {

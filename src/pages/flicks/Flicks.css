@@ -1,0 +1,190 @@
+.flicks-page {
+  min-height: 100vh;
+  background: #1a1a1a;
+  color: #f5f5f5;
+}
+
+.flicks-feed {
+  width: min(720px, calc(100% - 48px));
+  margin: 28px auto 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  scroll-snap-type: y proximity;
+}
+
+.flick-feed-card {
+  position: relative;
+  width: min(620px, 100%);
+  min-height: min(86vh, 900px);
+  overflow: hidden;
+  border-radius: 14px;
+  background: #101010;
+  scroll-snap-align: center;
+}
+
+.flick-feed-card video {
+  display: block;
+  width: 100%;
+  height: min(86vh, 900px);
+  object-fit: contain;
+  background: #000;
+}
+
+.flick-feed-skeleton {
+  position: relative;
+  overflow: hidden;
+  background: #171717;
+}
+
+.flick-feed-skeleton::before {
+  position: absolute;
+  inset: 0;
+  content: '';
+  background: linear-gradient(
+    105deg,
+    transparent 25%,
+    rgba(255, 255, 255, 0.08) 42%,
+    rgba(255, 255, 255, 0.16) 50%,
+    rgba(255, 255, 255, 0.08) 58%,
+    transparent 75%
+  );
+  transform: translateX(-100%);
+  animation: flick-skeleton-shimmer 1.6s ease-in-out infinite;
+}
+
+.flick-skeleton-details {
+  position: absolute;
+  right: 32px;
+  bottom: 34px;
+  left: 32px;
+  z-index: 1;
+}
+
+.flick-skeleton-avatar,
+.flick-skeleton-line {
+  display: block;
+  background: #292929;
+}
+
+.flick-skeleton-avatar {
+  width: 42px;
+  height: 42px;
+  margin-bottom: 14px;
+  border-radius: 50%;
+}
+
+.flick-skeleton-line {
+  height: 14px;
+  margin-top: 10px;
+  border-radius: 8px;
+}
+
+.flick-skeleton-name {
+  width: 160px;
+}
+
+.flick-skeleton-description {
+  width: min(320px, 70%);
+}
+
+@keyframes flick-skeleton-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.flick-feed-card::after {
+  position: absolute;
+  inset: 45% 0 0;
+  z-index: 1;
+  pointer-events: none;
+  content: '';
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.78));
+}
+
+.flick-feed-details {
+  position: absolute;
+  right: 96px;
+  bottom: 28px;
+  left: 34px;
+  z-index: 2;
+}
+
+.flick-feed-user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.flick-feed-user img {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.flick-feed-user button {
+  padding: 5px 12px;
+  border: 1px solid #aaa;
+  border-radius: 14px;
+  color: #fff;
+  background: transparent;
+}
+
+.flick-feed-details p {
+  margin: 14px 0 0;
+  color: #eee;
+}
+
+.flick-feed-actions {
+  position: absolute;
+  right: 24px;
+  bottom: 26px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.flick-feed-actions button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  border: 0;
+  color: #fff;
+  background: transparent;
+  font-size: 28px;
+}
+
+.flick-feed-actions button img {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+}
+
+.flick-feed-actions span {
+  font-size: 14px;
+}
+
+.flicks-status {
+  color: #aaa;
+}
+
+@media (max-width: 700px) {
+  .flicks-feed {
+    width: 100%;
+    margin-top: 18px;
+  }
+
+  .flick-feed-card {
+    min-height: calc(100vh - 110px);
+    border-radius: 0;
+  }
+
+  .flick-feed-card video {
+    height: calc(100vh - 110px);
+  }
+}
