@@ -8,10 +8,10 @@ import { PostCard } from './components/PostCard'
 import { ProfileCard } from './components/ProfileCard'
 import { SidebarMenu } from './components/SidebarMenu'
 import './Home.css'
+import { useProfile } from '../../context/ProfileContext'
 
 const FEED_PAGE_SIZE = 10
 
-const profileIcon = '/assets/logo_icons/profile_avatar.png'
 const professionalIcon = '/assets/logo_icons/Professional.svg'
 const connectionIcon = '/assets/logo_icons/connection.svg'
 const dropdownIcon = '/assets/logo_icons/postadddropdown.svg'
@@ -169,6 +169,7 @@ export function Home() {
 }
 
 export function CreatePost() {
+  const { profile, isLoading } = useProfile()
   const [profileType, setProfileType] = useState('Professional')
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false)
@@ -200,9 +201,9 @@ export function CreatePost() {
   return (
     <section ref={createPostRef} className="create-post">
       <div className="feed-user-row">
-        <img src={profileIcon} alt="Dianne Russell" />
+        <img src={profile?.image || '/assets/logo_icons/profile_alt.avif'} alt="" />
         <div>
-          <h2>Dianne Russell</h2>
+          <h2>{isLoading ? <span className="profile-skeleton-line profile-skeleton-create-name" /> : profile?.fullName}</h2>
           <ProfileTypeSelector
             value={profileType}
             isOpen={isProfileMenuOpen}

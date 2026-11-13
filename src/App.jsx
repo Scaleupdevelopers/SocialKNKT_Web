@@ -21,14 +21,16 @@ import { Flicks } from './pages/flicks/Flicks'
 import { AppToast } from './components/common/AppToast'
 import { ProtectedRoute } from './components/common/ProtectedRoute'
 import { PublicOnlyRoute } from './components/common/PublicOnlyRoute'
+import { ProfileProvider } from './context/ProfileContext'
 
 import './styles/globals.css'
 
 function App() {
   return (
     <BrowserRouter>
-      <AppToast />
-      <Routes>
+      <ProfileProvider>
+        <AppToast />
+        <Routes>
         <Route element={<PublicOnlyRoute />}>
           <Route path="/" element={<SignIn />} />
         </Route>
@@ -53,7 +55,8 @@ function App() {
           <Route path="/profile" element={<Profile />} />
           <Route path="/flicks" element={<Flicks />} />
         </Route>
-      </Routes>
+        </Routes>
+      </ProfileProvider>
     </BrowserRouter>
   )
 }

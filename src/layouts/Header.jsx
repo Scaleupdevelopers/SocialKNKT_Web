@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { AskShareModal } from '../components/modals/AskShareModal/AskShareModal'
 import { AUTH_STORAGE_KEY } from '../utils/helper'
 import './Header.css'
+import { useProfile } from '../context/ProfileContext'
 
 const navigationItems = [
   {
@@ -34,6 +35,7 @@ const navigationItems = [
 ]
 
 export function Header() {
+  const { profile, isLoading } = useProfile()
   const navigate = useNavigate()
   const location = useLocation()
   const [openPanel, setOpenPanel] = useState(null)
@@ -110,7 +112,7 @@ export function Header() {
 
         <button className="header-account" type="button" aria-label="Open account menu" onClick={() => setIsAccountMenuOpen(!isAccountMenuOpen)}>
           <span className="header-account-avatar">
-            <img src="/assets/logo_icons/profile_avatar.png" alt="" />
+            <img src={profile?.image || '/assets/logo_icons/profile_alt.avif'} alt="" />
           </span>
           <img className="header-account-chevron" src="/assets/logo_icons/dropdownHeader.svg" alt="" />
         </button>
@@ -118,10 +120,19 @@ export function Header() {
         {isAccountMenuOpen && (
           <div className="account-menu">
             <div className="account-menu-profile">
-              <img src="/assets/logo_icons/profile_avatar.png" alt="Dianne Russell" />
+              <img src={profile?.image || '/assets/logo_icons/profile_alt.avif'} alt="" />
               <div>
-                <strong>Dianne Russell</strong>
-                <span>@Diane_R001</span>
+                {isLoading ? (
+                  <>
+                    <span className="header-profile-skeleton header-profile-skeleton-name" />
+                    <span className="header-profile-skeleton header-profile-skeleton-username" />
+                  </>
+                ) : (
+                  <>
+                    <strong>{profile?.fullName}</strong>
+                    <span>{profile?.displayUsername}</span>
+                  </>
+                )}
               </div>
             </div>
             <button className="account-view-profile" type="button" onClick={() => navigate('/profile')}>View Profile</button>
@@ -161,6 +172,7 @@ function HeaderAction({ label, icon, count, onClick }) {
 }
 
 function PostComposerModal({ onClose }) {
+  const { profile } = useProfile()
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false)
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
   const [profileType, setProfileType] = useState('Professional')
@@ -219,9 +231,9 @@ function PostComposerModal({ onClose }) {
         </div>
 
         <div className="post-modal-user">
-          <img src="/assets/logo_icons/profile_avatar.png" alt="Dianne Russell" />
+          <img src={profile?.image || '/assets/logo_icons/profile_alt.avif'} alt="" />
           <div>
-            <h3>Dianne Russell</h3>
+            <h3>{profile?.fullName || 'Loading profile...'}</h3>
             <div className="post-profile-selector">
               <button
                 type="button"

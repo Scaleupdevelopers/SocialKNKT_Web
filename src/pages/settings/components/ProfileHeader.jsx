@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-
-const profileImage = '/assets/logo_icons/profile_avatar.png'
+import { useProfile } from '../../../context/ProfileContext'
 
 export function ProfileHeader({ editProfile = false }) {
   const navigate = useNavigate()
+  const { profile, isLoading } = useProfile()
   const [bannerImage, setBannerImage] = useState(null)
 
   function handleBannerChange(event) {
@@ -33,22 +33,22 @@ export function ProfileHeader({ editProfile = false }) {
       </div>
 
       <div className="settings-profile-image">
-        <img src={profileImage} alt="Dianne Russell" />
+        <img src={profile?.image || '/assets/logo_icons/profile_alt.avif'} alt="" />
       </div>
 
       <div className="settings-profile-details">
         <div>
           <div className="settings-name-row">
-            <h1>Dianne Russell</h1>
-            <span>@Diane_R001</span>
+            <h1>{isLoading ? <span className="settings-profile-skeleton settings-profile-skeleton-name" /> : profile?.fullName}</h1>
+            <span>{isLoading ? <span className="settings-profile-skeleton settings-profile-skeleton-username" /> : profile?.displayUsername}</span>
           </div>
 
           <div className="settings-stats">
-            <span><strong>2,467</strong> Posts</span>
-            <span><strong>1,589</strong> Connections</span>
+            <span><strong>{profile?.postCount || 0}</strong> Posts</span>
+            <span><strong>{profile?.connectionCount || 0}</strong> Connections</span>
           </div>
 
-          <h2>UI UX Designer</h2>
+          <h2>{profile?.profession || ''}</h2>
           <p className="settings-location">
             ● <span>San Francisco, California</span>
           </p>

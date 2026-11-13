@@ -34,6 +34,8 @@ export const getProfileMedia = async (page = 0, limit = 10) => {
   return getRequest('user/profile/media', { page, limit })
 }
 
+export const getUserProfile = async () => getRequest('user/profile')
+
 export const getFlicks = async (page = 0, limit = 10) => {
   return getRequest('user/flick', { page, limit })
 }

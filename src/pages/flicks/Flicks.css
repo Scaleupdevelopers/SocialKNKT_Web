@@ -1,35 +1,99 @@
 .flicks-page {
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   background: #1a1a1a;
   color: #f5f5f5;
 }
 
 .flicks-feed {
+  height: calc(100vh - 90px);
   width: min(720px, calc(100% - 48px));
-  margin: 28px auto 60px;
+  margin: 0 auto;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 24px;
-  scroll-snap-type: y proximity;
+  gap: 0;
+  overscroll-behavior-y: contain;
+  scrollbar-width: none;
+  scroll-snap-type: y mandatory;
+}
+
+.flicks-feed::-webkit-scrollbar {
+  display: none;
 }
 
 .flick-feed-card {
   position: relative;
   width: min(620px, 100%);
-  min-height: min(86vh, 900px);
+  height: calc(100% - 14px);
+  min-height: calc(100% - 14px);
+  flex: 0 0 calc(100% - 14px);
+  margin-bottom: 14px;
   overflow: hidden;
   border-radius: 14px;
   background: #101010;
-  scroll-snap-align: center;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
 }
 
 .flick-feed-card video {
   display: block;
   width: 100%;
-  height: min(86vh, 900px);
+  height: 100%;
+  object-fit: cover;
+  background: transparent;
+}
+
+.flick-video-controls {
+  position: absolute;
+  top: 20px;
+  left: 24px;
+  z-index: 3;
+  display: flex;
+  gap: 12px;
+}
+
+.flick-video-controls button {
+  position: relative;
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: #fff;
+  background: rgb(20 20 20 / 58%);
+  cursor: pointer;
+  font-size: 25px;
+  line-height: 1;
+  backdrop-filter: blur(4px);
+}
+
+.flick-video-controls button:hover {
+  background: rgb(20 20 20 / 78%);
+}
+
+.flick-video-controls button img {
+  width: 20px;
+  height: 21px;
   object-fit: contain;
-  background: #000;
+}
+
+.flick-video-controls button:first-child img {
+  width: 12px;
+  height: 21px;
+}
+
+.flick-video-controls button.is-muted::after {
+  position: absolute;
+  width: 2px;
+  height: 27px;
+  border-radius: 2px;
+  content: '';
+  background: #fff;
+  transform: rotate(-45deg);
 }
 
 .flick-feed-skeleton {
@@ -176,15 +240,16 @@
 @media (max-width: 700px) {
   .flicks-feed {
     width: 100%;
-    margin-top: 18px;
   }
 
   .flick-feed-card {
-    min-height: calc(100vh - 110px);
+    min-height: calc(100% - 12px);
+    flex-basis: calc(100% - 12px);
+    margin-bottom: 12px;
     border-radius: 0;
   }
 
   .flick-feed-card video {
-    height: calc(100vh - 110px);
+    height: 100%;
   }
 }
