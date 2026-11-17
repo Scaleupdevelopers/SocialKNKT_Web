@@ -1,4 +1,4 @@
-import { getRequest, postRequest } from '../utils/helper'
+import { deleteRequest, getRequest, getRequestAllowFailure, postRequest } from '../utils/helper'
 
 //------------------|| USER AUTH ||------------------//
 
@@ -8,6 +8,14 @@ export const login = async (data) => {
 
 export const signUp = async (data) => {
   return postRequest('user/signup', data)
+}
+
+export const googleSignup = async (data) => {
+  return postRequest('user/signup', data)
+}
+
+export const ssoCheck = async (data) => {
+  return getRequestAllowFailure('sso', data)
 }
 
 export const checkUser = async (data) => {
@@ -32,6 +40,10 @@ export const getCities = async (data) => {
 
 export const getProfileMedia = async (page = 0, limit = 10) => {
   return getRequest('user/profile/media', { page, limit })
+}
+
+export const deletePost = async (postId) => {
+  return deleteRequest(`user/post?postId=${encodeURIComponent(postId)}`)
 }
 
 export const getUserProfile = async () => getRequest('user/profile')

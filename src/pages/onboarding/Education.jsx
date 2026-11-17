@@ -198,7 +198,7 @@ export function Education() {
             <button className="education-primary-button" type="submit" disabled={isSaving}>
               {isSaving ? 'Saving...' : 'Save Education'}
             </button>
-            <button className="education-skip-button" type="button" onClick={() => navigate('/')}>
+            <button className="education-skip-button" type="button" onClick={() => navigate('/location')}>
               Skip for now
             </button>
           </form>

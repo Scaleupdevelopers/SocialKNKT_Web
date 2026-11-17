@@ -184,7 +184,7 @@ export function Location() {
             <button className="location-primary-button" type="submit" disabled={isSaving}>
               {isSaving ? 'Saving...' : 'Save Location'}
             </button>
-            <button className="location-skip-button" type="button" onClick={() => navigate('/')}>
+            <button className="location-skip-button" type="button" onClick={() => navigate('/pronunciation')}>
               Skip for now
             </button>
           </form>

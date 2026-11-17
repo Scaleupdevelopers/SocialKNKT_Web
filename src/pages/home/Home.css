@@ -440,15 +440,60 @@
 }
 
 .more-button {
-  position: absolute;
-  top: 0;
-  right: 0;
   border: 0;
   background: transparent;
   color: #eeeeee;
   cursor: pointer;
   font-size: 26px;
   line-height: 1;
+}
+
+.post-options {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+
+.post-options-menu {
+  position: absolute;
+  top: 34px;
+  right: 0;
+  z-index: 5;
+  min-width: 136px;
+  padding: 6px;
+  border: 1px solid #3b3b3b;
+  border-radius: 8px;
+  background: #1c1c1c;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.post-delete-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.post-delete-option:hover {
+  background: #303030;
+}
+
+.post-delete-option:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.post-delete-option img {
+  width: 18px;
+  height: 18px;
 }
 
 .post-copy {

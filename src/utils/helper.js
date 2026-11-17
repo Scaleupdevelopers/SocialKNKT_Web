@@ -3,7 +3,7 @@ import config from './config'
 const serverPath = config.API_URL
 export const AUTH_STORAGE_KEY = 'socialknkt_auth'
 
-export const request = async (path, data, method) => {
+export const request = async (path, data, method, allowFailure = false) => {
   const loginData = JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) || 'null')
   const headers = { 'Content-Type': 'application/json' }
 
@@ -24,7 +24,7 @@ export const request = async (path, data, method) => {
 
   const responseData = await response.json().catch(() => ({}))
 
-  if (!response.ok || responseData.status === false) {
+  if ((!response.ok || responseData.status === false) && !allowFailure) {
     const message = responseData.message || 'Something went wrong.'
     throw new Error(message)
   }
@@ -37,3 +37,4 @@ export const putRequest = async (path, data) => request(path, data, 'PUT')
 export const PatchRequest = async (path, data) => request(path, data, 'PATCH')
 export const deleteRequest = async (path, data) => request(path, data, 'DELETE')
 export const getRequest = async (path, data) => request(path, data, 'GET')
+export const getRequestAllowFailure = async (path, data) => request(path, data, 'GET', true)

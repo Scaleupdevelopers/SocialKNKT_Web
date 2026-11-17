@@ -151,7 +151,11 @@ export function Home() {
               <p className="feed-status">No posts available yet.</p>
             )}
             {!isLoadingFeed && feedPosts.map((post) => (
-              <PostCard key={post._id} post={post} />
+              <PostCard
+                key={post._id}
+                post={post}
+                onDeleted={(postId) => setFeedPosts((currentPosts) => currentPosts.filter((item) => item._id !== postId))}
+              />
             ))}
             <div ref={feedEndRef} className="feed-end-marker" aria-hidden="true" />
             {isLoadingMoreFeed && <PostSkeleton />}

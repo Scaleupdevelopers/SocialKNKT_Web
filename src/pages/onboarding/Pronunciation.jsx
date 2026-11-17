@@ -69,7 +69,7 @@ export function Pronunciation() {
 
       if (response.status === true) {
         toast.success(response.message || 'Pronunciation saved successfully.')
-        navigate('/add-media')
+        navigate('/home')
       }
     } catch (error) {
       toast.error(error.message || 'Unable to save pronunciation.')
@@ -118,7 +118,7 @@ export function Pronunciation() {
           <button className="pronunciation-submit" type="submit" disabled={isSaving}>
             {isSaving ? 'Saving...' : 'Save Pronunciation'}
           </button>
-          <button className="pronunciation-skip" type="button" onClick={() => navigate('/')}>
+          <button className="pronunciation-skip" type="button" onClick={() => navigate('/home')}>
             Skip for now
           </button>
         </form>

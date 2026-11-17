@@ -1,9 +1,44 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ReportPostModal } from '../../../components/modals/ReportPostModal/ReportPostModal'
+import { deletePost } from '../../../action/action'
+import { toast } from 'react-toastify'
 const profileIcon = '/assets/logo_icons/profile_avatar.png'
 
-export function PostCard({ post }) {
+export function PostCard({ post, onDeleted }) {
   const [isReportOpen, setIsReportOpen] = useState(false)
+  const [isOptionsOpen, setIsOptionsOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const optionsRef = useRef(null)
+
+  useEffect(() => {
+    if (!isOptionsOpen) return undefined
+
+    const closeOptionsOnOutsideClick = (event) => {
+      if (!optionsRef.current?.contains(event.target)) {
+        setIsOptionsOpen(false)
+      }
+    }
+
+    document.addEventListener('click', closeOptionsOnOutsideClick)
+    return () => document.removeEventListener('click', closeOptionsOnOutsideClick)
+  }, [isOptionsOpen])
+
+  const handleDelete = async () => {
+    const postId = post._id || post.id
+    if (!postId || isDeleting) return
+
+    setIsDeleting(true)
+    try {
+      await deletePost(postId)
+      setIsOptionsOpen(false)
+      onDeleted?.(postId)
+      toast.success('Post deleted successfully.')
+    } catch (error) {
+      toast.error(error.message || 'Unable to delete post.')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
   const authorName = [post.fname, post.lname].filter(Boolean).join(' ')
     || post.username
@@ -32,7 +67,25 @@ export function PostCard({ post }) {
           <h2>{authorName}</h2>
           <p>{postTime} · {post.username || post.role || ''}</p>
         </div>
-        <button className="more-button" type="button" aria-label="More options">⋮</button>
+        <div className="post-options" ref={optionsRef}>
+          <button
+            className="more-button"
+            type="button"
+            aria-label="More options"
+            aria-expanded={isOptionsOpen}
+            onClick={() => setIsOptionsOpen((value) => !value)}
+          >
+            ⋮
+          </button>
+          {isOptionsOpen && (
+            <div className="post-options-menu" role="menu">
+              <button className="post-delete-option" type="button" role="menuitem" onClick={handleDelete} disabled={isDeleting}>
+                <img src="/assets/logo_icons/delete_icon.svg" alt="" />
+                <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {postDescription && (

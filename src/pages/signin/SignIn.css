@@ -188,6 +188,30 @@
   display:grid;
   gap:16px
 }
+
+.google-login-button-wrap {
+  position: relative;
+  height: 62px;
+}
+
+.google-login-button-wrap .social-button {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+}
+
+.google-login-provider-button {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  overflow: hidden;
+  opacity: 0;
+}
+
+.google-login-provider-button.is-disabled {
+  pointer-events: none;
+}
+
 .social-button{
   height:62px;
   border:1px solid #e2e2e2;
@@ -209,6 +233,12 @@
   object-fit:contain;
   object-position:center;
   vertical-align:middle
+}
+
+.social-button .social-icon[src*="apple_icon"] {
+  width: 23px;
+  height: 24px;
+  vertical-align: -6px;
 }
 .google-social-icon{
   object-fit:cover;
