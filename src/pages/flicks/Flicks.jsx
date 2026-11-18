@@ -3,6 +3,7 @@ import { toast } from 'react-toastify'
 import { getFlicks, savePost, updatePostLike } from '../../action/action'
 import { Header } from '../../layouts/Header'
 import './Flicks.css'
+import { CommentsModal } from '../../components/modals/CommentsModal/CommentsModal'
 
 export function Flicks() {
   const [flicks, setFlicks] = useState([])
@@ -153,6 +154,7 @@ function FlickCard({ flick, isSaved, isSaving, onToggleSaved }) {
   const videoRef = useRef(null)
   const [isPlaying, setIsPlaying] = useState(true)
   const [isMuted, setIsMuted] = useState(true)
+  const [isCommentsOpen, setIsCommentsOpen] = useState(false)
   const [isLiked, setIsLiked] = useState(Boolean(flick.isLiked ?? flick.liked ?? flick.likeStatus))
   const [likeCount, setLikeCount] = useState(Number(flick.likeCount ?? flick.likes ?? 0))
 
@@ -239,7 +241,7 @@ function FlickCard({ flick, isSaved, isSaving, onToggleSaved }) {
           <img src={isLiked ? '/assets/logo_icons/heartLike.svg' : '/assets/logo_icons/like.svg'} alt="" />
           <span>{likeCount}</span>
         </button>
-        <button type="button" aria-label="Comments">
+        <button type="button" aria-label="Comments" onClick={() => setIsCommentsOpen(true)}>
           <img src="/assets/logo_icons/comment.svg" alt="" />
           <span>{flick.commentCount || 0}</span>
         </button>
@@ -248,6 +250,7 @@ function FlickCard({ flick, isSaved, isSaving, onToggleSaved }) {
         </button>
         <button type="button" aria-label="More">⋮</button>
       </div>
+      {isCommentsOpen && <CommentsModal post={flick} onClose={() => setIsCommentsOpen(false)} />}
     </article>
   )
 }

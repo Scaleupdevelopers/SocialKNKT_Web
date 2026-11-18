@@ -62,6 +62,26 @@ export const reportPost = async (postId, description) => {
   return postRequest('user/post/report', { postId, description })
 }
 
+export const commentPost = async (postId, comment) => {
+  return postRequest('user/post/comment', { postId, comment })
+}
+
+export const getComments = async (postId, page = 0) => {
+  return getRequest('user/post/comment', { page, postId })
+}
+
+export const updateCommentLike = async (commentId, postId, likeStatus) => {
+  return putRequest('user/post/comment/like', { commentId, postId, likeStatus })
+}
+
+export const replyToComment = async (postId, commentId, comment) => {
+  return postRequest('user/post/comment/reply', { postId, commentId, comment })
+}
+
+export const getCommentReplies = async (commentId, page = 0) => {
+  return getRequest('user/post/comment/reply', { page, commentId })
+}
+
 export const getUploadUrl = async (ext) => getRequest('upload/sign', { ext })
 
 export const createPost = async (data) => postRequest('user/post', data)

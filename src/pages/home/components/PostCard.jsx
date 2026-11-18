@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { ReportPostModal } from '../../../components/modals/ReportPostModal/ReportPostModal'
+import { CommentsModal } from '../../../components/modals/CommentsModal/CommentsModal'
 import { deletePost, updatePostLike } from '../../../action/action'
 import { toast } from 'react-toastify'
 const profileIcon = '/assets/logo_icons/profile_avatar.png'
@@ -7,6 +8,7 @@ const profileIcon = '/assets/logo_icons/profile_avatar.png'
 export function PostCard({ post, onDeleted }) {
   const [isReportOpen, setIsReportOpen] = useState(false)
   const [isShareOpen, setIsShareOpen] = useState(false)
+  const [isCommentsOpen, setIsCommentsOpen] = useState(false)
   const [isOptionsOpen, setIsOptionsOpen] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -160,7 +162,7 @@ export function PostCard({ post, onDeleted }) {
           <img src={isLiked ? '/assets/logo_icons/heartLike.svg' : '/assets/logo_icons/like.svg'} alt="" />
           {likeCount} Like
         </button>
-        <button type="button">
+        <button type="button" onClick={() => setIsCommentsOpen(true)}>
           <img src="/assets/logo_icons/comment.svg" alt="" />
           {commentCount} Comments
         </button>
@@ -175,6 +177,7 @@ export function PostCard({ post, onDeleted }) {
       </div>
 
       {isReportOpen && <ReportPostModal postId={post._id || post.id} onClose={() => setIsReportOpen(false)} />}
+      {isCommentsOpen && <CommentsModal post={post} onClose={() => setIsCommentsOpen(false)} />}
 
       {isShareOpen && (
         <div className="post-share-backdrop" role="presentation" onClick={() => setIsShareOpen(false)}>
