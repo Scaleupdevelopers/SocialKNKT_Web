@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'react-toastify'
-import { getFlicks } from '../../action/action'
+import { getFlicks, savePost, updatePostLike } from '../../action/action'
 import { Header } from '../../layouts/Header'
 import './Flicks.css'
 
@@ -8,6 +8,7 @@ export function Flicks() {
   const [flicks, setFlicks] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [savedFlickIds, setSavedFlickIds] = useState(() => new Set())
+  const [savingFlickIds, setSavingFlickIds] = useState(() => new Set())
   const feedRef = useRef(null)
   const isWheelAnimating = useRef(false)
   const wheelUnlockTimer = useRef(null)
@@ -44,18 +45,29 @@ export function Flicks() {
 
   useEffect(() => () => window.clearTimeout(wheelUnlockTimer.current), [])
 
-  const toggleSavedFlick = (flickId) => {
-    setSavedFlickIds((currentIds) => {
-      const nextIds = new Set(currentIds)
+  const toggleSavedFlick = async (flickId) => {
+    if (savingFlickIds.has(flickId) || savedFlickIds.has(flickId)) return
+    const flick = flicks.find((item, index) => (item._id || item.media || index) === flickId)
+    const postId = flick?._id || flick?.id
+    if (!postId) return
 
-      if (nextIds.has(flickId)) {
-        nextIds.delete(flickId)
-      } else {
+    setSavingFlickIds((currentIds) => new Set(currentIds).add(flickId))
+    try {
+      await savePost(postId)
+      setSavedFlickIds((currentIds) => {
+        const nextIds = new Set(currentIds)
         nextIds.add(flickId)
-      }
-
-      return nextIds
-    })
+        return nextIds
+      })
+    } catch (error) {
+      toast.error(error.message || 'Unable to save flick.')
+    } finally {
+      setSavingFlickIds((currentIds) => {
+        const nextIds = new Set(currentIds)
+        nextIds.delete(flickId)
+        return nextIds
+      })
+    }
   }
 
   useEffect(() => {
@@ -127,6 +139,7 @@ export function Flicks() {
               key={flickId}
               flick={flick}
               isSaved={isSaved}
+              isSaving={savingFlickIds.has(flickId)}
               onToggleSaved={() => toggleSavedFlick(flickId)}
             />
           )
@@ -136,10 +149,31 @@ export function Flicks() {
   )
 }
 
-function FlickCard({ flick, isSaved, onToggleSaved }) {
+function FlickCard({ flick, isSaved, isSaving, onToggleSaved }) {
   const videoRef = useRef(null)
   const [isPlaying, setIsPlaying] = useState(true)
   const [isMuted, setIsMuted] = useState(true)
+  const [isLiked, setIsLiked] = useState(Boolean(flick.isLiked ?? flick.liked ?? flick.likeStatus))
+  const [likeCount, setLikeCount] = useState(Number(flick.likeCount ?? flick.likes ?? 0))
+
+  const handleLike = async () => {
+    const postId = flick._id || flick.id
+    if (!postId) return
+
+    const previousLikeStatus = isLiked
+    const nextLikeStatus = !previousLikeStatus
+    setIsLiked(nextLikeStatus)
+    setLikeCount((count) => Math.max(0, count + (nextLikeStatus ? 1 : -1)))
+    try {
+      await updatePostLike(postId, nextLikeStatus)
+    } catch {
+      setIsLiked((currentStatus) => {
+        if (currentStatus !== nextLikeStatus) return currentStatus
+        setLikeCount((count) => Math.max(0, count + (nextLikeStatus ? -1 : 1)))
+        return previousLikeStatus
+      })
+    }
+  }
 
   const togglePlayback = () => {
     const video = videoRef.current
@@ -201,15 +235,15 @@ function FlickCard({ flick, isSaved, onToggleSaved }) {
         <p>{flick.description || ''}</p>
       </div>
       <div className="flick-feed-actions">
-        <button type="button" aria-label="Like">
-          <img src="/assets/logo_icons/like.svg" alt="" />
-          <span>{flick.likeCount || 0}</span>
+        <button type="button" className={isLiked ? 'is-liked' : ''} aria-label={isLiked ? 'Unlike' : 'Like'} aria-pressed={isLiked} onClick={handleLike}>
+          <img src={isLiked ? '/assets/logo_icons/heartLike.svg' : '/assets/logo_icons/like.svg'} alt="" />
+          <span>{likeCount}</span>
         </button>
         <button type="button" aria-label="Comments">
           <img src="/assets/logo_icons/comment.svg" alt="" />
           <span>{flick.commentCount || 0}</span>
         </button>
-        <button type="button" aria-label={isSaved ? 'Remove from saved' : 'Save flick'} onClick={onToggleSaved}>
+        <button type="button" aria-label={isSaved ? 'Saved' : 'Save flick'} onClick={onToggleSaved} disabled={isSaving || isSaved}>
           <img src={isSaved ? '/assets/logo_icons/saveIcon.svg' : '/assets/logo_icons/unsaved.svg'} alt="" />
         </button>
         <button type="button" aria-label="More">⋮</button>

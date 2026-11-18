@@ -65,7 +65,7 @@ export function SignIn() {
     try {
       const result = await signInWithPopup(firebaseAuth, googleProvider)
       const firebaseUser = result.user
-      const identityToken = firebaseUser.uid
+      const identityToken = firebaseUser.uid 
       const [fname = '', ...lnameParts] = (firebaseUser.displayName || '').split(' ')
 
       const ssoPayload = {

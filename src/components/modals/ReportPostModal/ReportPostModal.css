@@ -1,20 +1,40 @@
+.report-post-modal {
+  width: min(600px, calc(100% - 32px));
+  padding: 36px 40px 46px;
+}
+
+.report-post-modal .community-modal-heading {
+  margin-bottom: 28px;
+}
+
+.report-post-modal .community-modal-heading h2 {
+  font-size: 32px;
+  letter-spacing: -1px;
+}
+
+.report-post-modal .community-modal-heading button {
+  width: 40px;
+  height: 40px;
+  font-size: 26px;
+}
+
 .report-question {
-  margin: 0 0 12px;
-  color: #c6c6c6;
-  font-size: 13px;
+  margin: 0 0 18px;
+  color: #f0f0f0;
+  font-size: 17px;
 }
 
 .report-reasons {
   display: grid;
-  gap: 9px;
+  gap: 14px;
 }
 
 .report-reasons label {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   color: #c6c6c6;
-  font-size: 13px;
+  font-size: 17px;
 }
 
 .report-reasons input {
@@ -22,6 +42,29 @@
 }
 
 .report-description {
-  min-height: 130px;
+  min-height: 150px;
+  margin-top: 18px;
+  font-size: 15px;
   resize: vertical;
+}
+
+.report-post-modal .community-gradient-button {
+  height: 58px;
+  margin-top: 26px;
+  font-size: 18px;
+}
+
+@media (max-width: 640px) {
+  .report-post-modal {
+    padding: 30px 24px 36px;
+  }
+
+  .report-post-modal .community-modal-heading h2 {
+    font-size: 30px;
+  }
+
+  .report-reasons label,
+  .report-question {
+    font-size: 15px;
+  }
 }

@@ -223,6 +223,10 @@
   font-size: 28px;
 }
 
+.flick-feed-actions button:disabled {
+  cursor: pointer;
+}
+
 .flick-feed-actions button img {
   width: 26px;
   height: 26px;

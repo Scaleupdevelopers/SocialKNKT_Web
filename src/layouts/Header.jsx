@@ -4,6 +4,8 @@ import { AskShareModal } from '../components/modals/AskShareModal/AskShareModal'
 import { AUTH_STORAGE_KEY } from '../utils/helper'
 import './Header.css'
 import { useProfile } from '../context/ProfileContext'
+import { createPost, getUploadUrl } from '../action/action'
+import { toast } from 'react-toastify'
 
 const navigationItems = [
   {
@@ -179,16 +181,63 @@ function PostComposerModal({ onClose }) {
   const [isEditorFocused, setIsEditorFocused] = useState(false)
   const [postText, setPostText] = useState('')
   const [isAskShareOpen, setIsAskShareOpen] = useState(false)
+  const [selectedFile, setSelectedFile] = useState(null)
+  const [videoLink, setVideoLink] = useState('')
+  const [isVideoLinkModalOpen, setIsVideoLinkModalOpen] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const photoInputRef = useRef(null)
+  const videoInputRef = useRef(null)
   const modalRef = useRef(null)
 
   const addOptions = [
     ['post_card_img.svg', 'Add a photo'],
     ['post_card_chat.svg', 'Create KNKT(n) Thread'],
     ['post_card_video.svg', 'Add flicks'],
-    ['post_card_video.svg', 'Take a video'],
+    ['post_card_video.svg', 'Add a video'],
     ['post_card_video_link.svg', 'Add Video Link'],
-    ['post_card_doc.svg', 'Add a document'],
   ]
+
+  const handleAddOption = (label) => {
+    setIsAddMenuOpen(false)
+    if (label === 'Add a photo') photoInputRef.current?.click()
+    if (label === 'Add a video' || label === 'Add flicks') videoInputRef.current?.click()
+  }
+
+  const handleSubmit = async (linkOverride = videoLink) => {
+    if (isSubmitting) return
+    const link = typeof linkOverride === 'string' ? linkOverride : ''
+    setIsSubmitting(true)
+    try {
+      const payload = {
+        postType: profileType === 'Professional' ? 1 : profileType === 'Personal' ? 2 : 3,
+        description: postText,
+        mediaType: link.trim() ? 'videolink' : selectedFile?.type?.startsWith('video/') ? 'video' : selectedFile ? 'image' : undefined,
+      }
+
+      if (link.trim()) {
+        payload.media = link.trim()
+        payload.thumbnail = link.trim()
+      } else if (selectedFile) {
+        const ext = selectedFile.name.split('.').pop().toLowerCase()
+        const signedResponse = await getUploadUrl(ext)
+        const uploadResponse = await fetch(signedResponse.data, {
+          method: 'PUT',
+          headers: { 'Content-Type': selectedFile.type || 'application/octet-stream' },
+          body: selectedFile,
+        })
+        if (!uploadResponse.ok) throw new Error('Unable to upload media.')
+        payload.media = signedResponse.data.split('?')[0]
+      }
+
+      await createPost(payload)
+      toast.success('Post created successfully.')
+      window.location.reload()
+    } catch (error) {
+      toast.error(error.message || 'Unable to create post.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   useEffect(() => {
     const handleOutsideClick = (event) => {
@@ -276,6 +325,9 @@ function PostComposerModal({ onClose }) {
           {!isEditorFocused && <img src="/assets/logo_icons/editPost.svg" alt="" />}
         </div>
 
+        <input ref={photoInputRef} type="file" accept="image/*" hidden onChange={(event) => setSelectedFile(event.target.files?.[0] || null)} />
+        <input ref={videoInputRef} type="file" accept="video/*" hidden onChange={(event) => setSelectedFile(event.target.files?.[0] || null)} />
+
         <div className="post-modal-actions">
           <div className="post-add-wrapper">
             <button
@@ -297,6 +349,11 @@ function PostComposerModal({ onClose }) {
                       if (label === 'Create KNKT(n) Thread') {
                         setIsAddMenuOpen(false)
                         setIsAskShareOpen(true)
+                      } else if (label === 'Add a photo' || label === 'Add a video' || label === 'Add flicks') {
+                        handleAddOption(label)
+                      } else if (label === 'Add Video Link') {
+                        setIsVideoLinkModalOpen(true)
+                        setIsAddMenuOpen(false)
                       }
                     }}
                   >
@@ -308,13 +365,28 @@ function PostComposerModal({ onClose }) {
             )}
           </div>
 
-          <button className="post-modal-submit" type="button">
+          <button className="post-modal-submit" type="button" onClick={() => handleSubmit()} disabled={isSubmitting} aria-busy={isSubmitting}>
             <img src="/assets/logo_icons/Send.svg" alt="" />
-            Post
+            {isSubmitting && <span className="post-submit-spinner" />}
+            {isSubmitting ? 'Posting...' : 'Post'}
           </button>
         </div>
       </section>
       {isAskShareOpen && <AskShareModal onClose={() => setIsAskShareOpen(false)} />}
+      {isVideoLinkModalOpen && (
+        <div className="header-video-link-backdrop" role="presentation" onClick={() => setIsVideoLinkModalOpen(false)}>
+          <div className="header-video-link-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+            <button className="header-video-link-close" type="button" onClick={() => setIsVideoLinkModalOpen(false)} aria-label="Close">×</button>
+            <h2>Add Video Link</h2>
+            <p>Paste a YouTube or video link to add it to your post.</p>
+            <input autoFocus value={videoLink} onChange={(event) => setVideoLink(event.target.value)} placeholder="Enter video link" />
+            <div className="header-video-link-actions">
+              <button type="button" onClick={() => setIsVideoLinkModalOpen(false)}>Cancel</button>
+              <button type="button" onClick={() => handleSubmit(videoLink)} disabled={!videoLink.trim() || isSubmitting}>{isSubmitting && <span className="post-submit-spinner" />}{isSubmitting ? 'Posting...' : 'Add Link'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

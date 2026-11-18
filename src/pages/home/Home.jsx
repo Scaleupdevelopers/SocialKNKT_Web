@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { AskShareModal } from '../../components/modals/AskShareModal/AskShareModal'
-import { getFlicks, getProfileMedia } from '../../action/action'
+import { createPost, getFlicks, getPosts, getUploadUrl } from '../../action/action'
 import { toast } from 'react-toastify'
 import { Header } from '../../layouts/Header'
 import { FlicksSection } from './components/FlicksSection'
@@ -21,9 +21,8 @@ const addOptions = [
   ['post_card_img.svg', 'Add a photo'],
   ['post_card_chat.svg', 'Create KNKT(n) Thread'],
   ['post_card_video.svg', 'Add flicks'],
-  ['post_card_video.svg', 'Take a video'],
+  ['post_card_video.svg', 'Add a video'],
   ['post_card_video_link.svg', 'Add Video Link'],
-  ['post_card_doc.svg', 'Add a document'],
 ]
 
 function PostSkeleton() {
@@ -50,6 +49,16 @@ function PostSkeleton() {
   )
 }
 
+function EmptyFeedState() {
+  return (
+    <div className="empty-feed-state">
+      <img src="/assets/logo_icons/noposticon.svg" alt="" />
+      <h2>Explore and Connect</h2>
+      <p>Looks like you've just joined KNKT. Connect with people<br />whose content you find intriguing.</p>
+    </div>
+  )
+}
+
 export function Home() {
   const [feedPosts, setFeedPosts] = useState([])
   const [isLoadingFeed, setIsLoadingFeed] = useState(true)
@@ -63,7 +72,7 @@ export function Home() {
   useEffect(() => {
     const loadProfileMedia = async () => {
       try {
-        const response = await getProfileMedia(0, FEED_PAGE_SIZE)
+        const response = await getPosts(0, FEED_PAGE_SIZE)
         const posts = response.data || []
 
         setFeedPosts(posts)
@@ -89,7 +98,7 @@ export function Home() {
 
       try {
         const nextPage = feedPage + 1
-        const response = await getProfileMedia(nextPage, FEED_PAGE_SIZE)
+        const response = await getPosts(nextPage, FEED_PAGE_SIZE)
         const nextPosts = response.data || []
 
         setFeedPosts((currentPosts) => [...currentPosts, ...nextPosts])
@@ -147,24 +156,24 @@ export function Home() {
           <CreatePost />
           <div className="feed-posts">
             {isLoadingFeed && <PostSkeleton />}
-            {!isLoadingFeed && feedPosts.length === 0 && (
-              <p className="feed-status">No posts available yet.</p>
-            )}
+            {!isLoadingFeed && feedPosts.length === 0 && <EmptyFeedState />}
             {!isLoadingFeed && feedPosts.map((post) => (
               <PostCard
-                key={post._id}
+              key={post._id || post.id}
                 post={post}
-                onDeleted={(postId) => setFeedPosts((currentPosts) => currentPosts.filter((item) => item._id !== postId))}
+                onDeleted={(postId) => setFeedPosts((currentPosts) => currentPosts.filter((item) => (item._id || item.id) !== postId))}
               />
             ))}
             <div ref={feedEndRef} className="feed-end-marker" aria-hidden="true" />
             {isLoadingMoreFeed && <PostSkeleton />}
           </div>
 
-          <FlicksSection
-            flicks={flicks}
-            isLoading={isLoadingFlicks}
-          />
+          {flicks.length > 0 && (
+            <FlicksSection
+              flicks={flicks}
+              isLoading={isLoadingFlicks}
+            />
+          )}
         </section>
 
       </div>
@@ -180,8 +189,44 @@ export function CreatePost() {
   const [isAskShareOpen, setIsAskShareOpen] = useState(false)
   const [isEditorFocused, setIsEditorFocused] = useState(false)
   const [postText, setPostText] = useState('')
+  const [selectedFile, setSelectedFile] = useState(null)
+  const [videoLink, setVideoLink] = useState('')
+  const [isVideoLinkModalOpen, setIsVideoLinkModalOpen] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const editorRef = useRef(null)
   const createPostRef = useRef(null)
+  const photoInputRef = useRef(null)
+  const videoInputRef = useRef(null)
+
+  const handlePost = async (linkOverride = videoLink) => {
+    if (isSubmitting) return
+    const link = typeof linkOverride === 'string' ? linkOverride : ''
+    setIsSubmitting(true)
+    try {
+      const payload = {
+        postType: profileType === 'Professional' ? 1 : profileType === 'Personal' ? 2 : 3,
+        description: postText,
+        mediaType: link.trim() ? 'videolink' : selectedFile?.type?.startsWith('video/') ? 'video' : selectedFile ? 'image' : undefined,
+      }
+      if (link.trim()) {
+        payload.media = link.trim()
+        payload.thumbnail = link.trim()
+      } else if (selectedFile) {
+        const ext = selectedFile.name.split('.').pop().toLowerCase()
+        const signedUrl = await getUploadUrl(ext)
+        const upload = await fetch(signedUrl.data, { method: 'PUT', headers: { 'Content-Type': selectedFile.type || 'application/octet-stream' }, body: selectedFile })
+        if (!upload.ok) throw new Error('Unable to upload media.')
+        payload.media = signedUrl.data.split('?')[0]
+      }
+      await createPost(payload)
+      toast.success('Post created successfully.')
+      window.location.reload()
+    } catch (error) {
+      toast.error(error.message || 'Unable to create post.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   useEffect(() => {
     const handleOutsideClick = (event) => {
@@ -242,6 +287,8 @@ export function CreatePost() {
           </button>
         )}
       </div>
+      <input ref={photoInputRef} type="file" accept="image/*" hidden onChange={(event) => setSelectedFile(event.target.files?.[0] || null)} />
+      <input ref={videoInputRef} type="file" accept="video/*" hidden onChange={(event) => setSelectedFile(event.target.files?.[0] || null)} />
       <div className="create-post-actions">
         <div className="home-add-wrapper">
           <button
@@ -257,15 +304,33 @@ export function CreatePost() {
                 setIsAddMenuOpen(false)
                 setIsAskShareOpen(true)
               }}
+              onPhoto={() => photoInputRef.current?.click()}
+              onVideo={() => videoInputRef.current?.click()}
+              onVideoLink={() => { setIsVideoLinkModalOpen(true); setIsAddMenuOpen(false) }}
             />
           )}
         </div>
-        <button className="post-button" type="button">
+        <button className="post-button" type="button" onClick={() => handlePost()} disabled={isSubmitting} aria-busy={isSubmitting}>
           <img src="/assets/logo_icons/Send.svg" alt="" />
-          Post
+          {isSubmitting && <span className="post-submit-spinner" />}
+          {isSubmitting ? 'Posting...' : 'Post'}
         </button>
       </div>
       {isAskShareOpen && <AskShareModal onClose={() => setIsAskShareOpen(false)} />}
+      {isVideoLinkModalOpen && (
+        <div className="video-link-modal-backdrop" role="presentation" onClick={() => setIsVideoLinkModalOpen(false)}>
+          <div className="video-link-modal" role="dialog" aria-modal="true" aria-labelledby="video-link-title" onClick={(event) => event.stopPropagation()}>
+            <button className="video-link-modal-close" type="button" onClick={() => setIsVideoLinkModalOpen(false)} aria-label="Close">×</button>
+            <h2 id="video-link-title">Add Video Link</h2>
+            <p>Paste a YouTube or video link to add it to your post.</p>
+            <input autoFocus value={videoLink} onChange={(event) => setVideoLink(event.target.value)} placeholder="Enter video link" />
+            <div className="video-link-modal-actions">
+              <button type="button" onClick={() => setIsVideoLinkModalOpen(false)}>Cancel</button>
+              <button type="button" onClick={() => handlePost(videoLink)} disabled={!videoLink.trim() || isSubmitting}>{isSubmitting ? 'Posting...' : 'Add Link'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   )
 }
@@ -292,14 +357,14 @@ function ProfileTypeSelector({ value, isOpen, onToggle, onSelect }) {
   )
 }
 
-function AddContentMenu({ onCreateThread }) {
+function AddContentMenu({ onCreateThread, onPhoto, onVideo, onVideoLink }) {
   return (
     <div className="home-add-menu">
       {addOptions.map(([icon, label]) => (
         <button
           type="button"
           key={label}
-          onClick={label === 'Create KNKT(n) Thread' ? onCreateThread : undefined}
+          onClick={label === 'Create KNKT(n) Thread' ? onCreateThread : label === 'Add a photo' ? onPhoto : label === 'Add a video' || label === 'Add flicks' ? onVideo : label === 'Add Video Link' ? onVideoLink : undefined}
         >
           <img src={`/assets/logo_icons/${icon}`} alt="" />
           {label}

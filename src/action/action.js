@@ -1,4 +1,4 @@
-import { deleteRequest, getRequest, getRequestAllowFailure, postRequest } from '../utils/helper'
+import { deleteRequest, getRequest, getRequestAllowFailure, postRequest, putRequest } from '../utils/helper'
 
 //------------------|| USER AUTH ||------------------//
 
@@ -42,9 +42,29 @@ export const getProfileMedia = async (page = 0, limit = 10) => {
   return getRequest('user/profile/media', { page, limit })
 }
 
+export const getPosts = async (page = 0, limit = 10) => {
+  return getRequest('user/post', { page, limit })
+}
+
 export const deletePost = async (postId) => {
   return deleteRequest(`user/post?postId=${encodeURIComponent(postId)}`)
 }
+
+export const updatePostLike = async (postId, likeStatus) => {
+  return putRequest('user/post/like', { postId, likeStatus })
+}
+
+export const savePost = async (postId) => {
+  return postRequest('user/post/saved', { postId })
+}
+
+export const reportPost = async (postId, description) => {
+  return postRequest('user/post/report', { postId, description })
+}
+
+export const getUploadUrl = async (ext) => getRequest('upload/sign', { ext })
+
+export const createPost = async (data) => postRequest('user/post', data)
 
 export const getUserProfile = async () => getRequest('user/profile')
 

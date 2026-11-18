@@ -1,13 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { ReportPostModal } from '../../../components/modals/ReportPostModal/ReportPostModal'
-import { deletePost } from '../../../action/action'
+import { deletePost, updatePostLike } from '../../../action/action'
 import { toast } from 'react-toastify'
 const profileIcon = '/assets/logo_icons/profile_avatar.png'
 
 export function PostCard({ post, onDeleted }) {
   const [isReportOpen, setIsReportOpen] = useState(false)
+  const [isShareOpen, setIsShareOpen] = useState(false)
   const [isOptionsOpen, setIsOptionsOpen] = useState(false)
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isLiked, setIsLiked] = useState(Boolean(post.isLiked ?? post.liked ?? post.likeStatus))
+  const [likeCount, setLikeCount] = useState(Number(post.likeCount ?? post.likes ?? 0))
   const optionsRef = useRef(null)
 
   useEffect(() => {
@@ -26,17 +30,64 @@ export function PostCard({ post, onDeleted }) {
   const handleDelete = async () => {
     const postId = post._id || post.id
     if (!postId || isDeleting) return
-
+    
     setIsDeleting(true)
     try {
       await deletePost(postId)
       setIsOptionsOpen(false)
+      setIsDeleteModalOpen(false)
       onDeleted?.(postId)
       toast.success('Post deleted successfully.')
     } catch (error) {
       toast.error(error.message || 'Unable to delete post.')
     } finally {
       setIsDeleting(false)
+    }
+  }
+
+  const handleLike = async () => {
+    const postId = post._id || post.id
+    if (!postId) return
+
+    const previousLikeStatus = isLiked
+    const nextLikeStatus = !previousLikeStatus
+    setIsLiked(nextLikeStatus)
+    setLikeCount((count) => Math.max(0, count + (nextLikeStatus ? 1 : -1)))
+    try {
+      await updatePostLike(postId, nextLikeStatus)
+    } catch {
+      setIsLiked((currentStatus) => {
+        if (currentStatus !== nextLikeStatus) return currentStatus
+        setLikeCount((count) => Math.max(0, count + (nextLikeStatus ? -1 : 1)))
+        return previousLikeStatus
+      })
+    }
+  }
+
+  const shareUrl = `${window.location.origin}/home?postId=${post._id || post.id}`
+
+  const handleShare = async () => {
+    const postId = post._id || post.id
+    if (!postId) return
+    const shareText = `📢 Social Knkt Notification\nNew Post Shared by: ${authorName}\nPost: ${postDescription || ''}\nMedia:\n${mediaUrl || ''}\nStay connected and check out the latest activity on Social Knkt.`
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: `${authorName}'s post`, text: shareText, url: shareUrl })
+      } else {
+        await navigator.clipboard.writeText(shareText)
+      }
+    } catch {
+      // Sharing can be cancelled or unavailable; keep the feed quiet.
+    }
+  }
+
+  const copyShareLink = async () => {
+    try {
+      const shareText = `📢 Social Knkt Notification\nNew Post Shared by: ${authorName}\nPost: ${postDescription || ''}\nMedia:\n${mediaUrl || ''}\nStay connected and check out the latest activity on Social Knkt.`
+      await navigator.clipboard.writeText(shareText)
+      setIsShareOpen(false)
+    } catch {
+      // Clipboard may be unavailable in some browsers.
     }
   }
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
@@ -56,7 +107,6 @@ export function PostCard({ post, onDeleted }) {
   const visibleDescription = isDescriptionExpanded || !hasLongDescription
     ? postDescription
     : `${postDescription.slice(0, descriptionLimit).trimEnd()}...`
-  const likeCount = post.likeCount ?? post.likes ?? 0
   const commentCount = post.commentCount ?? post.comments ?? 0
 
   return (
@@ -79,9 +129,9 @@ export function PostCard({ post, onDeleted }) {
           </button>
           {isOptionsOpen && (
             <div className="post-options-menu" role="menu">
-              <button className="post-delete-option" type="button" role="menuitem" onClick={handleDelete} disabled={isDeleting}>
-                <img src="/assets/logo_icons/delete_icon.svg" alt="" />
-                <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
+              <button className="post-delete-option" type="button" role="menuitem" onClick={() => { setIsOptionsOpen(false); setIsDeleteModalOpen(true) }} disabled={isDeleting}>
+                <img src="/assets/logo_icons/red_delete_icon.svg" alt="" />
+                <span>{isDeleting ? 'Deleting...' : 'Delete Post'}</span>
               </button>
             </div>
           )}
@@ -106,13 +156,17 @@ export function PostCard({ post, onDeleted }) {
       <PostMedia post={post} mediaUrl={mediaUrl} mediaAlt={mediaAlt} />
 
       <div className="post-actions">
-        <button type="button">
-          <img src="/assets/logo_icons/like.svg" alt="" />
+        <button className={`post-like-button ${isLiked ? 'is-liked' : ''}`} type="button" onClick={handleLike} aria-pressed={isLiked}>
+          <img src={isLiked ? '/assets/logo_icons/heartLike.svg' : '/assets/logo_icons/like.svg'} alt="" />
           {likeCount} Like
         </button>
         <button type="button">
           <img src="/assets/logo_icons/comment.svg" alt="" />
           {commentCount} Comments
+        </button>
+        <button type="button" onClick={() => setIsShareOpen(true)}>
+          <img src="/assets/logo_icons/share_icon.svg" alt="" />
+          Share
         </button>
         <button type="button" onClick={() => setIsReportOpen(true)}>
           <img src="/assets/logo_icons/report.svg" alt="" />
@@ -120,7 +174,34 @@ export function PostCard({ post, onDeleted }) {
         </button>
       </div>
 
-      {isReportOpen && <ReportPostModal onClose={() => setIsReportOpen(false)} />}
+      {isReportOpen && <ReportPostModal postId={post._id || post.id} onClose={() => setIsReportOpen(false)} />}
+
+      {isShareOpen && (
+        <div className="post-share-backdrop" role="presentation" onClick={() => setIsShareOpen(false)}>
+          <div className="post-share-modal" role="dialog" aria-modal="true" aria-labelledby="share-post-title" onClick={(event) => event.stopPropagation()}>
+            <button className="post-share-close" type="button" aria-label="Close" onClick={() => setIsShareOpen(false)}>×</button>
+            <h2 id="share-post-title">Share Post</h2>
+            <button className="post-share-action" type="button" onClick={handleShare}>Share</button>
+            <button className="post-share-action" type="button" onClick={copyShareLink}>Copy Link</button>
+          </div>
+        </div>
+      )}
+
+      {isDeleteModalOpen && (
+        <div className="post-delete-modal-backdrop" role="presentation" onClick={() => !isDeleting && setIsDeleteModalOpen(false)}>
+          <div className="post-delete-modal" role="dialog" aria-modal="true" aria-labelledby="delete-post-title" onClick={(event) => event.stopPropagation()}>
+            <button className="post-delete-modal-close" type="button" aria-label="Close" onClick={() => setIsDeleteModalOpen(false)} disabled={isDeleting}>×</button>
+            <h2 id="delete-post-title">Delete Post</h2>
+            <p>Are you sure you want to delete this post?</p>
+            <div className="post-delete-modal-actions">
+              <button type="button" onClick={() => setIsDeleteModalOpen(false)} disabled={isDeleting}>Cancel</button>
+              <button className="post-delete-confirm" type="button" onClick={handleDelete} disabled={isDeleting}>
+                {isDeleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </article>
   )
 }
