@@ -257,3 +257,17 @@
     height: 100%;
   }
 }
+.flick-share-backdrop { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; padding: 20px; background: rgba(0, 0, 0, .72); }
+.flick-share-modal { position: relative; width: min(360px, 100%); padding: 30px; border: 1px solid #444; border-radius: 12px; background: #1b1b1b; color: #fff; text-align: center; }
+.flick-share-modal h2 { margin: 0 0 24px; }
+.flick-share-close { position: absolute; top: 10px; right: 14px; border: 0; background: transparent; color: #bbb; cursor: pointer; font-size: 25px; }
+.flick-share-action { width: 100%; margin-top: 10px; padding: 12px; border: 0; border-radius: 24px; background: linear-gradient(100deg, #ff6046, #f719a0, #a442d4); color: #fff; cursor: pointer; font: inherit; font-weight: 600; }
+.flick-options-menu { position: absolute; right: 18px; bottom: 42px; z-index: 5; width: 155px; overflow: hidden; border: 1px solid #444; border-radius: 10px; background: #171717; }
+.flick-options-menu button { display: flex !important; flex-direction: row !important; width: 100%; height: auto !important; min-height: 34px; gap: 8px; align-items: center; justify-content: flex-start; padding: 7px 10px; border: 0; border-bottom: 1px solid #444; background: transparent; color: #fff; cursor: pointer; font-family: inherit; font-size: 13px !important; line-height: 1.2; text-align: left; }
+.flick-options-menu button:last-child { color: #ff3838; border-bottom: 0; }
+.flick-options-menu button img { width: 18px !important; height: 18px !important; min-width: 18px; object-fit: contain; }
+.flick-delete-backdrop { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: rgba(0,0,0,.75); backdrop-filter: blur(8px); }
+.flick-delete-modal { width: min(420px, calc(100% - 32px)); padding: 30px; border: 1px solid #444; border-radius: 12px; background: #1b1b1b; color: #fff; text-align: center; }
+.flick-delete-modal > div { display: flex; gap: 12px; margin-top: 24px; }
+.flick-delete-modal button { flex: 1; padding: 12px; border: 0; border-radius: 22px; background: #333; color: #fff; cursor: pointer; font: inherit; }
+.flick-delete-modal button:last-child { background: linear-gradient(100deg,#ff6046,#f719a0,#a442d4); }

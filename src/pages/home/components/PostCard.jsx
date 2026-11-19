@@ -3,9 +3,12 @@ import { ReportPostModal } from '../../../components/modals/ReportPostModal/Repo
 import { CommentsModal } from '../../../components/modals/CommentsModal/CommentsModal'
 import { deletePost, updatePostLike } from '../../../action/action'
 import { toast } from 'react-toastify'
+import { useProfile } from '../../../context/ProfileContext'
+import { AUTH_STORAGE_KEY } from '../../../utils/helper'
 const profileIcon = '/assets/logo_icons/profile_avatar.png'
 
 export function PostCard({ post, onDeleted }) {
+  const { profile } = useProfile()
   const [isReportOpen, setIsReportOpen] = useState(false)
   const [isShareOpen, setIsShareOpen] = useState(false)
   const [isCommentsOpen, setIsCommentsOpen] = useState(false)
@@ -15,6 +18,9 @@ export function PostCard({ post, onDeleted }) {
   const [isLiked, setIsLiked] = useState(Boolean(post.isLiked ?? post.liked ?? post.likeStatus))
   const [likeCount, setLikeCount] = useState(Number(post.likeCount ?? post.likes ?? 0))
   const optionsRef = useRef(null)
+  const authData = JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) || 'null')
+  const currentUserId = profile?.id || authData?.user?.id || authData?.data?.id
+  const isOwnPost = Boolean(currentUserId && (post.userId || post.user?.id) === currentUserId)
 
   useEffect(() => {
     if (!isOptionsOpen) return undefined
@@ -119,7 +125,7 @@ export function PostCard({ post, onDeleted }) {
           <h2>{authorName}</h2>
           <p>{postTime} · {post.username || post.role || ''}</p>
         </div>
-        <div className="post-options" ref={optionsRef}>
+        {isOwnPost && <div className="post-options" ref={optionsRef}>
           <button
             className="more-button"
             type="button"
@@ -137,7 +143,7 @@ export function PostCard({ post, onDeleted }) {
               </button>
             </div>
           )}
-        </div>
+        </div>}
       </div>
 
       {postDescription && (

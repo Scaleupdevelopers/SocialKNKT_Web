@@ -122,7 +122,7 @@ export function Header() {
         {isAccountMenuOpen && (
           <div className="account-menu">
             <div className="account-menu-profile">
-              <img src={profile?.image || '/assets/logo_icons/profile_alt.avif'} alt="" />
+            <img src={profile?.image || '/assets/logo_icons/profile_alt.avif'} alt="" />
               <div>
                 {isLoading ? (
                   <>

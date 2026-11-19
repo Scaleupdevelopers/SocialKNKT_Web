@@ -78,11 +78,37 @@ export const replyToComment = async (postId, commentId, comment) => {
   return postRequest('user/post/comment/reply', { postId, commentId, comment })
 }
 
+export const reportComment = async (postId, commentId, description) => {
+  return postRequest('user/post/comment/report', { postId, commentId, description })
+}
+
+export const deleteComment = async (postId, commentId) => {
+  return deleteRequest(`user/post/comment?commentId=${encodeURIComponent(commentId)}&postId=${encodeURIComponent(postId)}`)
+}
+
 export const getCommentReplies = async (commentId, page = 0) => {
   return getRequest('user/post/comment/reply', { page, commentId })
 }
 
 export const getUploadUrl = async (ext) => getRequest('upload/sign', { ext })
+
+export const updateBannerImage = async (banner_image) => {
+  return postRequest('user/update-banner-image', { banner_image })
+}
+
+export const updateProfessionalStatus = async (isProfessional) => {
+  return postRequest('user/update-professional-status', { isProfessional })
+}
+
+export const updateAccountStatus = async (profileType) => {
+  return postRequest('user/update-account-status', { profileType })
+}
+
+export const updatePassword = async (data) => {
+  return putRequest('user/password', data)
+}
+
+export const deleteAccount = async () => deleteRequest('user/delete-account')
 
 export const createPost = async (data) => postRequest('user/post', data)
 

@@ -34,6 +34,7 @@ function App() {
         <Routes>
         <Route element={<PublicOnlyRoute />}>
           <Route path="/" element={<SignIn />} />
+          <Route path="/signin" element={<SignIn />} />
         </Route>
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/verify-code" element={<VerifyCode />} />

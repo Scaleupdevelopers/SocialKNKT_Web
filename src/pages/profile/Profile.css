@@ -48,6 +48,7 @@
 .profile-summary p { margin: 0 0 22px; }
 .profile-summary-item { display: flex; gap: 10px; align-items: flex-start; }
 .profile-summary-item span { color: #bbb; }
+.profile-summary-item img { width: 16px; height: 16px; object-fit: contain; }
 .profile-summary-item small { display: block; color: #777; font-size: 10px; }
 .profile-feed {
   min-width: 0;

@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react'
 import './CommentsModal.css'
 import { commentPost, getCommentReplies, getComments, replyToComment, updateCommentLike } from '../../../action/action'
+import { deleteComment, reportComment } from '../../../action/action'
+import { toast } from 'react-toastify'
 import { useProfile } from '../../../context/ProfileContext'
 import { AUTH_STORAGE_KEY } from '../../../utils/helper'
 
 export function CommentsModal({ post, onClose }) {
   const { profile } = useProfile()
+  const authData = JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) || 'null')
+  const currentUserId = profile?.id || authData?.user?.id || authData?.data?.id
   const [comment, setComment] = useState('')
   const [comments, setComments] = useState(Array.isArray(post.comments) ? post.comments : [])
   const [isLoading, setIsLoading] = useState(true)
@@ -13,6 +17,11 @@ export function CommentsModal({ post, onClose }) {
   const [replyTarget, setReplyTarget] = useState(null)
   const [expandedReplies, setExpandedReplies] = useState({})
   const [loadingReplies, setLoadingReplies] = useState({})
+  const [openMenuId, setOpenMenuId] = useState(null)
+  const [reportTarget, setReportTarget] = useState(null)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
   const commentCount = comments.length || post.commentCount || 0
   const mediaPreview = getMediaPreview(post)
 
@@ -34,7 +43,6 @@ export function CommentsModal({ post, onClose }) {
     if (!text || !postId || isSubmitting) return
 
     const tempId = `pending-${Date.now()}`
-    const authData = JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) || 'null')
     const currentUser = profile || authData?.user || authData?.data || {}
     const username = currentUser.username || profile?.displayUsername?.replace(/^@/, '') || 'You'
     const image = currentUser.image || '/assets/logo_icons/profile_alt.avif'
@@ -118,6 +126,33 @@ export function CommentsModal({ post, onClose }) {
     setExpandedReplies((current) => ({ ...current, [commentId]: true }))
   }
 
+  const submitCommentReport = async (description) => {
+    try {
+      await reportComment(post._id || post.id, reportTarget, description)
+      toast.success('Comment reported successfully.')
+      setReportTarget(null)
+    } catch (error) {
+      toast.error(error.message || 'Unable to report comment.')
+    }
+  }
+
+  const isOwnComment = (item) => Boolean(currentUserId && item.userId === currentUserId)
+
+  const confirmDeleteComment = async () => {
+    if (!deleteTarget || isDeleting) return
+    setIsDeleting(true)
+    try {
+      await deleteComment(post._id || post.id, deleteTarget)
+      setComments((current) => removeCommentTree(current, deleteTarget))
+      setDeleteTarget(null)
+      toast.success('Comment deleted successfully.')
+    } catch (error) {
+      toast.error(error.message || 'Unable to delete comment.')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
   return (
     <div className="comments-modal-backdrop" role="presentation" onClick={onClose}>
       <section className="comments-modal" role="dialog" aria-modal="true" aria-labelledby="comments-title" onClick={(event) => event.stopPropagation()}>
@@ -132,8 +167,9 @@ export function CommentsModal({ post, onClose }) {
               <strong>{post.username || post.user?.username || 'Username'}</strong>
               <span>{post.createdAt ? formatTime(post.createdAt) : ''}</span>
             </div>
+            {currentUserId && (post.userId || post.user?.id) === currentUserId ? <button className="comments-more-button" type="button" aria-label="Post options">⋮</button> : null}
           </div>
-          {post.description ? <p className="comments-post-description">{post.description}</p> : null}
+          {post.description ? <p className="comments-post-description">{isDescriptionExpanded || post.description.length <= 160 ? post.description : `${post.description.slice(0, 160).trimEnd()}...`} {post.description.length > 160 ? <button className="comments-description-more" type="button" onClick={() => setIsDescriptionExpanded((value) => !value)}>{isDescriptionExpanded ? 'Less' : 'More'}</button> : null}</p> : null}
           <h2 id="comments-title">Comments</h2>
           {isLoading ? (
             <div className="comments-skeleton" aria-label="Loading comments">
@@ -166,6 +202,8 @@ export function CommentsModal({ post, onClose }) {
                       <button type="button" onClick={() => setReplyTarget({ _id: item._id || item.id, username: item.username || 'user' })}>Reply</button>
                       <span className="comment-divider">|</span>
                       <span>{item.likeCount || 0} Likes</span>
+                      <button className="comment-meta-more" type="button" aria-label="Comment options" onClick={() => setOpenMenuId(openMenuId === (item._id || item.id) ? null : (item._id || item.id))}>•••</button>
+                      {openMenuId === (item._id || item.id) ? <CommentMenu canDelete={isOwnComment(item)} onReport={() => { setReportTarget(item._id || item.id); setOpenMenuId(null) }} onDelete={() => { setDeleteTarget(item._id || item.id); setOpenMenuId(null) }} /> : null}
                     </div>
                     {item.commentReplies > 0 ? <button className="view-replies" type="button" onClick={() => handleViewReplies(item)}>View {item.commentReplies} Replies <img src="/assets/logo_icons/reply_icon.svg" alt="" /></button> : null}
                     {loadingReplies[item._id || item.id] ? (
@@ -181,7 +219,7 @@ export function CommentsModal({ post, onClose }) {
                             <strong>{reply.username || 'Username'}</strong>
                           </div>
                           <p>{reply.comment} <span className="comment-time">{formatTime(reply.createdAt)}</span></p>
-                          <div className="comment-meta"><span>{reply.likeCount || 0} Likes</span></div>
+                          <div className="comment-meta"><span>{reply.likeCount || 0} Likes</span><button className="comment-meta-more" type="button" aria-label="Reply options" onClick={() => setOpenMenuId(openMenuId === (reply._id || reply.id) ? null : (reply._id || reply.id))}>•••</button>{openMenuId === (reply._id || reply.id) ? <CommentMenu canDelete={isOwnComment(reply)} onReport={() => { setReportTarget(reply._id || reply.id); setOpenMenuId(null) }} onDelete={() => { setDeleteTarget(reply._id || reply.id); setOpenMenuId(null) }} /> : null}</div>
                         </div>
                         <button className="comment-like-button" type="button" onClick={() => handleCommentLike(reply)} aria-label={reply.isLiked ? 'Unlike reply' : 'Like reply'}>
                           <img src={reply.isLiked ? '/assets/logo_icons/heartLike.svg' : '/assets/logo_icons/like.svg'} alt="" />
@@ -202,8 +240,27 @@ export function CommentsModal({ post, onClose }) {
           </div>
         </div>
       </section>
+      {reportTarget ? <CommentReportModal onClose={() => setReportTarget(null)} onSubmit={submitCommentReport} /> : null}
+      {deleteTarget ? <DeleteCommentModal onClose={() => setDeleteTarget(null)} onConfirm={confirmDeleteComment} isDeleting={isDeleting} /> : null}
     </div>
   )
+}
+
+function CommentMenu({ canDelete, onReport, onDelete }) {
+  return <div className="comment-options-menu"><button type="button" onClick={onReport}><img src="/assets/logo_icons/report.svg" alt="" /><span>Report</span></button>{canDelete ? <button type="button" onClick={onDelete}><img src="/assets/logo_icons/red_delete_icon.svg" alt="" /><span>Delete Comment</span></button> : null}</div>
+}
+
+function DeleteCommentModal({ onClose, onConfirm, isDeleting }) {
+  return <div className="comment-report-backdrop" role="presentation" onClick={isDeleting ? undefined : onClose}><div className="comment-delete-modal" role="dialog" onClick={(event) => event.stopPropagation()}><button className="comment-report-close" type="button" onClick={onClose} disabled={isDeleting}>×</button><h2>Delete Comment</h2><p>Are you sure you want to delete this comment?</p><div className="comment-delete-actions"><button type="button" onClick={onClose} disabled={isDeleting}>No</button><button type="button" onClick={onConfirm} disabled={isDeleting}>{isDeleting ? 'Deleting...' : 'Delete'}</button></div></div></div>
+}
+
+function CommentReportModal({ onClose, onSubmit }) {
+  const reasons = ['Spam or misleading content', 'Harassment or bullying', 'Hate speech or discrimination', 'Inappropriate or offensive content', 'Violence or dangerous content', 'Other']
+  const [reason, setReason] = useState('')
+  const [description, setDescription] = useState('')
+  const handleSubmit = () => onSubmit(reason === 'Other' ? description.trim() || 'Other' : reason || 'Other')
+
+  return <div className="comment-report-backdrop" role="presentation" onClick={onClose}><div className="comment-report-modal" role="dialog" onClick={(event) => event.stopPropagation()}><button className="comment-report-close" type="button" onClick={onClose}>×</button><h2>Report Comment</h2><p>Why are you reporting this Comment?</p><div className="comment-report-reasons">{reasons.map((item) => <label key={item}><input type="radio" name="comment-report-reason" checked={reason === item} onChange={() => setReason(item)} /><span>{item}</span></label>)}</div>{reason === 'Other' ? <textarea placeholder="Describe..." value={description} onChange={(event) => setDescription(event.target.value)} /> : null}<button className="comment-report-submit" type="button" onClick={handleSubmit}>Report</button></div></div>
 }
 
 function formatTime(value) {
@@ -224,6 +281,12 @@ function updateCommentTree(items, commentId, isLiked) {
     if (item.replies?.length) return { ...item, replies: updateCommentTree(item.replies, commentId, isLiked) }
     return item
   })
+}
+
+function removeCommentTree(items, commentId) {
+  return items.filter((item) => (item._id || item.id) !== commentId).map((item) => (
+    item.replies?.length ? { ...item, replies: removeCommentTree(item.replies, commentId), commentReplies: item.replies.some((reply) => (reply._id || reply.id) === commentId) ? Math.max(0, (item.commentReplies || 1) - 1) : item.commentReplies } : item
+  ))
 }
 
 function getMediaPreview(post) {

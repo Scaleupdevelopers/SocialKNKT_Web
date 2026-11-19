@@ -4,6 +4,7 @@ import { Header } from '../../layouts/Header'
 import { CreatePost } from '../home/Home'
 import { PostCard } from '../home/components/PostCard'
 import { ProfileHeader } from '../settings/components/ProfileHeader'
+import { useProfile } from '../../context/ProfileContext'
 import '../home/Home.css'
 import '../settings/Settings.css'
 import './Profile.css'
@@ -36,6 +37,7 @@ const profilePosts = [
 ]
 
 export function Profile() {
+  const { profile } = useProfile()
   const [activeTab, setActiveTab] = useState('all')
 
   return (
@@ -61,7 +63,7 @@ export function Profile() {
           <MediaContent />
         ) : (
           <div className="profile-content">
-            <ProfileSummary />
+            <ProfileSummary profile={profile} />
             <section className="profile-feed" aria-label="Profile posts">
               <CreatePost />
               {profilePosts.map((post) => (
@@ -114,28 +116,29 @@ function MediaContent() {
   )
 }
 
-function ProfileSummary() {
+function ProfileSummary({ profile }) {
+  const work = profile?.workExperiences || []
+  const education = profile?.educations || []
+  const locations = profile?.placesLived || profile?.locations || []
   return (
     <aside className="profile-summary">
       <h2>Bio</h2>
-      <p>I’m exploring entrepreneurship after several years in finance and operations. I’m passionate about building something meaningful and enjoy working with people who value trust, ownership, and thoughtful execution.</p>
+      <p>{profile?.bio || 'No bio added yet.'}</p>
 
       <h2>Work</h2>
-      <p className="profile-summary-item">💼 <span>No workplaces to show</span></p>
+      {work.length ? work.map((item, index) => <p className="profile-summary-item" key={`work-${index}`}>💼 <span>{item.jobTitle || item.companyName || 'No workplace to show'}</span></p>) : <p className="profile-summary-item">💼 <span>No workplaces to show</span></p>}
 
       <h2>Education</h2>
-      <p className="profile-summary-item">🎓 <span>Studied at Gaston College</span></p>
-      <p className="profile-summary-item">🎓 <span>Went to Lincolnton High</span></p>
+      {education.length ? education.map((item, index) => <p className="profile-summary-item" key={`education-${index}`}>🎓 <span>{item.schoolName || item.instituteName || item.degree || 'Education'}</span></p>) : <p className="profile-summary-item">🎓 <span>No education to show</span></p>}
 
       <h2>Places Lived</h2>
-      <p className="profile-summary-item">📍 <span>Lincolnton, North Carolina<small>Current City</small></span></p>
-      <p className="profile-summary-item">📍 <span>Lincolnton, North Carolina<small>Hometown</small></span></p>
+      {locations.length ? locations.map((item, index) => <p className="profile-summary-item" key={`location-${index}`}><img src="/assets/logo_icons/location.svg" alt="" /> <span>{[item.cityName || item.city, item.stateName || item.state, item.countryName || item.country].filter(Boolean).join(', ')}<small>{item.currentlyLiving ? 'Current City' : ''}</small></span></p>) : <p className="profile-summary-item"><img src="/assets/logo_icons/location.svg" alt="" /> <span>No locations to show</span></p>}
 
       <h2>Basic Info</h2>
-      <p className="profile-summary-item">♀ <span>Female<small>Gender</small></span></p>
+      <p className="profile-summary-item">♀ <span>{profile?.gender || 'Not added'}<small>Gender</small></span></p>
 
       <h2>Name pronunciation</h2>
-      <p className="profile-summary-item">🔊 <span>ri-bek-uh</span></p>
+      <p className="profile-summary-item">🔊 <span>{profile?.phonetic_spelling || 'Not added'}</span></p>
     </aside>
   )
 }

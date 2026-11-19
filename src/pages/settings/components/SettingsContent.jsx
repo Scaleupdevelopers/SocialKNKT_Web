@@ -1,10 +1,23 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { toast } from 'react-toastify'
+import { deleteAccount, updateAccountStatus, updatePassword, updateProfessionalStatus } from '../../../action/action'
+import { useProfile } from '../../../context/ProfileContext'
 
 export function SettingsContent() {
-  const [isProfessional, setIsProfessional] = useState(true)
-  const [isPrivateAccount, setIsPrivateAccount] = useState(true)
+  const navigate = useNavigate()
+  const { profile, setProfile } = useProfile()
+  const [isProfessional, setIsProfessional] = useState(Boolean(profile?.isProfessional))
+  const [isProfessionalUpdating, setIsProfessionalUpdating] = useState(false)
+  const [isPrivateAccount, setIsPrivateAccount] = useState(profile?.profileType === 2)
+  const [isPrivacyUpdating, setIsPrivacyUpdating] = useState(false)
   const [activeSection, setActiveSection] = useState('privacy')
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
+
+  useEffect(() => {
+    if (typeof profile?.isProfessional === 'boolean') setIsProfessional(profile.isProfessional)
+    if (typeof profile?.profileType === 'number') setIsPrivateAccount(profile.profileType === 2)
+  }, [profile?.isProfessional, profile?.profileType])
 
   return (
     <div className="settings-content">
@@ -17,7 +30,21 @@ export function SettingsContent() {
             <Toggle
               checked={isProfessional}
               label="Toggle professional mode"
-              onChange={() => setIsProfessional(!isProfessional)}
+              onChange={async () => {
+                if (isProfessionalUpdating) return
+                const nextValue = !isProfessional
+                setIsProfessional(nextValue)
+                setIsProfessionalUpdating(true)
+                try {
+                  await updateProfessionalStatus(nextValue)
+                  setProfile((current) => current ? { ...current, isProfessional: nextValue } : current)
+                } catch (error) {
+                  setIsProfessional(!nextValue)
+                  toast.error(error.message || 'Unable to update professional status.')
+                } finally {
+                  setIsProfessionalUpdating(false)
+                }
+              }}
             />
           </div>
 
@@ -54,7 +81,22 @@ export function SettingsContent() {
               <Toggle
                 checked={isPrivateAccount}
                 label="Toggle account privacy"
-                onChange={() => setIsPrivateAccount(!isPrivateAccount)}
+                onChange={async () => {
+                  if (isPrivacyUpdating) return
+                  const nextValue = !isPrivateAccount
+                  setIsPrivateAccount(nextValue)
+                  setIsPrivacyUpdating(true)
+                  try {
+                    const profileType = nextValue ? 2 : 1
+                    await updateAccountStatus(profileType)
+                    setProfile((current) => current ? { ...current, profileType } : current)
+                  } catch (error) {
+                    setIsPrivateAccount(!nextValue)
+                    toast.error(error.message || 'Unable to update account privacy.')
+                  } finally {
+                    setIsPrivacyUpdating(false)
+                  }
+                }}
               />
             </div>
           </section>
@@ -63,7 +105,7 @@ export function SettingsContent() {
         )}
       </div>
 
-      {isDeleteOpen && <DeleteAccountModal onClose={() => setIsDeleteOpen(false)} />}
+      {isDeleteOpen && <DeleteAccountModal onClose={() => setIsDeleteOpen(false)} onDeleted={() => navigate('/signin')} />}
     </div>
   )
 }
@@ -82,7 +124,8 @@ function Toggle({ checked, label, onChange }) {
   )
 }
 
-function DeleteAccountModal({ onClose }) {
+function DeleteAccountModal({ onClose, onDeleted }) {
+  const [isDeleting, setIsDeleting] = useState(false)
   function handleBackdropClick(event) {
     if (event.target === event.currentTarget) {
       onClose()
@@ -106,27 +149,74 @@ function DeleteAccountModal({ onClose }) {
         <p>
           Once you confirm, your account will be deactivated for 30 days. You can recover your account during this period. After 30 days, your account and associated data will be permanently deleted and cannot be recovered.
         </p>
-        <button className="delete-account-button" type="button" onClick={onClose}>Delete</button>
+        <button className="delete-account-button" type="button" disabled={isDeleting} onClick={async () => {
+          if (isDeleting) return
+          setIsDeleting(true)
+          try {
+            await deleteAccount()
+            localStorage.removeItem('socialknkt_auth')
+            toast.success('Account deleted successfully.')
+            onDeleted()
+          } catch (error) {
+            toast.error(error.message || 'Unable to delete account.')
+          } finally {
+            setIsDeleting(false)
+          }
+        }}>{isDeleting ? 'Deleting...' : 'Delete'}</button>
       </section>
     </div>
   )
 }
 
 function ChangePasswordForm() {
+  const [values, setValues] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' })
+  const [errors, setErrors] = useState({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const updateValue = (field, value) => {
+    setValues((current) => ({ ...current, [field]: value }))
+    setErrors((current) => ({ ...current, [field]: '' }))
+  }
+
+  const handleSubmit = async (event) => {
+    event.preventDefault()
+    const nextErrors = {}
+    if (!values.oldPassword) nextErrors.oldPassword = 'Old password is required.'
+    if (!values.newPassword) nextErrors.newPassword = 'New password is required.'
+    if (!values.confirmPassword) nextErrors.confirmPassword = 'Confirm password is required.'
+    if (values.newPassword && values.confirmPassword && values.newPassword !== values.confirmPassword) nextErrors.confirmPassword = 'Passwords do not match.'
+    if (Object.keys(nextErrors).length) {
+      setErrors(nextErrors)
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+      await updatePassword({ oldPassword: values.oldPassword, newPassword: values.newPassword })
+      setValues({ oldPassword: '', newPassword: '', confirmPassword: '' })
+      setErrors({})
+      toast.success('Password changed successfully.')
+    } catch (error) {
+      toast.error(error.message || 'Unable to change password.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   return (
     <section className="privacy-settings change-password-section">
       <h3>Change Password</h3>
-      <form onSubmit={(event) => event.preventDefault()}>
-        <PasswordField label="Old Password" placeholder="Enter Old Password" info="Your current password is required." />
-        <PasswordField label="New Password" placeholder="Enter New Password" info="Use at least 8 characters with a number and symbol." />
-        <PasswordField label="Confirm Password" placeholder="Re-enter New Password" info="Enter the same new password again." />
-        <button className="community-gradient-button settings-password-submit" type="submit">Change Password</button>
+      <form onSubmit={handleSubmit} noValidate>
+        <PasswordField label="Old Password" placeholder="Enter Old Password" info="Your current password is required." value={values.oldPassword} error={errors.oldPassword} onChange={(value) => updateValue('oldPassword', value)} />
+        <PasswordField label="New Password" placeholder="Enter New Password" info="Use at least 8 characters with a number and symbol." value={values.newPassword} error={errors.newPassword} onChange={(value) => updateValue('newPassword', value)} />
+        <PasswordField label="Confirm Password" placeholder="Re-enter New Password" info="Enter the same new password again." value={values.confirmPassword} error={errors.confirmPassword} onChange={(value) => updateValue('confirmPassword', value)} />
+        <button className="community-gradient-button settings-password-submit" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Updating...' : 'Change Password'}</button>
       </form>
     </section>
   )
 }
 
-function PasswordField({ label, placeholder, info }) {
+function PasswordField({ label, placeholder, info, value, error, onChange }) {
   const [isVisible, setIsVisible] = useState(false)
   const [isInfoOpen, setIsInfoOpen] = useState(false)
 
@@ -138,11 +228,12 @@ function PasswordField({ label, placeholder, info }) {
         {isInfoOpen && <span className="password-info-popover">{info}</span>}
       </span>
       <span className="settings-password-input">
-        <input type={isVisible ? 'text' : 'password'} placeholder={placeholder} />
+        <input type={isVisible ? 'text' : 'password'} placeholder={placeholder} value={value} onChange={(event) => onChange(event.target.value)} aria-invalid={Boolean(error)} />
         <button type="button" aria-label={`Toggle ${label} visibility`} onClick={() => setIsVisible(!isVisible)}>
           <EyeIcon hidden={!isVisible} />
         </button>
       </span>
+      {error && <small className="settings-field-error">{error}</small>}
     </label>
   )
 }

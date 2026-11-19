@@ -13,7 +13,7 @@ const reportReasons = [
   'Other',
 ]
 
-export function ReportPostModal({ postId, onClose }) {
+export function ReportPostModal({ postId, onClose, contentLabel = 'Post' }) {
   const [selectedReason, setSelectedReason] = useState('')
   const [description, setDescription] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -37,8 +37,8 @@ export function ReportPostModal({ postId, onClose }) {
   }
 
   return (
-    <ModalShell title="Report Post" onClose={onClose} className="report-post-modal">
-      <p className="report-question">Why are you reporting this Post?</p>
+    <ModalShell title={`Report ${contentLabel}`} onClose={onClose} className="report-post-modal">
+      <p className="report-question">Why are you reporting this {contentLabel}?</p>
       <div className="report-reasons">
         {reportReasons.map((reason, index) => (
           <label key={reason}>
