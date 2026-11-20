@@ -5,9 +5,14 @@ import { deletePost, updatePostLike } from '../../../action/action'
 import { toast } from 'react-toastify'
 import { useProfile } from '../../../context/ProfileContext'
 import { AUTH_STORAGE_KEY } from '../../../utils/helper'
+import * as pdfjsLib from 'pdfjs-dist'
+import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker
+
 const profileIcon = '/assets/logo_icons/profile_avatar.png'
 
-export function PostCard({ post, onDeleted }) {
+export function PostCard({ post, onDeleted, showReport = true }) {
   const { profile } = useProfile()
   const [isReportOpen, setIsReportOpen] = useState(false)
   const [isShareOpen, setIsShareOpen] = useState(false)
@@ -17,6 +22,7 @@ export function PostCard({ post, onDeleted }) {
   const [isDeleting, setIsDeleting] = useState(false)
   const [isLiked, setIsLiked] = useState(Boolean(post.isLiked ?? post.liked ?? post.likeStatus))
   const [likeCount, setLikeCount] = useState(Number(post.likeCount ?? post.likes ?? 0))
+  const [commentCount, setCommentCount] = useState(Number(post.commentCount ?? post.comments ?? 0))
   const optionsRef = useRef(null)
   const authData = JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) || 'null')
   const currentUserId = profile?.id || authData?.user?.id || authData?.data?.id
@@ -115,7 +121,6 @@ export function PostCard({ post, onDeleted }) {
   const visibleDescription = isDescriptionExpanded || !hasLongDescription
     ? postDescription
     : `${postDescription.slice(0, descriptionLimit).trimEnd()}...`
-  const commentCount = post.commentCount ?? post.comments ?? 0
 
   return (
     <article className="feed-post">
@@ -176,14 +181,16 @@ export function PostCard({ post, onDeleted }) {
           <img src="/assets/logo_icons/share_icon.svg" alt="" />
           Share
         </button>
-        <button type="button" onClick={() => setIsReportOpen(true)}>
-          <img src="/assets/logo_icons/report.svg" alt="" />
-          Report
-        </button>
+        {showReport && !isOwnPost && (
+          <button type="button" onClick={() => setIsReportOpen(true)}>
+            <img src="/assets/logo_icons/report.svg" alt="" />
+            Report
+          </button>
+        )}
       </div>
 
       {isReportOpen && <ReportPostModal postId={post._id || post.id} onClose={() => setIsReportOpen(false)} />}
-      {isCommentsOpen && <CommentsModal post={post} onClose={() => setIsCommentsOpen(false)} />}
+      {isCommentsOpen && <CommentsModal post={post} onClose={() => setIsCommentsOpen(false)} onCommentCountChange={(change) => setCommentCount((count) => Math.max(0, count + change))} />}
 
       {isShareOpen && (
         <div className="post-share-backdrop" role="presentation" onClick={() => setIsShareOpen(false)}>
@@ -220,6 +227,17 @@ function PostMedia({ post, mediaUrl, mediaAlt }) {
     return null
   }
 
+  if (isDocumentMedia(post)) {
+    const thumbnail = getDocumentThumbnail(post)
+
+    return (
+      <a className="post-document-thumbnail" href={mediaUrl} target="_blank" rel="noreferrer" aria-label={`Open ${mediaAlt}`}>
+        {thumbnail ? <img src={thumbnail} alt={mediaAlt} /> : <div className="post-document-placeholder">Document</div>}
+        <span>Click to open full document</span>
+      </a>
+    )
+  }
+
   const embedUrl = getVideoEmbedUrl(mediaUrl)
 
   if (embedUrl) {
@@ -250,6 +268,96 @@ function PostMedia({ post, mediaUrl, mediaAlt }) {
   return <img className="post-image" src={mediaUrl} alt={mediaAlt} />
 }
 
+function DocumentThumbnail({ url, thumbnail, title }) {
+  const canvasRef = useRef(null)
+  const [isOpen, setIsOpen] = useState(false)
+  const [previewFailed, setPreviewFailed] = useState(false)
+
+  useEffect(() => {
+    if (thumbnail) return undefined
+
+    let cancelled = false
+    const loadingTask = pdfjsLib.getDocument(url)
+    loadingTask.promise.then(async (pdf) => {
+      const page = await pdf.getPage(1)
+      if (cancelled || !canvasRef.current) return
+      const baseViewport = page.getViewport({ scale: 1 })
+      const scale = Math.min(1.5, 900 / baseViewport.width)
+      const viewport = page.getViewport({ scale })
+      const canvas = canvasRef.current
+      canvas.width = viewport.width
+      canvas.height = viewport.height
+      await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise
+    }).catch(() => {})
+
+    return () => {
+      cancelled = true
+      loadingTask.destroy()
+    }
+  }, [thumbnail, url])
+
+  return (
+    <>
+      <button className="post-document-thumbnail" type="button" onClick={() => setIsOpen(true)} aria-label={`Open ${title}`}>
+      {thumbnail ? <img src={thumbnail} alt={title} /> : <canvas ref={canvasRef} aria-label={title} />}
+      <span>Tap to open full document</span>
+      </button>
+      {isOpen && (
+        <div className="post-document-modal" role="presentation" onClick={() => setIsOpen(false)}>
+          <div className="post-document-modal-content" role="dialog" aria-modal="true" aria-label={title} onClick={(event) => event.stopPropagation()}>
+            <button className="post-document-modal-close" type="button" onClick={() => setIsOpen(false)} aria-label="Close">×</button>
+            {previewFailed ? <iframe className="post-document-fallback" src={url} title={title} /> : <PdfPreview url={url} title={title} onError={() => setPreviewFailed(true)} />}
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+function PdfPreview({ url, title, onError }) {
+  const containerRef = useRef(null)
+
+  useEffect(() => {
+    let cancelled = false
+    let loadingTask
+
+    const renderPdf = async () => {
+      const container = containerRef.current
+      if (!container) return
+      container.replaceChildren()
+
+      try {
+        loadingTask = pdfjsLib.getDocument(url)
+        const pdf = await loadingTask.promise
+
+        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+          if (cancelled) return
+          const page = await pdf.getPage(pageNumber)
+          const baseViewport = page.getViewport({ scale: 1 })
+          const scale = Math.min(1.8, (container.clientWidth - 24) / baseViewport.width)
+          const viewport = page.getViewport({ scale })
+          const canvas = document.createElement('canvas')
+          canvas.className = 'post-pdf-page'
+          canvas.width = viewport.width
+          canvas.height = viewport.height
+          container.appendChild(canvas)
+          await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise
+        }
+      } catch {
+        if (!cancelled) onError?.()
+      }
+    }
+
+    renderPdf()
+    return () => {
+      cancelled = true
+      loadingTask?.destroy()
+    }
+  }, [url])
+
+  return <div ref={containerRef} className="post-document-preview" aria-label={title} />
+}
+
 function isVideoMedia(post) {
   const mediaType = String(post.mediaType || '').toLowerCase().replace(/[-_\s]/g, '')
   const mediaUrl = String(post.media || '').toLowerCase()
@@ -261,6 +369,16 @@ function isVideoMedia(post) {
     'link',
   ].includes(mediaType) || /\.(mp4|webm|ogg)(\?|$)/.test(mediaUrl)
 }
+
+function isDocumentMedia(post) {
+  const mediaType = String(post.mediaType || '').toLowerCase().replace(/[-_\s]/g, '')
+  return ['document', 'file', 'pdf'].includes(mediaType)
+}
+
+function getDocumentThumbnail(post) {
+  return post.thumbnail || post.thumbnailUrl || post.mediaThumbnail || post.documentThumbnail || ''
+}
+
 
 function getVideoEmbedUrl(url) {
   try {

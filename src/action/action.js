@@ -38,8 +38,8 @@ export const getCities = async (data) => {
   return postRequest('user/get-cities', data)
 }
 
-export const getProfileMedia = async (page = 0, limit = 10) => {
-  return getRequest('user/profile/media', { page, limit })
+export const getProfileMedia = async (page = 0, limit = 10, userId) => {
+  return getRequest('user/profile/media', { page, limit, ...(userId ? { userId } : {}) })
 }
 
 export const getPosts = async (page = 0, limit = 10) => {

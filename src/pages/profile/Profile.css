@@ -46,12 +46,24 @@
 }
 .profile-summary h2 { margin: 0 0 7px; color: #eee; font-size: 15px; }
 .profile-summary p { margin: 0 0 22px; }
-.profile-summary-item { display: flex; gap: 10px; align-items: flex-start; }
+.profile-summary-item { display: flex; gap: 10px; align-items: center; }
 .profile-summary-item span { color: #bbb; }
-.profile-summary-item img { width: 16px; height: 16px; object-fit: contain; }
+.profile-summary-item img { width: 48px; height: 48px; object-fit: cover; }
+.profile-summary-item .profile-summary-icon-circle { flex: 0 0 48px; padding: 11px; border-radius: 50%; background: #fff; object-fit: contain; }
 .profile-summary-item small { display: block; color: #777; font-size: 10px; }
 .profile-feed {
   min-width: 0;
+}
+
+.profile-feed .feed-post {
+  background: #1c1c1c;
+}
+
+.profile-posts-loading,
+.profile-posts-empty {
+  padding: 40px 16px;
+  color: #999;
+  text-align: center;
 }
 
 .profile-media-content {

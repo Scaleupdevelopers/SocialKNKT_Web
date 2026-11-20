@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { AskShareModal } from '../../components/modals/AskShareModal/AskShareModal'
 import { createPost, getFlicks, getPosts, getUploadUrl } from '../../action/action'
+import { createPdfThumbnail } from '../../utils/pdfThumbnail'
 import { toast } from 'react-toastify'
 import { Header } from '../../layouts/Header'
 import { FlicksSection } from './components/FlicksSection'
@@ -23,6 +24,7 @@ const addOptions = [
   ['post_card_video.svg', 'Add flicks'],
   ['post_card_video.svg', 'Add a video'],
   ['post_card_video_link.svg', 'Add Video Link'],
+  ['post_card_doc.svg', 'Add a document'],
 ]
 
 function PostSkeleton() {
@@ -197,6 +199,7 @@ export function CreatePost() {
   const createPostRef = useRef(null)
   const photoInputRef = useRef(null)
   const videoInputRef = useRef(null)
+  const documentInputRef = useRef(null)
 
   const handlePost = async (linkOverride = videoLink) => {
     if (isSubmitting) return
@@ -206,7 +209,7 @@ export function CreatePost() {
       const payload = {
         postType: profileType === 'Professional' ? 1 : profileType === 'Personal' ? 2 : 3,
         description: postText,
-        mediaType: link.trim() ? 'videolink' : selectedFile?.type?.startsWith('video/') ? 'video' : selectedFile ? 'image' : undefined,
+        mediaType: link.trim() ? 'videolink' : selectedFile?.type?.startsWith('video/') ? 'video' : selectedFile?.type?.startsWith('image/') ? 'image' : selectedFile ? 'document' : undefined,
       }
       if (link.trim()) {
         payload.media = link.trim()
@@ -217,6 +220,17 @@ export function CreatePost() {
         const upload = await fetch(signedUrl.data, { method: 'PUT', headers: { 'Content-Type': selectedFile.type || 'application/octet-stream' }, body: selectedFile })
         if (!upload.ok) throw new Error('Unable to upload media.')
         payload.media = signedUrl.data.split('?')[0]
+        if (selectedFile.type === 'application/pdf' || ext === 'pdf') {
+          const thumbnailBlob = await createPdfThumbnail(selectedFile)
+          const thumbnailUrl = await getUploadUrl('png')
+          const thumbnailUpload = await fetch(thumbnailUrl.data, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'image/png' },
+            body: thumbnailBlob,
+          })
+          if (!thumbnailUpload.ok) throw new Error('Unable to upload document preview.')
+          payload.thumbnail = thumbnailUrl.data.split('?')[0]
+        }
       }
       await createPost(payload)
       toast.success('Post created successfully.')
@@ -289,6 +303,7 @@ export function CreatePost() {
       </div>
       <input ref={photoInputRef} type="file" accept="image/*" hidden onChange={(event) => setSelectedFile(event.target.files?.[0] || null)} />
       <input ref={videoInputRef} type="file" accept="video/*" hidden onChange={(event) => setSelectedFile(event.target.files?.[0] || null)} />
+      <input ref={documentInputRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv" hidden onChange={(event) => setSelectedFile(event.target.files?.[0] || null)} />
       <div className="create-post-actions">
         <div className="home-add-wrapper">
           <button
@@ -300,12 +315,14 @@ export function CreatePost() {
           </button>
           {isAddMenuOpen && (
             <AddContentMenu
+              showDocument={profileType !== 'Personal'}
               onCreateThread={() => {
                 setIsAddMenuOpen(false)
                 setIsAskShareOpen(true)
               }}
               onPhoto={() => photoInputRef.current?.click()}
               onVideo={() => videoInputRef.current?.click()}
+              onDocument={() => { setIsAddMenuOpen(false); documentInputRef.current?.click() }}
               onVideoLink={() => { setIsVideoLinkModalOpen(true); setIsAddMenuOpen(false) }}
             />
           )}
@@ -357,14 +374,14 @@ function ProfileTypeSelector({ value, isOpen, onToggle, onSelect }) {
   )
 }
 
-function AddContentMenu({ onCreateThread, onPhoto, onVideo, onVideoLink }) {
+function AddContentMenu({ onCreateThread, onPhoto, onVideo, onVideoLink, onDocument, showDocument }) {
   return (
     <div className="home-add-menu">
-      {addOptions.map(([icon, label]) => (
+      {addOptions.filter(([, label]) => label !== 'Add a document' || showDocument).map(([icon, label]) => (
         <button
           type="button"
           key={label}
-          onClick={label === 'Create KNKT(n) Thread' ? onCreateThread : label === 'Add a photo' ? onPhoto : label === 'Add a video' || label === 'Add flicks' ? onVideo : label === 'Add Video Link' ? onVideoLink : undefined}
+          onClick={label === 'Create KNKT(n) Thread' ? onCreateThread : label === 'Add a photo' ? onPhoto : label === 'Add a video' || label === 'Add flicks' ? onVideo : label === 'Add Video Link' ? onVideoLink : label === 'Add a document' ? onDocument : undefined}
         >
           <img src={`/assets/logo_icons/${icon}`} alt="" />
           {label}

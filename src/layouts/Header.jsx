@@ -5,6 +5,7 @@ import { AUTH_STORAGE_KEY } from '../utils/helper'
 import './Header.css'
 import { useProfile } from '../context/ProfileContext'
 import { createPost, getUploadUrl } from '../action/action'
+import { createPdfThumbnail } from '../utils/pdfThumbnail'
 import { toast } from 'react-toastify'
 
 const navigationItems = [
@@ -187,6 +188,7 @@ function PostComposerModal({ onClose }) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const photoInputRef = useRef(null)
   const videoInputRef = useRef(null)
+  const documentInputRef = useRef(null)
   const modalRef = useRef(null)
 
   const addOptions = [
@@ -195,12 +197,14 @@ function PostComposerModal({ onClose }) {
     ['post_card_video.svg', 'Add flicks'],
     ['post_card_video.svg', 'Add a video'],
     ['post_card_video_link.svg', 'Add Video Link'],
+    ['post_card_doc.svg', 'Add a document'],
   ]
 
   const handleAddOption = (label) => {
     setIsAddMenuOpen(false)
     if (label === 'Add a photo') photoInputRef.current?.click()
     if (label === 'Add a video' || label === 'Add flicks') videoInputRef.current?.click()
+    if (label === 'Add a document') documentInputRef.current?.click()
   }
 
   const handleSubmit = async (linkOverride = videoLink) => {
@@ -211,7 +215,7 @@ function PostComposerModal({ onClose }) {
       const payload = {
         postType: profileType === 'Professional' ? 1 : profileType === 'Personal' ? 2 : 3,
         description: postText,
-        mediaType: link.trim() ? 'videolink' : selectedFile?.type?.startsWith('video/') ? 'video' : selectedFile ? 'image' : undefined,
+        mediaType: link.trim() ? 'videolink' : selectedFile?.type?.startsWith('video/') ? 'video' : selectedFile?.type?.startsWith('image/') ? 'image' : selectedFile ? 'document' : undefined,
       }
 
       if (link.trim()) {
@@ -227,6 +231,17 @@ function PostComposerModal({ onClose }) {
         })
         if (!uploadResponse.ok) throw new Error('Unable to upload media.')
         payload.media = signedResponse.data.split('?')[0]
+        if (selectedFile.type === 'application/pdf' || ext === 'pdf') {
+          const thumbnailBlob = await createPdfThumbnail(selectedFile)
+          const thumbnailUrl = await getUploadUrl('png')
+          const thumbnailUpload = await fetch(thumbnailUrl.data, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'image/png' },
+            body: thumbnailBlob,
+          })
+          if (!thumbnailUpload.ok) throw new Error('Unable to upload document preview.')
+          payload.thumbnail = thumbnailUrl.data.split('?')[0]
+        }
       }
 
       await createPost(payload)
@@ -327,6 +342,7 @@ function PostComposerModal({ onClose }) {
 
         <input ref={photoInputRef} type="file" accept="image/*" hidden onChange={(event) => setSelectedFile(event.target.files?.[0] || null)} />
         <input ref={videoInputRef} type="file" accept="video/*" hidden onChange={(event) => setSelectedFile(event.target.files?.[0] || null)} />
+        <input ref={documentInputRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv" hidden onChange={(event) => setSelectedFile(event.target.files?.[0] || null)} />
 
         <div className="post-modal-actions">
           <div className="post-add-wrapper">
@@ -341,7 +357,7 @@ function PostComposerModal({ onClose }) {
 
             {isAddMenuOpen && (
               <div className="post-add-menu">
-                {addOptions.map(([icon, label]) => (
+                {addOptions.filter(([, label]) => label !== 'Add a document' || profileType !== 'Personal').map(([icon, label]) => (
                   <button
                     type="button"
                     key={label}
@@ -349,7 +365,7 @@ function PostComposerModal({ onClose }) {
                       if (label === 'Create KNKT(n) Thread') {
                         setIsAddMenuOpen(false)
                         setIsAskShareOpen(true)
-                      } else if (label === 'Add a photo' || label === 'Add a video' || label === 'Add flicks') {
+                      } else if (label === 'Add a photo' || label === 'Add a video' || label === 'Add flicks' || label === 'Add a document') {
                         handleAddOption(label)
                       } else if (label === 'Add Video Link') {
                         setIsVideoLinkModalOpen(true)

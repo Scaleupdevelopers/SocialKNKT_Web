@@ -6,7 +6,7 @@ import { toast } from 'react-toastify'
 import { useProfile } from '../../../context/ProfileContext'
 import { AUTH_STORAGE_KEY } from '../../../utils/helper'
 
-export function CommentsModal({ post, onClose }) {
+export function CommentsModal({ post, onClose, onCommentCountChange }) {
   const { profile } = useProfile()
   const authData = JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) || 'null')
   const currentUserId = profile?.id || authData?.user?.id || authData?.data?.id
@@ -56,6 +56,7 @@ export function CommentsModal({ post, onClose }) {
       )))
     } else {
       setComments((current) => [optimisticComment, ...current])
+      onCommentCountChange?.(1)
     }
     setComment('')
     setReplyTarget(null)
@@ -76,6 +77,7 @@ export function CommentsModal({ post, onClose }) {
           : item)
         : current.map((item) => item._id === tempId ? savedComment : item))
     } catch {
+      if (!parentComment) onCommentCountChange?.(-1)
       setComments((current) => parentComment
         ? current.map((item) => item._id === parentComment._id
           ? { ...item, commentReplies: Math.max(0, (item.commentReplies || 1) - 1), replies: (item.replies || []).filter((reply) => reply._id !== tempId) }

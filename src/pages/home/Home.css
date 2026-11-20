@@ -666,6 +666,117 @@
   object-fit: cover;
 }
 
+.post-document-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  margin-top: 26px;
+  min-height: 300px;
+  padding: 12px;
+  border-radius: 8px;
+  background: #292929;
+  overflow-y: auto;
+}
+
+.post-document-thumbnail {
+  position: relative;
+  display: block;
+  width: 100%;
+  margin-top: 26px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.post-document-thumbnail img,
+.post-document-thumbnail canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 620px;
+  object-fit: contain;
+}
+
+.post-document-frame {
+  display: block;
+  width: 100%;
+  height: 520px;
+  border: 0;
+  pointer-events: none;
+}
+
+.post-document-placeholder {
+  display: grid;
+  min-height: 260px;
+  place-items: center;
+  color: #555;
+  font-size: 28px;
+}
+
+.post-document-thumbnail span {
+  position: absolute;
+  right: 0;
+  bottom: 22px;
+  left: 0;
+  color: #777;
+  font-size: 18px;
+  font-style: italic;
+  text-align: center;
+}
+
+.post-document-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, .78);
+}
+
+.post-document-modal-content {
+  position: relative;
+  width: min(900px, 100%);
+  max-height: 90vh;
+}
+
+.post-document-modal-content .post-document-preview {
+  max-height: 90vh;
+  margin-top: 0;
+}
+
+.post-document-fallback {
+  display: block;
+  width: 100%;
+  height: 80vh;
+  border: 0;
+  background: #fff;
+}
+
+.post-document-modal-close {
+  position: absolute;
+  top: -42px;
+  right: 0;
+  z-index: 1;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  font-size: 34px;
+}
+
+.post-pdf-page {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  background: #fff;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, .35);
+}
+
 .post-video-embed {
   border: 0;
 }

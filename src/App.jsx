@@ -19,6 +19,7 @@ import { Settings } from './pages/settings/Settings'
 import { Profile } from './pages/profile/Profile'
 import { Flicks } from './pages/flicks/Flicks'
 import { KnktFund } from './pages/knktfund/KnktFund'
+import { Connections } from './pages/connections/Connections'
 import { AppToast } from './components/common/AppToast'
 import { ProtectedRoute } from './components/common/ProtectedRoute'
 import { PublicOnlyRoute } from './components/common/PublicOnlyRoute'
@@ -53,6 +54,7 @@ function App() {
           <Route path="/add-media" element={<AddMedia />} />
           <Route path="/home" element={<Home />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/connections" element={<Connections />} />
           <Route path="/edit-profile" element={<Settings editProfile />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/flicks" element={<Flicks />} />
