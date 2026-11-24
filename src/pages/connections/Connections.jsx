@@ -61,7 +61,7 @@ export function Connections() {
           <h1>{filteredConnections.length} Connections</h1>
           <div className="connections-filter-wrap">
             <button className="connections-filter-button" type="button" aria-label="Filter connections" onClick={() => setFilterOpen((open) => !open)}>
-              <img src="/assets/logo_icons/filter_line.svg" alt="" />
+              <img src="/assets/logo_icons/solar_sort-linear.svg" alt="" />
             </button>
             {filterOpen && (
               <div className="connections-filter-menu">

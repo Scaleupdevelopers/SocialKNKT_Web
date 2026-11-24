@@ -12,6 +12,22 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker
 
 const profileIcon = '/assets/logo_icons/profile_avatar.png'
 
+function PostTypeIcons({ postType }) {
+  const type = Number(postType)
+  if (![1, 2, 3].includes(type)) return null
+  const icons = type === 3
+    ? [['/assets/logo_icons/User and Briefcase Icon.png', 'Personal and Professional']]
+    : type === 1
+      ? [['/assets/logo_icons/Professional.svg', 'Professional']]
+      : [['/assets/logo_icons/personal.svg', 'Personal']]
+
+  return (
+    <span className={`post-type-icons ${type === 3 ? 'post-type-both' : ''}`} aria-label={icons.map(([, label]) => label).join(' and ')}>
+      {icons.map(([icon, label]) => <img key={label} src={icon} alt={label} />)}
+    </span>
+  )
+}
+
 export function PostCard({ post, onDeleted, showReport = true }) {
   const { profile } = useProfile()
   const [isReportOpen, setIsReportOpen] = useState(false)
@@ -128,7 +144,10 @@ export function PostCard({ post, onDeleted, showReport = true }) {
         <img src={authorImage} alt={authorName} />
         <div>
           <h2>{authorName}</h2>
-          <p>{postTime} · {post.username || post.role || ''}</p>
+          <p>
+            {postTime}
+            <PostTypeIcons postType={post.postType} />
+          </p>
         </div>
         {isOwnPost && <div className="post-options" ref={optionsRef}>
           <button

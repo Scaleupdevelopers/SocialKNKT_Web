@@ -6,7 +6,7 @@ import { toast } from 'react-toastify'
 import { useProfile } from '../../../context/ProfileContext'
 import { AUTH_STORAGE_KEY } from '../../../utils/helper'
 
-export function CommentsModal({ post, onClose, onCommentCountChange }) {
+export function CommentsModal({ post, onClose, onCommentCountChange, getCommentsAction = getComments, commentAction = commentPost }) {
   const { profile } = useProfile()
   const authData = JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) || 'null')
   const currentUserId = profile?.id || authData?.user?.id || authData?.data?.id
@@ -24,12 +24,13 @@ export function CommentsModal({ post, onClose, onCommentCountChange }) {
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
   const commentCount = comments.length || post.commentCount || 0
   const mediaPreview = getMediaPreview(post)
+  const showVideoPreview = isVideoPost(post) && !post.thumbnail && !post.videoThumbnail && !post.mediaThumbnail
 
   useEffect(() => {
     const postId = post._id || post.id
     if (!postId) return undefined
 
-    getComments(postId)
+    getCommentsAction(postId)
       .then((response) => setComments(response.data || []))
       .catch(() => {})
       .finally(() => setIsLoading(false))
@@ -64,7 +65,7 @@ export function CommentsModal({ post, onClose, onCommentCountChange }) {
     try {
       const response = parentComment
         ? await replyToComment(postId, parentComment._id, text)
-        : await commentPost(postId, text)
+        : await commentAction(postId, text)
       const savedComment = {
         ...optimisticComment,
         ...(response.data || {}),
@@ -160,7 +161,7 @@ export function CommentsModal({ post, onClose, onCommentCountChange }) {
       <section className="comments-modal" role="dialog" aria-modal="true" aria-labelledby="comments-title" onClick={(event) => event.stopPropagation()}>
         <button className="comments-modal-close" type="button" onClick={onClose} aria-label="Close">×</button>
         <div className="comments-modal-media">
-          {mediaPreview ? <img src={mediaPreview} alt="Post" /> : null}
+          {mediaPreview ? (showVideoPreview ? <video src={mediaPreview} controls playsInline preload="metadata" aria-label="Thread video preview" /> : <img src={mediaPreview} alt="Post" />) : null}
         </div>
         <div className="comments-modal-content">
           <div className="comments-post-header">
@@ -308,4 +309,10 @@ function getMediaPreview(post) {
   } catch {
     return url
   }
+}
+
+function isVideoPost(post) {
+  const mediaType = String(post.mediaType || '').toLowerCase().replace(/[-_\s]/g, '')
+  const media = String(post.media || '').toLowerCase()
+  return ['video', 'videolink', 'flicks', 'link'].includes(mediaType) || /\.(mp4|webm|ogg)(\?|$)/.test(media)
 }

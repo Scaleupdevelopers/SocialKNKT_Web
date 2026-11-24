@@ -13,7 +13,7 @@ const reportReasons = [
   'Other',
 ]
 
-export function ReportPostModal({ postId, onClose, contentLabel = 'Post' }) {
+export function ReportPostModal({ postId, onClose, contentLabel = 'Post', reportAction = reportPost }) {
   const [selectedReason, setSelectedReason] = useState('')
   const [description, setDescription] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -26,8 +26,8 @@ export function ReportPostModal({ postId, onClose, contentLabel = 'Post' }) {
 
     setIsSubmitting(true)
     try {
-      await reportPost(postId, reportDescription)
-      toast.success('Post reported successfully.')
+      await reportAction(postId, reportDescription)
+      toast.success(`${contentLabel} reported successfully.`)
       onClose()
     } catch (error) {
       toast.error(error.message || 'Unable to report post.')

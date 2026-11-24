@@ -118,6 +118,44 @@ export const getFlicks = async (page = 0, limit = 10) => {
   return getRequest('user/flick', { page, limit })
 }
 
+//------------------|| KNKT ||------------------//
+
+export const getTopics = async () => {
+  return getRequest('user/topics')
+}
+
+export const getThreadLocations = async (query, page = 0, limit = 10) => {
+  return getRequest('user/threads/locations', { page, q: query, limit })
+}
+
+export const getThreads = async (page = 0, filter = 1, limit = 10) => {
+  return getRequest('user/threads', { page, filter, limit })
+}
+
+export const createThread = async (data) => {
+  return postRequest('user/thread', data)
+}
+
+export const reportThread = async (threadId, description) => {
+  return postRequest('user/thread/report', { threadId, description })
+}
+
+export const deleteThread = async (threadId) => {
+  return deleteRequest(`user/thread?threadId=${encodeURIComponent(threadId)}`)
+}
+
+export const updateThreadLike = async (threadId, likeStatus) => {
+  return putRequest('user/thread/like', { threadId, likeStatus })
+}
+
+export const getThreadComments = async (threadId, page = 0) => {
+  return getRequest('user/thread/comment', { page, threadId })
+}
+
+export const createThreadComment = async (threadId, comment) => {
+  return postRequest('user/thread/comment', { comment, threadId })
+}
+
 export const sendForgotPasswordOtp = async (data) => {
   return postRequest('forget-password/send-otp', data)
 }

@@ -497,6 +497,31 @@
   vertical-align: middle;
 }
 
+.post-type-icons {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+.post-type-icons::before {
+  content: '•';
+  margin-right: 4px;
+  color: currentColor;
+}
+
+.post-type-icons img {
+  width: 17px !important;
+  height: 17px !important;
+  object-fit: contain;
+}
+
+.post-type-icons.post-type-both img {
+  width: 30px !important;
+  height: 30px !important;
+}
+
 .more-button {
   border: 0;
   background: transparent;
