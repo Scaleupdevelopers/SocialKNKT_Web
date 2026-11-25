@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Header } from '../../layouts/Header'
-import { getRequest } from '../../utils/helper'
+import { getTopics } from '../../action/action'
 import './PopularTopics.css'
 
 export function PopularTopics() {
@@ -10,7 +10,7 @@ export function PopularTopics() {
   const navigate = useNavigate()
 
   useEffect(() => {
-      getRequest('user/topics')
+      getTopics()
         .then((response) => setTopics(response.data))
         .finally(() => setTopicsLoading(false))
   }, [])
@@ -24,10 +24,10 @@ export function PopularTopics() {
           {topicsLoading
             ? Array.from({ length: 15 }, (_, index) => <div className="popular-topic popular-topic-skeleton" key={index}><span className="popular-topic-skeleton-image" /><span className="popular-topic-skeleton-label" /></div>)
             : topics.map((topic) => (
-            <div className="popular-topic" key={topic._id}>
+            <button className="popular-topic" type="button" key={topic._id} onClick={() => navigate(`/knkt?topicId=${topic._id}`)}>
               <img src={topic.image} alt={topic.topic || topic.title} />
                 <span>{topic.topic || topic.title}</span>
-            </div>
+            </button>
           ))}
         </div>
       </main>

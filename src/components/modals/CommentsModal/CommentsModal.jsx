@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import './CommentsModal.css'
 import { commentPost, getCommentReplies, getComments, replyToComment, updateCommentLike } from '../../../action/action'
 import { deleteComment, reportComment } from '../../../action/action'
@@ -6,12 +6,15 @@ import { toast } from 'react-toastify'
 import { useProfile } from '../../../context/ProfileContext'
 import { AUTH_STORAGE_KEY } from '../../../utils/helper'
 
-export function CommentsModal({ post, onClose, onCommentCountChange, getCommentsAction = getComments, commentAction = commentPost }) {
+export function CommentsModal({ post, onClose, onCommentCountChange, getCommentsAction = getComments, commentAction = commentPost, replyAction = replyToComment, repliesAction = getCommentReplies, commentReportAction, commentDeleteAction, commentLikeAction }) {
   const { profile } = useProfile()
   const authData = JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) || 'null')
-  const currentUserId = profile?.id || authData?.user?.id || authData?.data?.id
+  const currentUserId = profile?._id || profile?.id || profile?.userId || authData?.user?.id || authData?.data?.id
   const [comment, setComment] = useState('')
   const [comments, setComments] = useState(Array.isArray(post.comments) ? post.comments : [])
+  const [commentsPage, setCommentsPage] = useState(0)
+  const [hasMoreComments, setHasMoreComments] = useState(true)
+  const [isLoadingMoreComments, setIsLoadingMoreComments] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [replyTarget, setReplyTarget] = useState(null)
@@ -25,18 +28,46 @@ export function CommentsModal({ post, onClose, onCommentCountChange, getComments
   const commentCount = comments.length || post.commentCount || 0
   const mediaPreview = getMediaPreview(post)
   const showVideoPreview = isVideoPost(post) && !post.thumbnail && !post.videoThumbnail && !post.mediaThumbnail
+  const commentsListRef = useRef(null)
 
   useEffect(() => {
     const postId = post._id || post.id
     if (!postId) return undefined
 
-    getCommentsAction(postId)
-      .then((response) => setComments(response.data || []))
+    setCommentsPage(0)
+    setHasMoreComments(true)
+    getCommentsAction(postId, 0)
+      .then((response) => {
+        const nextComments = response.data || []
+        setComments(nextComments)
+        setHasMoreComments(response.totalCount !== undefined ? nextComments.length < response.totalCount : nextComments.length >= 10)
+      })
       .catch(() => {})
       .finally(() => setIsLoading(false))
 
     return undefined
   }, [post._id, post.id])
+
+  const loadMoreComments = async () => {
+    const postId = post._id || post.id
+    if (!postId || isLoading || isLoadingMoreComments || !hasMoreComments) return
+    const nextPage = commentsPage + 1
+    setIsLoadingMoreComments(true)
+    try {
+      const response = await getCommentsAction(postId, nextPage)
+      const nextComments = response.data || []
+      setComments((current) => [...current, ...nextComments])
+      setCommentsPage(nextPage)
+      setHasMoreComments(response.totalCount !== undefined ? comments.length + nextComments.length < response.totalCount : nextComments.length >= 10)
+    } finally {
+      setIsLoadingMoreComments(false)
+    }
+  }
+
+  const handleCommentsScroll = (event) => {
+    const element = event.currentTarget
+    if (element.scrollHeight - element.scrollTop - element.clientHeight < 80) loadMoreComments()
+  }
 
   const handleComment = async () => {
     const text = comment.trim()
@@ -64,7 +95,7 @@ export function CommentsModal({ post, onClose, onCommentCountChange, getComments
     setIsSubmitting(true)
     try {
       const response = parentComment
-        ? await replyToComment(postId, parentComment._id, text)
+        ? await replyAction(postId, parentComment._id, text)
         : await commentAction(postId, text)
       const savedComment = {
         ...optimisticComment,
@@ -97,7 +128,10 @@ export function CommentsModal({ post, onClose, onCommentCountChange, getComments
     const nextLiked = !item.isLiked
     setComments((current) => updateCommentTree(current, commentId, nextLiked))
 
-    updateCommentLike(commentId, postId, nextLiked).catch(() => {
+    const likeRequest = commentLikeAction
+      ? commentLikeAction(postId, commentId, nextLiked)
+      : updateCommentLike(commentId, postId, nextLiked)
+    likeRequest.catch(() => {
       setComments((current) => updateCommentTree(current, commentId, !nextLiked))
     })
   }
@@ -114,7 +148,7 @@ export function CommentsModal({ post, onClose, onCommentCountChange, getComments
     if (!item.repliesLoaded) {
       setLoadingReplies((current) => ({ ...current, [commentId]: true }))
       try {
-        const response = await getCommentReplies(commentId)
+        const response = await repliesAction(commentId)
         setComments((current) => current.map((commentItem) => (
           (commentItem._id || commentItem.id) === commentId
             ? { ...commentItem, replies: response.data || [], repliesLoaded: true }
@@ -131,7 +165,8 @@ export function CommentsModal({ post, onClose, onCommentCountChange, getComments
 
   const submitCommentReport = async (description) => {
     try {
-      await reportComment(post._id || post.id, reportTarget, description)
+      if (commentReportAction) await commentReportAction(post._id || post.id, reportTarget, description)
+      else await reportComment(post._id || post.id, reportTarget, description)
       toast.success('Comment reported successfully.')
       setReportTarget(null)
     } catch (error) {
@@ -139,13 +174,14 @@ export function CommentsModal({ post, onClose, onCommentCountChange, getComments
     }
   }
 
-  const isOwnComment = (item) => Boolean(currentUserId && item.userId === currentUserId)
+  const isOwnComment = (item) => Boolean(currentUserId && item.userId && String(item.userId) === String(currentUserId))
 
   const confirmDeleteComment = async () => {
     if (!deleteTarget || isDeleting) return
     setIsDeleting(true)
     try {
-      await deleteComment(post._id || post.id, deleteTarget)
+      if (commentDeleteAction) await commentDeleteAction(post._id || post.id, deleteTarget)
+      else await deleteComment(post._id || post.id, deleteTarget)
       setComments((current) => removeCommentTree(current, deleteTarget))
       setDeleteTarget(null)
       toast.success('Comment deleted successfully.')
@@ -194,7 +230,7 @@ export function CommentsModal({ post, onClose, onCommentCountChange, getComments
               <p>Be the first to share your thoughts and engage with the community!</p>
             </div>
           ) : (
-            <div className="comments-list">
+            <div className="comments-list" ref={commentsListRef} onScroll={handleCommentsScroll}>
               {comments.map((item, index) => (
                 <div className="comment-item" key={item._id || index}>
                   <img src={item.image || ''} alt="" />
@@ -235,6 +271,7 @@ export function CommentsModal({ post, onClose, onCommentCountChange, getComments
                   </button>
                 </div>
               ))}
+              {isLoadingMoreComments ? <div className="comments-loading-more">Loading more comments...</div> : null}
             </div>
           )}
           <div className="comments-input-wrap">
@@ -250,7 +287,7 @@ export function CommentsModal({ post, onClose, onCommentCountChange, getComments
 }
 
 function CommentMenu({ canDelete, onReport, onDelete }) {
-  return <div className="comment-options-menu"><button type="button" onClick={onReport}><img src="/assets/logo_icons/report.svg" alt="" /><span>Report</span></button>{canDelete ? <button type="button" onClick={onDelete}><img src="/assets/logo_icons/red_delete_icon.svg" alt="" /><span>Delete Comment</span></button> : null}</div>
+  return <div className="comment-options-menu">{canDelete ? <button type="button" onClick={onDelete}><img src="/assets/logo_icons/red_delete_icon.svg" alt="" /><span>Delete Comment</span></button> : <button type="button" onClick={onReport}><img src="/assets/logo_icons/report.svg" alt="" /><span>Report</span></button>}</div>
 }
 
 function DeleteCommentModal({ onClose, onConfirm, isDeleting }) {

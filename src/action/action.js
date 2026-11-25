@@ -128,8 +128,8 @@ export const getThreadLocations = async (query, page = 0, limit = 10) => {
   return getRequest('user/threads/locations', { page, q: query, limit })
 }
 
-export const getThreads = async (page = 0, filter = 1, limit = 10) => {
-  return getRequest('user/threads', { page, filter, limit })
+export const getThreads = async (page = 0, filter = 1, limit = 10, topicId) => {
+  return getRequest('user/threads', { page, filter, limit, ...(topicId ? { topicId } : {}) })
 }
 
 export const createThread = async (data) => {
@@ -154,6 +154,26 @@ export const getThreadComments = async (threadId, page = 0) => {
 
 export const createThreadComment = async (threadId, comment) => {
   return postRequest('user/thread/comment', { comment, threadId })
+}
+
+export const createThreadCommentReply = async (threadId, commentId, comment) => {
+  return postRequest('user/thread/comment/reply', { comment, threadId, commentId })
+}
+
+export const getThreadCommentReplies = async (commentId, page = 0) => {
+  return getRequest('user/thread/comment/reply', { page, commentId, limit: 10, createdAt: 1 })
+}
+
+export const reportThreadComment = async (threadId, commentId, description) => {
+  return postRequest('user/thread/comment/report', { threadId, commentId, description })
+}
+
+export const deleteThreadComment = async (threadId, commentId) => {
+  return deleteRequest(`user/thread/comment?commentId=${encodeURIComponent(commentId)}&threadId=${encodeURIComponent(threadId)}`)
+}
+
+export const updateThreadCommentLike = async (threadId, commentId, likeStatus) => {
+  return putRequest('user/thread/comment/like', { commentId, threadId, likeStatus })
 }
 
 export const sendForgotPasswordOtp = async (data) => {

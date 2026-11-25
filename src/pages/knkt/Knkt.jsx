@@ -1,17 +1,22 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Header } from "../../layouts/Header";
 import {
   createThread,
   createThreadComment,
+  createThreadCommentReply,
+  deleteThreadComment,
   deleteThread,
   getThreadComments,
+  getThreadCommentReplies,
   getThreadLocations,
   getThreads,
   getTopics,
   getUploadUrl,
   reportThread,
+  reportThreadComment,
   updateThreadLike,
+  updateThreadCommentLike,
 } from "../../action/action";
 import { CommentsModal } from "../../components/modals/CommentsModal/CommentsModal";
 import { ReportPostModal } from "../../components/modals/ReportPostModal/ReportPostModal";
@@ -144,10 +149,13 @@ export function Knkt() {
   const [mediaPreviewUrl, setMediaPreviewUrl] = useState("");
   const threadLikeStateRef = useRef(new Map());
   const threadLikeVersionRef = useRef(new Map());
+  const threadRequestIdRef = useRef(0);
   const photoInputRef = useRef(null);
   const videoInputRef = useRef(null);
   const threadsEndRef = useRef(null);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const selectedTopicId = searchParams.get("topicId") || "";
   const { profile } = useProfile();
 
   useEffect(() => {
@@ -199,16 +207,29 @@ export function Knkt() {
   }, [threadForm.location]);
 
   useEffect(() => {
+    const requestId = threadRequestIdRef.current + 1;
+    threadRequestIdRef.current = requestId;
+    let isActive = true;
     setThreadsLoading(true);
     setThreadPage(0);
-    getThreads(0, threadFilter)
+    setThreadData([]);
+    setHasMoreThreads(false);
+    getThreads(0, threadFilter, 10, selectedTopicId)
       .then((response) => {
+        if (!isActive || threadRequestIdRef.current !== requestId) return;
         const threads = response.data || [];
         setThreadData(threads);
         setHasMoreThreads(threads.length >= 10);
       })
-      .finally(() => setThreadsLoading(false));
-  }, [threadFilter]);
+      .finally(() => {
+        if (isActive && threadRequestIdRef.current === requestId) {
+          setThreadsLoading(false);
+        }
+      });
+    return () => {
+      isActive = false;
+    };
+  }, [selectedTopicId, threadFilter]);
 
   useEffect(() => {
     const loadMoreThreads = async () => {
@@ -216,7 +237,9 @@ export function Knkt() {
       setIsLoadingMoreThreads(true);
       try {
         const nextPage = threadPage + 1;
-        const response = await getThreads(nextPage, threadFilter);
+        const requestId = threadRequestIdRef.current;
+        const response = await getThreads(nextPage, threadFilter, 10, selectedTopicId);
+        if (threadRequestIdRef.current !== requestId) return;
         const nextThreads = response.data || [];
         setThreadData((currentThreads) => [...currentThreads, ...nextThreads]);
         setThreadPage(nextPage);
@@ -238,6 +261,7 @@ export function Knkt() {
   }, [
     hasMoreThreads,
     isLoadingMoreThreads,
+    selectedTopicId,
     threadFilter,
     threadPage,
     threadsLoading,
@@ -452,7 +476,7 @@ export function Knkt() {
       setTopicMenuOpen(false);
       setSelectedMedia(null);
       setIsComposerOpen(false);
-      const response = await getThreads(0, threadFilter);
+      const response = await getThreads(0, threadFilter, 10, selectedTopicId);
       const threads = response.data || [];
       setThreadPage(0);
       setThreadData(threads);
@@ -477,16 +501,7 @@ export function Knkt() {
               See All
             </button>
           </div>
-          <div
-            className="knkt-topic-list"
-            onWheel={(event) => {
-              event.preventDefault();
-              event.currentTarget.scrollBy({
-                left: event.deltaY,
-                behavior: "smooth",
-              });
-            }}
-          >
+          <div className="knkt-topic-list">
             {topicsLoading
               ? Array.from({ length: 12 }, (_, index) => (
                   <div className="knkt-topic knkt-topic-skeleton" key={index}>
@@ -494,12 +509,17 @@ export function Knkt() {
                     <span className="topic-skeleton-label" />
                   </div>
                 ))
-              : topics.slice(0, 12).map((topic) => (
-                  <div className="knkt-topic" key={topic._id}>
+              : topics.slice(0, 10).map((topic) => (
+                  <button className={`knkt-topic${selectedTopicId === topic._id ? " selected" : ""}`} type="button" key={topic._id} onClick={() => navigate(`/knkt?topicId=${topic._id}`)}>
                     <img src={topic.image} alt={topic.topic || topic.title} />
                     <span>{topic.topic || topic.title}</span>
-                  </div>
+                  </button>
                 ))}
+            {!topicsLoading && topics.length > 10 && (
+              <button className="knkt-topic-see-all" type="button" onClick={() => navigate("/knkt/topics")}>
+                <span>See All</span>
+              </button>
+            )}
           </div>
         </section>
 
@@ -785,7 +805,7 @@ export function Knkt() {
                     key={index}
                   />
                 ))
-              : threadData.map((thread) => {
+              : threadData.length ? threadData.map((thread) => {
                   const name =
                     [thread.fname, thread.lname].filter(Boolean).join(" ") ||
                     thread.username;
@@ -924,7 +944,13 @@ export function Knkt() {
                       </div>
                     </article>
                   );
-                })}
+                }) : (
+              <div className="knkt-empty-threads">
+                <img src="/assets/logo_icons/noposticon.svg" alt="" />
+                <h2>No threads found</h2>
+                <p>There are no threads available for this topic yet.</p>
+              </div>
+            )}
             {reportThreadId && (
               <ReportPostModal
                 postId={reportThreadId}
@@ -987,6 +1013,11 @@ export function Knkt() {
                 }}
                 getCommentsAction={getThreadComments}
                 commentAction={createThreadComment}
+                replyAction={createThreadCommentReply}
+                repliesAction={getThreadCommentReplies}
+                commentReportAction={reportThreadComment}
+                commentDeleteAction={deleteThreadComment}
+                commentLikeAction={updateThreadCommentLike}
                 onClose={() => setCommentThread(null)}
                 onCommentCountChange={(change) =>
                   setThreadData((current) =>
