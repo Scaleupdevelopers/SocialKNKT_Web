@@ -4,8 +4,8 @@ import { Header } from '../../layouts/Header'
 import { CreatePost } from '../home/Home'
 import { PostCard } from '../home/components/PostCard'
 import { ProfileHeader } from '../settings/components/ProfileHeader'
-import { useProfile } from '../../context/ProfileContext'
-import { getProfileMedia } from '../../action/action'
+import { normalizeProfile, useProfile } from '../../context/ProfileContext'
+import { getAllMyFeed, getAllMyFlicks, getMyAllPosts, getOtherUserPosts, getOtherUserProfile } from '../../action/action'
 import '../home/Home.css'
 import '../settings/Settings.css'
 import './Profile.css'
@@ -23,17 +23,15 @@ function ProfilePostSkeleton() {
   )
 }
 
-const restaurantImages = [
-  '/assets/home/restaurant-01.jpg',
-  '/assets/home/restaurant-02.jpg',
-  '/assets/home/restaurant-03.jpg',
-]
-
 export function Profile() {
   const { profile } = useProfile()
   const [searchParams] = useSearchParams()
-  const viewedUserId = searchParams.get('userId') || profile?.id
-  const isOwnProfile = !searchParams.get('userId') || viewedUserId === profile?.id
+  const requestedUserId = searchParams.get('userId')
+  const currentUserId = profile?.id || profile?._id || profile?.userId
+  const viewedUserId = requestedUserId || currentUserId
+  const isOwnProfile = !requestedUserId || String(viewedUserId) === String(currentUserId)
+  const [viewedProfile, setViewedProfile] = useState(null)
+  const [isViewedProfileLoading, setIsViewedProfileLoading] = useState(!isOwnProfile)
   const [activeTab, setActiveTab] = useState('all')
   const [profilePosts, setProfilePosts] = useState([])
   const [isPostsLoading, setIsPostsLoading] = useState(true)
@@ -41,13 +39,49 @@ export function Profile() {
   const [hasMorePosts, setHasMorePosts] = useState(true)
   const [isLoadingMorePosts, setIsLoadingMorePosts] = useState(false)
   const postsEndRef = useRef(null)
+  const postRequestsRef = useRef(new Set())
+  const postsOwnerRef = useRef(null)
+
+  useEffect(() => {
+    if (isOwnProfile || !requestedUserId) {
+      setViewedProfile(null)
+      setIsViewedProfileLoading(false)
+      return undefined
+    }
+
+    let isMounted = true
+    setIsViewedProfileLoading(true)
+    getOtherUserProfile(requestedUserId)
+      .then((response) => {
+        const profileData = response.data?.data || response.data
+        if (isMounted) setViewedProfile(normalizeProfile(profileData))
+      })
+      .catch(() => {
+        if (isMounted) setViewedProfile(null)
+      })
+      .finally(() => {
+        if (isMounted) setIsViewedProfileLoading(false)
+      })
+
+    return () => { isMounted = false }
+  }, [isOwnProfile, requestedUserId])
 
   useEffect(() => {
     let isMounted = true
+    const ownerKey = isOwnProfile ? `own:${currentUserId || 'current'}` : `other:${viewedUserId}`
+    if (postsOwnerRef.current !== ownerKey) {
+      postsOwnerRef.current = ownerKey
+      postRequestsRef.current.clear()
+    }
 
     const loadProfilePosts = async () => {
+      const requestKey = `${isOwnProfile ? 'own' : viewedUserId}:0`
+      if (postRequestsRef.current.has(requestKey)) return
+      postRequestsRef.current.add(requestKey)
       try {
-        const response = await getProfileMedia(0, PROFILE_PAGE_SIZE, viewedUserId)
+        const response = isOwnProfile
+          ? await getMyAllPosts(0, PROFILE_PAGE_SIZE)
+          : await getOtherUserPosts(viewedUserId, 0, PROFILE_PAGE_SIZE)
         const posts = response.data || []
         if (isMounted) {
           setProfilePosts(posts)
@@ -56,6 +90,7 @@ export function Profile() {
         }
       } catch {
         if (isMounted) setProfilePosts([])
+        postRequestsRef.current.delete(requestKey)
       } finally {
         if (isMounted) setIsPostsLoading(false)
       }
@@ -63,7 +98,7 @@ export function Profile() {
 
     loadProfilePosts()
     return () => { isMounted = false }
-  }, [profile?.id, viewedUserId])
+  }, [isOwnProfile, profile?.id, viewedUserId])
 
   useEffect(() => {
     const loadMorePosts = async () => {
@@ -71,7 +106,12 @@ export function Profile() {
       setIsLoadingMorePosts(true)
       try {
         const nextPage = profilePage + 1
-        const response = await getProfileMedia(nextPage, PROFILE_PAGE_SIZE, viewedUserId)
+        const requestKey = `${isOwnProfile ? 'own' : viewedUserId}:${nextPage}`
+        if (postRequestsRef.current.has(requestKey)) return
+        postRequestsRef.current.add(requestKey)
+        const response = isOwnProfile
+          ? await getMyAllPosts(nextPage, PROFILE_PAGE_SIZE)
+          : await getOtherUserPosts(viewedUserId, nextPage, PROFILE_PAGE_SIZE)
         const nextPosts = response.data || []
         setProfilePosts((currentPosts) => [...currentPosts, ...nextPosts])
         setProfilePage(nextPage)
@@ -87,13 +127,13 @@ export function Profile() {
 
     if (postsEndRef.current) observer.observe(postsEndRef.current)
     return () => observer.disconnect()
-  }, [hasMorePosts, isLoadingMorePosts, isPostsLoading, profile?.id, profilePage, viewedUserId])
+  }, [hasMorePosts, isLoadingMorePosts, isOwnProfile, isPostsLoading, profile?.id, profilePage, viewedUserId])
 
   return (
     <main className="profile-page settings-page">
       <Header />
       <section className="settings-profile-card profile-card-page">
-        <ProfileHeader />
+        <ProfileHeader profileOverride={viewedProfile} isLoadingOverride={isOwnProfile ? null : isViewedProfileLoading} isOtherProfile={!isOwnProfile} />
 
         <div className="profile-tabs">
           {['all', 'media', 'posts'].map((tab) => (
@@ -112,7 +152,7 @@ export function Profile() {
           <MediaContent />
         ) : (
           <div className="profile-content">
-            <ProfileSummary profile={profile} />
+            <ProfileSummary profile={isOwnProfile ? profile : viewedProfile} />
             <section className="profile-feed" aria-label="Profile posts">
               {isOwnProfile && <CreatePost />}
               {isPostsLoading && <ProfilePostSkeleton />}
@@ -136,11 +176,18 @@ export function Profile() {
 }
 
 function MediaContent() {
-  const feedImages = [...restaurantImages, ...restaurantImages, ...restaurantImages]
-  const flickImages = [
-    ...restaurantImages,
-    ...restaurantImages,
-  ]
+  const [feedMedia, setFeedMedia] = useState([])
+  const [myFlicks, setMyFlicks] = useState([])
+  const [previewImage, setPreviewImage] = useState(null)
+
+  useEffect(() => {
+    getAllMyFeed(0, 10)
+      .then((response) => setFeedMedia(response.data || []))
+      .catch(() => setFeedMedia([]))
+    getAllMyFlicks(0, 10)
+      .then((response) => setMyFlicks(response.data || []))
+      .catch(() => setMyFlicks([]))
+  }, [])
 
   return (
     <section className="profile-media-content" aria-label="Profile media">
@@ -149,9 +196,19 @@ function MediaContent() {
       </div>
 
       <div className="profile-page-media-grid">
-        {Array.from({ length: 10 }, (_, index) => feedImages[index] || null).map((image, index) => (
-          <div className="profile-media-cell" key={`${image || 'empty'}-${index}`}>
-            {image && <img src={image} alt={`Feed media ${index + 1}`} />}
+        {feedMedia.map((item, index) => (
+          <div className="profile-media-cell" key={item._id || item.id || index}>
+            {item.mediaType === 'video' ? (
+              <video src={item.media} poster={item.thumbnail || undefined} muted playsInline controls preload="metadata" aria-label={`Feed video ${index + 1}`} />
+            ) : item.mediaType === 'document' ? (
+              <a href={item.media} target="_blank" rel="noreferrer" aria-label={`Open document ${index + 1}`}>
+                {item.thumbnail ? <img src={item.thumbnail} alt={`Document ${index + 1}`} /> : <span>Open document</span>}
+              </a>
+            ) : (
+              <button className="profile-media-preview-trigger" type="button" onClick={() => setPreviewImage(item.media || item.thumbnail)}>
+                <img src={item.media || item.thumbnail} alt={`Feed media ${index + 1}`} />
+              </button>
+            )}
           </div>
         ))}
       </div>
@@ -166,10 +223,19 @@ function MediaContent() {
       </div>
 
       <div className="profile-flicks-grid">
-        {flickImages.map((image, index) => (
-          <img key={`${image}-flick-${index}`} src={image} alt={`Flick ${index + 1}`} />
+        {myFlicks.map((flick, index) => (
+          <video key={flick._id || flick.id || index} src={flick.media} poster={flick.thumbnail || undefined} muted playsInline controls preload="metadata" aria-label={`Flick ${index + 1}`} />
         ))}
       </div>
+
+      {previewImage && (
+        <div className="profile-media-preview-backdrop" role="presentation" onClick={() => setPreviewImage(null)}>
+          <div className="profile-media-preview-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+            <button type="button" className="profile-media-preview-close" aria-label="Close image preview" onClick={() => setPreviewImage(null)}>×</button>
+            <img src={previewImage} alt="Preview" />
+          </div>
+        </div>
+      )}
     </section>
   )
 }

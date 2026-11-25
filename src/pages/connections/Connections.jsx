@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Header } from '../../layouts/Header'
 import { getProfileConnections } from '../../action/action'
 import { useProfile } from '../../context/ProfileContext'
@@ -16,12 +16,19 @@ function getCtaType(connection) {
 }
 
 function ConnectionRow({ connection, isAdded, onAdd, onRemove }) {
+  const navigate = useNavigate()
   const addType = getCtaType(connection)
+  const userId = connection.userId || connection.id || connection._id || connection.connectionId
   const name = `${connection.fname || ''} ${connection.lname || ''}`.trim() || connection.username || 'Unknown user'
   const location = [connection.cityName || connection.city, connection.countryName || connection.country].filter(Boolean).join(', ')
+  const openProfile = () => {
+    if (userId) navigate(`/profile?userId=${encodeURIComponent(userId)}`)
+  }
   return <article className="connection-row">
-    <img className="connection-avatar" src={connection.image || FALLBACK_IMAGE} alt="" />
-    <div className="connection-info"><div className="connection-name-line"><strong>{name}</strong><span>@{connection.username || connection.userName}</span></div><p>{connection.jobTitle || 'SocialKNKT member'} <b>•</b> {connection.totalNoOfConnections ?? connection.totalConnections ?? 0} Connections</p>{location && <small className="connection-location"><img src="/assets/logo_icons/location.svg" alt="" />{location}</small>}</div>
+    <button className="connection-profile-trigger" type="button" onClick={openProfile} disabled={!userId} aria-label={`Open ${name}'s profile`}>
+      <img className="connection-avatar" src={connection.image || FALLBACK_IMAGE} alt="" />
+      <div className="connection-info"><div className="connection-name-line"><strong>{name}</strong><span>@{connection.username || connection.userName}</span></div><p>{connection.jobTitle || 'SocialKNKT member'} <b>•</b> {connection.totalNoOfConnections ?? connection.totalConnections ?? 0} Connections</p>{location && <small className="connection-location"><img src="/assets/logo_icons/location.svg" alt="" />{location}</small>}</div>
+    </button>
     <button className={`connection-add ${isAdded ? 'added' : ''}`} type="button" onClick={onAdd}>{isAdded ? `Added ${addType}` : `Add ${addType}`}</button>
     <button className="connection-remove" type="button" aria-label={`Remove ${name}`} onClick={onRemove}>×</button>
   </article>

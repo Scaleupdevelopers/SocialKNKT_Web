@@ -7,7 +7,7 @@ const ProfileContext = createContext(null)
 const FALLBACK_PROFILE_IMAGE = '/assets/logo_icons/profile_alt.avif'
 let profileRequest = null
 
-function normalizeProfile(data) {
+export function normalizeProfile(data) {
   const fullName = `${data?.fname || ''} ${data?.lname || ''}`.trim() || data?.username || ''
   const work = data?.workExperiences?.find((item) => item.jobTitle?.trim())
 

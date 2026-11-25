@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
-import { deleteAccount, updateAccountStatus, updatePassword, updateProfessionalStatus } from '../../../action/action'
+import { blockUser, deleteAccount, getBlockedUsers, updateAccountStatus, updatePassword, updateProfessionalStatus } from '../../../action/action'
 import { useProfile } from '../../../context/ProfileContext'
 
 export function SettingsContent() {
@@ -57,7 +57,14 @@ export function SettingsContent() {
             {activeSection === 'privacy' && <span>‹</span>}
           </button>
 
-          <button type="button">Block List</button>
+          <button
+            className={activeSection === 'block-list' ? 'active' : ''}
+            type="button"
+            onClick={() => setActiveSection('block-list')}
+          >
+            Block List
+            {activeSection === 'block-list' && <span>‹</span>}
+          </button>
 
           <button
             className={activeSection === 'password' ? 'active' : ''}
@@ -100,13 +107,71 @@ export function SettingsContent() {
               />
             </div>
           </section>
-        ) : (
+        ) : activeSection === 'password' ? (
           <ChangePasswordForm />
+        ) : (
+          <BlockList />
         )}
       </div>
 
       {isDeleteOpen && <DeleteAccountModal onClose={() => setIsDeleteOpen(false)} onDeleted={() => navigate('/signin')} />}
     </div>
+  )
+}
+
+function BlockList() {
+  const [blockedUsers, setBlockedUsers] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [unblockingId, setUnblockingId] = useState(null)
+
+  useEffect(() => {
+    let isMounted = true
+    getBlockedUsers()
+      .then((response) => {
+        if (isMounted) setBlockedUsers(response.data || [])
+      })
+      .catch((error) => toast.error(error.message || 'Unable to load block list.'))
+      .finally(() => {
+        if (isMounted) setIsLoading(false)
+      })
+
+    return () => { isMounted = false }
+  }, [])
+
+  const handleUnblock = async (user) => {
+    const userId = user.id || user._id
+    if (!userId || unblockingId) return
+    setUnblockingId(userId)
+    try {
+      await blockUser(userId, false)
+      setBlockedUsers((current) => current.filter((item) => (item.id || item._id) !== userId))
+      toast.success('User unblocked successfully.')
+    } catch (error) {
+      toast.error(error.message || 'Unable to unblock user.')
+    } finally {
+      setUnblockingId(null)
+    }
+  }
+
+  return (
+    <section className="privacy-settings block-list-section">
+      <h3>Block List</h3>
+      {isLoading ? <p className="block-list-status">Loading blocked users...</p> : blockedUsers.length === 0 ? <p className="block-list-status">No blocked users.</p> : (
+        <div className="blocked-users-list">
+          {blockedUsers.map((user) => {
+            const userId = user.id || user._id
+            const name = `${user.fname || ''} ${user.lname || ''}`.trim() || user.username || 'Unknown user'
+            return (
+              <div className="blocked-user-row" key={userId}>
+                <img src={user.image || '/assets/logo_icons/profile_alt.avif'} alt="" />
+                <div className="blocked-user-details"><strong>{name}</strong><span>@{user.username || 'user'}</span></div>
+                <button type="button" onClick={() => handleUnblock(user)} disabled={unblockingId === userId}>{unblockingId === userId ? 'Unblocking...' : 'Unblock'}</button>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </section>
   )
 }
 

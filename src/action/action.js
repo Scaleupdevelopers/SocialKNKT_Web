@@ -50,6 +50,22 @@ export const getPosts = async (page = 0, limit = 10) => {
   return getRequest('user/post', { page, limit })
 }
 
+export const getAllMyFeed = async (page = 0, limit = 10) => {
+  return getRequest('user/post/get-all-my-feed', { page, limit })
+}
+
+export const getAllMyFlicks = async (page = 0, limit = 10) => {
+  return getRequest('user/flick/get-all-my-flick', { page, limit })
+}
+
+export const getMyAllPosts = async (page = 0, limit = 10) => {
+  return getRequest('user/post/get-my-all-post', { page, limit })
+}
+
+export const getOtherUserPosts = async (userId, page = 0, limit = 10) => {
+  return postRequest('user/post/get-all-other-user-post', { userId, page, limit })
+}
+
 export const deletePost = async (postId) => {
   return deleteRequest(`user/post?postId=${encodeURIComponent(postId)}`)
 }
@@ -116,7 +132,17 @@ export const deleteAccount = async () => deleteRequest('user/delete-account')
 
 export const createPost = async (data) => postRequest('user/post', data)
 
-export const getUserProfile = async () => getRequest('user/profile')
+export const getUserProfile = async () => getRequest('user/profile/get-my-profile')
+
+export const getOtherUserProfile = async (userId) => {
+  return postRequest('user/profile/get-other-user-profile', { userId })
+}
+
+export const blockUser = async (blockedUserId, blockStatus) => {
+  return postRequest('user/block', { blockedUserId, blockStatus })
+}
+
+export const getBlockedUsers = async () => getRequest('user/block')
 
 export const getFlicks = async (page = 0, limit = 10) => {
   return getRequest('user/flick', { page, limit })

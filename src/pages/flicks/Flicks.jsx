@@ -170,8 +170,9 @@ function FlickCard({ flick, isSaved, isSaving, onToggleSaved }) {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const authData = JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) || 'null')
-  const currentUserId = profile?.id || authData?.user?.id || authData?.data?.id
-  const isOwnFlick = Boolean(currentUserId && (flick.userId || flick.user?.id) === currentUserId)
+  const currentUserId = profile?._id || profile?.id || profile?.userId || authData?.user?._id || authData?.user?.id || authData?.data?._id || authData?.data?.id
+  const flickOwnerId = flick.userId || flick.user?._id || flick.user?.id || flick.ownerId || flick.owner?._id || flick.owner?.id || flick.createdBy?._id || flick.createdBy?.id
+  const isOwnFlick = Boolean(currentUserId && flickOwnerId && String(flickOwnerId) === String(currentUserId))
   const [isLiked, setIsLiked] = useState(Boolean(flick.isLiked ?? flick.liked ?? flick.likeStatus))
   const [likeCount, setLikeCount] = useState(Number(flick.likeCount ?? flick.likes ?? 0))
 
@@ -299,7 +300,7 @@ function FlickCard({ flick, isSaved, isSaving, onToggleSaved }) {
           <img src={isSaved ? '/assets/logo_icons/saveIcon.svg' : '/assets/logo_icons/unsaved.svg'} alt="" />
         </button>
         <button type="button" aria-label="More" onClick={() => setIsOptionsOpen((value) => !value)}>⋮</button>
-        {isOptionsOpen && <div className="flick-options-menu"><button type="button" onClick={() => { setIsOptionsOpen(false); setIsReportOpen(true) }}><img src="/assets/logo_icons/report.svg" alt="" />Report</button>{isOwnFlick ? <button type="button" onClick={() => { setIsOptionsOpen(false); setIsDeleteOpen(true) }}><img src="/assets/logo_icons/red_delete_icon.svg" alt="" />Delete</button> : null}</div>}
+        {isOptionsOpen && <div className="flick-options-menu">{isOwnFlick ? <button type="button" onClick={() => { setIsOptionsOpen(false); setIsDeleteOpen(true) }}><img src="/assets/logo_icons/red_delete_icon.svg" alt="" />Delete</button> : <button type="button" onClick={() => { setIsOptionsOpen(false); setIsReportOpen(true) }}><img src="/assets/logo_icons/report.svg" alt="" />Report</button>}</div>}
       </div>
       {isShareOpen && (
         <div className="flick-share-backdrop" role="presentation" onClick={() => setIsShareOpen(false)}>
