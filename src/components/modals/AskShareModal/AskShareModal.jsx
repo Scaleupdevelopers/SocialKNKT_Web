@@ -1,10 +1,19 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ModalShell } from '../ModalShell'
+import { getTopics } from '../../../action/action'
 import './AskShareModal.css'
 
 export function AskShareModal({ onClose }) {
   const [isCategoryMenuOpen, setIsCategoryMenuOpen] = useState(false)
   const [category, setCategory] = useState('')
+  const [topics, setTopics] = useState([])
+  const [topicsLoading, setTopicsLoading] = useState(true)
+
+  useEffect(() => {
+    getTopics()
+      .then((response) => setTopics(response.data || []))
+      .finally(() => setTopicsLoading(false))
+  }, [])
 
   return (
     <ModalShell title="Ask or Share on KNKT(n)" onClose={onClose} className="ask-share-modal">
@@ -25,7 +34,9 @@ export function AskShareModal({ onClose }) {
         </button>
         {isCategoryMenuOpen && (
           <div className="ask-category-menu">
-            {['Design', 'Photography', 'Travel'].map((option) => (
+            {topicsLoading ? <span className="ask-category-loading">Loading categories...</span> : topics.map((topic) => {
+              const option = topic.topic || topic.title
+              return (
               <button
                 type="button"
                 key={option}
@@ -36,7 +47,8 @@ export function AskShareModal({ onClose }) {
               >
                 {option}
               </button>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>

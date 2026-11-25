@@ -42,6 +42,10 @@ export const getProfileMedia = async (page = 0, limit = 10, userId) => {
   return getRequest('user/profile/media', { page, limit, ...(userId ? { userId } : {}) })
 }
 
+export const getProfileConnections = async (page = 0, filter = null, query = '', limit = 10, userId) => {
+  return getRequest('user/profile/connections', { page, ...(filter ? { filter } : {}), q: query, limit, ...(userId ? { userId } : {}) })
+}
+
 export const getPosts = async (page = 0, limit = 10) => {
   return getRequest('user/post', { page, limit })
 }
