@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'react-toastify'
 import { ModalShell } from '../ModalShell'
-import { AutoLoadMore, LoadingSkeleton } from '../../common/RequestState'
+import { AutoLoadMore } from '../../common/RequestState'
 import { createThread, getThreadLocations, getTopics } from '../../../action/action'
 import { useProfile } from '../../../context/ProfileContext'
 import { usePagedList } from '../../../utils/usePagedList'
@@ -99,6 +99,7 @@ export function AskShareModal({ onClose, onCreated }) {
 
 function QuestionLocation({ value, onChange, disabled }) {
   const inputRef = useRef(null)
+  const selectedLocation = useRef('')
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   useEffect(() => {
@@ -113,10 +114,11 @@ function QuestionLocation({ value, onChange, disabled }) {
   const pendingQuery = query !== value.trim()
   const visible = open && Boolean(value.trim()) && !disabled
   const select = (item) => {
+    selectedLocation.current = [item.city, item.country].filter(Boolean).join(', ')
     inputRef.current?.focus()
     setOpen(false)
     setQuery('')
-    onChange([item.city, item.country].filter(Boolean).join(', '))
+    onChange(selectedLocation.current)
   }
   return (
     <div
@@ -144,10 +146,11 @@ function QuestionLocation({ value, onChange, disabled }) {
           role="combobox"
           value={value}
           onChange={(event) => {
+            selectedLocation.current = ''
             setOpen(true)
             onChange(event.target.value)
           }}
-          onFocus={() => setOpen(true)}
+          onFocus={() => setOpen(value.trim() !== selectedLocation.current)}
           onKeyDown={(event) => {
             if (event.key === 'ArrowDown') {
               event.preventDefault()
@@ -172,7 +175,11 @@ function LocationSuggestions({ list, pendingQuery, onSelect }) {
   if (pendingQuery)
     return (
       <div id="question-locations" role="listbox" aria-label="Locations">
-        <LoadingSkeleton label="Loading locations…" variant="field" />
+        <span
+          className="loading-skeleton-label"
+          role="status"
+          aria-label="Loading locations…"
+        />
       </div>
     )
   return (
@@ -208,7 +215,10 @@ function LocationSuggestions({ list, pendingQuery, onSelect }) {
 }
 
 function LocationFeedback({ list }) {
-  if (list.loading) return <LoadingSkeleton label="Loading locations…" variant="field" />
+  if (list.loading)
+    return (
+      <span className="loading-skeleton-label" role="status" aria-label="Loading locations…" />
+    )
   if (list.error)
     return (
       <p role="alert">
@@ -266,7 +276,7 @@ function QuestionTopics({ selected, onChange, disabled }) {
         if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false)
       }}
     >
-      <div className="ask-category-field">
+      <div className="ask-category-field" data-selected={Boolean(selected.length)}>
         <CategoryChips
           selected={selected}
           disabled={disabled}
@@ -290,7 +300,13 @@ function QuestionTopics({ selected, onChange, disabled }) {
       </div>
       {open && (
         <div className="ask-category-menu" role="group" aria-label="Choose up to 5 categories">
-          {loading && <LoadingSkeleton label="Loading categories…" variant="field" />}
+          {loading && (
+            <span
+              className="loading-skeleton-label"
+              role="status"
+              aria-label="Loading categories…"
+            />
+          )}
           {failed && (
             <p role="alert">
               Unable to load categories.{' '}

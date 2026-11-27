@@ -28,7 +28,7 @@ async function fillQuestion() {
   fireEvent.click(await screen.findByRole('checkbox', { name: 'Technology' }))
 }
 
-it('shows an accessible field shimmer while categories load', async () => {
+it('keeps category loading accessible without a visible shimmer', async () => {
   let finish
   getTopics.mockImplementationOnce(
     () =>
@@ -39,7 +39,7 @@ it('shows an accessible field shimmer while categories load', async () => {
   render(<AskShareModal onClose={vi.fn()} />)
   fireEvent.click(screen.getByRole('button', { name: 'Categories' }))
   expect(screen.getByRole('status', { name: 'Loading categories…' })).toHaveClass(
-    'loading-skeleton-field',
+    'loading-skeleton-label',
   )
   await waitFor(() => expect(finish).toBeTypeOf('function'))
   await act(async () => finish({ data: [{ id: 'topic', title: 'Technology' }] }))
@@ -145,7 +145,9 @@ it('selects a city and country without reopening or requerying the selected valu
   })
   render(<AskShareModal onClose={vi.fn()} />)
   fireEvent.change(screen.getByLabelText('Location'), { target: { value: 'Mum' } })
-  expect(screen.getByRole('status', { name: 'Loading locations…' })).toBeInTheDocument()
+  expect(screen.getByRole('status', { name: 'Loading locations…' })).toHaveClass(
+    'loading-skeleton-label',
+  )
   fireEvent.click(await screen.findByRole('option', { name: 'Mumbai, India' }))
   expect(screen.getByLabelText('Location')).toHaveValue('Mumbai, India')
   expect(screen.getByLabelText('Location')).toHaveFocus()
@@ -153,6 +155,12 @@ it('selects a city and country without reopening or requerying the selected valu
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 400))
   })
+  fireEvent.blur(screen.getByLabelText('Location'))
+  fireEvent.focus(screen.getByLabelText('Location'))
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 400))
+  })
+  expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
   expect(getThreadLocations).toHaveBeenCalledExactlyOnceWith('Mum', 0, 10)
 })
 

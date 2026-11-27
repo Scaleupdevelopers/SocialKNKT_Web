@@ -194,3 +194,29 @@
     font-size: 23px;
   }
 }
+
+/* Keep focus on the complete rounded location control, including its icon. */
+.ask-location:focus-within {
+  border-color: #ff19d5;
+  box-shadow: 0 0 0 1px #ff19d5;
+}
+.ask-share-modal .ask-location input:focus-visible {
+  outline: none;
+}
+.ask-category-field[data-selected="true"] {
+  display: flex;
+  align-items: center;
+}
+.ask-category-field[data-selected="true"] .ask-category-chips {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 0 12px 18px;
+}
+.ask-share-modal [data-selected="true"] .ask-category-trigger {
+  flex: none;
+  width: 48px;
+  padding: 15px;
+}
+[data-selected="true"] .ask-category-trigger span {
+  display: none;
+}

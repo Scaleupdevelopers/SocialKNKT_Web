@@ -161,3 +161,13 @@ Keyboard checks cover focus returning to the location field, Escape dismissing i
 Independent review identified focus/Escape issues and a function-complexity boundary; all were fixed and the final source review cleared. Before/after synthetic screenshots and source hashes are retained in the private task output `outputs/ask-share-dropdown-evidence`. Unit coverage includes debounce/stale reads, pagination failure/retry/deduplication, city selection, category limits/chip removal, draft preservation, submission locking and Escape/focus recovery.
 
 Final verification: `npm test -- --maxWorkers=1` passed **327 tests across 31 files**; `npm run test:e2e -- tests/e2e/composer.spec.js` passed both desktop/mobile cases; build, lint and `git diff --check` passed with existing warnings. An earlier parallel run hit an unrelated KNKT observer-timing test failure; the final full single-worker run passed without changing KNKT source/tests. The private gallery contains 12 before/after captures at 1440px and 390px; the baseline native datalist popup cannot be captured as DOM UI and that limitation is recorded. No blocking visual findings remain.
+
+
+## Remove composer picker shimmer (2026-11-27)
+
+At the user's request, location/category reads inside Ask/Share and the KNKT thread composer no longer render shimmer placeholders or visible loading copy. Named visually hidden status regions remain for accessibility. KNKT composer categories already had no shimmer. Page/feed loading, API requests, selection, retries and automatic location pagination are unchanged.
+
+From baseline `e642a34`: 31 affected unit tests passed; both desktop/mobile composer browser tests passed; build, lint and diff checks passed with existing warnings. Independent source review cleared the narrow change. Synthetic before/after loading captures are kept privately under `outputs/no-picker-shimmer-evidence`.
+
+
+The subsequent screenshot report also fixes the location field's protruding input focus ring (focus now outlines the full rounded control), prevents re-focusing a selected city from querying its full label and showing a false empty result, and puts selected-category chips and the dropdown arrow in one compact wrapping row. Chrome verified the reported Indore, India selection with no re-opened listbox; mobile had no horizontal overflow. Regression coverage re-focuses selected locations and checks the category-row alignment.

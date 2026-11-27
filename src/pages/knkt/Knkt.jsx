@@ -730,7 +730,7 @@ function KnktContent() {
       )
     }
     if (locationsLoading) {
-      return <LoadingSkeleton label="Loading locations…" variant="field" count={2} />
+      return <span className="loading-skeleton-label" role="status" aria-label="Loading locations…" />
     }
     return null
   }
