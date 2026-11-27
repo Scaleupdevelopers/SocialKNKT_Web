@@ -41,6 +41,7 @@ it('shows an accessible field shimmer while categories load', async () => {
   expect(screen.getByRole('status', { name: 'Loading categories…' })).toHaveClass(
     'loading-skeleton-field',
   )
+  await waitFor(() => expect(finish).toBeTypeOf('function'))
   await act(async () => finish({ data: [{ id: 'topic', title: 'Technology' }] }))
   expect(screen.queryByRole('status', { name: 'Loading categories…' })).not.toBeInTheDocument()
   expect(screen.getByRole('checkbox', { name: 'Technology' })).toBeEnabled()
@@ -128,12 +129,108 @@ it('ignores a stale location response after the query changes', async () => {
     }
     return Promise.resolve({ data: [{ _id: 'new', city: 'New City', country: 'India' }] })
   })
-  const { container } = render(<AskShareModal onClose={vi.fn()} />)
+  render(<AskShareModal onClose={vi.fn()} />)
   fireEvent.change(screen.getByLabelText('Location'), { target: { value: 'Old' } })
-  await waitFor(() => expect(getThreadLocations).toHaveBeenCalledWith('Old'))
+  await waitFor(() => expect(getThreadLocations).toHaveBeenCalledWith('Old', 0, 10))
   fireEvent.change(screen.getByLabelText('Location'), { target: { value: 'New' } })
-  await waitFor(() => expect(container.querySelector('option')?.value).toBe('New City, India'))
+  await waitFor(() => expect(screen.getByRole('option')).toHaveTextContent('New City'))
   await act(async () => finishOld({ data: [{ _id: 'old', city: 'Old City' }] }))
-  expect(container.querySelector('option').value).toBe('New City, India')
-  expect(container.querySelectorAll('option')).toHaveLength(1)
+  expect(screen.getByRole('option')).toHaveTextContent('New City')
+  expect(screen.getAllByRole('option')).toHaveLength(1)
+})
+
+it('selects a city and country without reopening or requerying the selected value', async () => {
+  getThreadLocations.mockResolvedValue({
+    data: [{ _id: 'city', city: 'Mumbai', country: 'India' }],
+  })
+  render(<AskShareModal onClose={vi.fn()} />)
+  fireEvent.change(screen.getByLabelText('Location'), { target: { value: 'Mum' } })
+  expect(screen.getByRole('status', { name: 'Loading locations…' })).toBeInTheDocument()
+  fireEvent.click(await screen.findByRole('option', { name: 'Mumbai, India' }))
+  expect(screen.getByLabelText('Location')).toHaveValue('Mumbai, India')
+  expect(screen.getByLabelText('Location')).toHaveFocus()
+  expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 400))
+  })
+  expect(getThreadLocations).toHaveBeenCalledExactlyOnceWith('Mum', 0, 10)
+})
+
+it('keeps location suggestions and retries a failed next page without duplicate items', async () => {
+  const observers = new Set()
+  vi.stubGlobal(
+    'IntersectionObserver',
+    class {
+      constructor(callback) {
+        this.callback = callback
+      }
+      observe(target) {
+        this.target = target
+        observers.add(this)
+      }
+      disconnect() {
+        observers.delete(this)
+      }
+    },
+  )
+  const first = Array.from({ length: 10 }, (_, i) => ({
+    _id: `city-${i}`,
+    city: `City ${i}`,
+    country: 'India',
+  }))
+  getThreadLocations
+    .mockResolvedValueOnce({ data: first })
+    .mockRejectedValueOnce(new Error('offline'))
+    .mockResolvedValueOnce({
+      data: [first[0], { _id: 'last', city: 'Last city', country: 'India' }],
+    })
+  render(<AskShareModal onClose={vi.fn()} />)
+  fireEvent.change(screen.getByLabelText('Location'), { target: { value: 'City' } })
+  await screen.findByRole('option', { name: 'City 0, India' })
+  await waitFor(() => expect(observers.size).toBe(1))
+  await act(async () => {
+    const observer = [...observers][0]
+    observer.callback([{ isIntersecting: true }])
+    observer.callback([{ isIntersecting: true }])
+  })
+  fireEvent.click(await screen.findByRole('button', { name: 'Retry locations' }))
+  await screen.findByRole('option', { name: 'Last city, India' })
+  expect(screen.getAllByRole('option')).toHaveLength(11)
+  expect(getThreadLocations.mock.calls).toEqual([
+    ['City', 0, 10],
+    ['City', 1, 10],
+    ['City', 1, 10],
+  ])
+  vi.unstubAllGlobals()
+})
+
+it('removes a selected category chip without submitting the form', async () => {
+  render(<AskShareModal onClose={vi.fn()} />)
+  await fillQuestion()
+  expect(screen.getByRole('checkbox', { name: 'Technology' })).toHaveAttribute(
+    'aria-checked',
+    'true',
+  )
+  fireEvent.click(screen.getByRole('button', { name: 'Remove Technology' }))
+  expect(screen.getByRole('checkbox', { name: 'Technology' })).toHaveAttribute(
+    'aria-checked',
+    'false',
+  )
+  expect(screen.queryByRole('button', { name: 'Remove Technology' })).not.toBeInTheDocument()
+  expect(createThread).not.toHaveBeenCalled()
+})
+
+it('dismisses the location dropdown with Escape without closing the question draft', async () => {
+  const onClose = vi.fn()
+  getThreadLocations.mockResolvedValue({
+    data: [{ id: 'm', city: 'Mumbai', country: 'India' }],
+  })
+  render(<AskShareModal onClose={onClose} />)
+  fireEvent.change(screen.getByLabelText('Location'), { target: { value: 'Mum' } })
+  const option = await screen.findByRole('option', { name: 'Mumbai, India' })
+  option.focus()
+  fireEvent.keyDown(option, { key: 'Escape' })
+  expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+  expect(screen.getByLabelText('Location')).toHaveFocus()
+  expect(onClose).not.toHaveBeenCalled()
 })

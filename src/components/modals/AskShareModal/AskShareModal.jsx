@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'react-toastify'
 import { ModalShell } from '../ModalShell'
-import { LoadingSkeleton } from '../../common/RequestState'
+import { AutoLoadMore, LoadingSkeleton } from '../../common/RequestState'
 import { createThread, getThreadLocations, getTopics } from '../../../action/action'
 import { useProfile } from '../../../context/ProfileContext'
+import { usePagedList } from '../../../utils/usePagedList'
 import './AskShareModal.css'
 
 const topicId = (topic) => topic._id || topic.id
@@ -97,72 +98,132 @@ export function AskShareModal({ onClose, onCreated }) {
 }
 
 function QuestionLocation({ value, onChange, disabled }) {
-  const [suggestions, setSuggestions] = useState([])
-  const [failed, setFailed] = useState(false)
-  const [retry, setRetry] = useState(0)
+  const inputRef = useRef(null)
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
   useEffect(() => {
-    let active = true
-    if (!value.trim()) return undefined
-    const timer = setTimeout(() => {
-      getThreadLocations(value.trim())
-        .then((response) => {
-          if (active) setSuggestions(response.data || [])
-        })
-        .catch(() => {
-          if (active) setFailed(true)
-        })
-    }, 300)
-    return () => {
-      active = false
-      clearTimeout(timer)
-    }
-  }, [value, retry])
+    const timer = setTimeout(() => setQuery(open ? value.trim() : ''), 350)
+    return () => clearTimeout(timer)
+  }, [value, open])
+  const loadPage = useCallback(
+    (page) => (query ? getThreadLocations(query, page, 10) : Promise.resolve({ data: [] })),
+    [query],
+  )
+  const list = usePagedList(loadPage)
+  const pendingQuery = query !== value.trim()
+  const visible = open && Boolean(value.trim()) && !disabled
+  const select = (item) => {
+    inputRef.current?.focus()
+    setOpen(false)
+    setQuery('')
+    onChange([item.city, item.country].filter(Boolean).join(', '))
+  }
   return (
-    <>
-      <div className="ask-location">
+    <div
+      className="ask-location-wrap"
+      onKeyDownCapture={(event) => {
+        if (event.key === 'Escape' && open) {
+          event.preventDefault()
+          event.stopPropagation()
+          inputRef.current?.focus()
+          setOpen(false)
+        }
+      }}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false)
+      }}
+    >
+      <label className="ask-location">
         <img src="/assets/logo_icons/location.svg" alt="" />
         <input
-          className="community-modal-input"
+          ref={inputRef}
           aria-label="Location"
-          list="question-locations"
+          aria-controls={visible ? 'question-locations' : undefined}
+          aria-expanded={visible}
+          aria-autocomplete="list"
+          role="combobox"
           value={value}
           onChange={(event) => {
-            setSuggestions([])
-            setFailed(false)
+            setOpen(true)
             onChange(event.target.value)
+          }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={(event) => {
+            if (event.key === 'ArrowDown') {
+              event.preventDefault()
+              event.currentTarget
+                .closest('.ask-location-wrap')
+                .querySelector('[role="option"]')
+                ?.focus()
+            }
           }}
           disabled={disabled}
           placeholder="Location"
         />
-        <datalist id="question-locations">
-          {suggestions.map((item) => (
-            <option
-              key={item._id || item.id || item.city}
-              value={[item.city, item.country].filter(Boolean).join(', ')}
-            />
-          ))}
-        </datalist>
-      </div>
-      {failed && (
-        <p role="status">
-          Location suggestions unavailable. Enter a location or{' '}
-          <button
-            type="button"
-            onClick={() => {
-              setFailed(false)
-              setRetry((current) => current + 1)
-            }}
-          >
-            Retry locations
-          </button>
-          .
-        </p>
+      </label>
+      {visible && (
+        <LocationSuggestions list={list} pendingQuery={pendingQuery} onSelect={select} />
       )}
-    </>
+    </div>
   )
 }
 
+function LocationSuggestions({ list, pendingQuery, onSelect }) {
+  if (pendingQuery)
+    return (
+      <div id="question-locations" role="listbox" aria-label="Locations">
+        <LoadingSkeleton label="Loading locations…" variant="field" />
+      </div>
+    )
+  return (
+    <div
+      className="ask-location-suggestions"
+      id="question-locations"
+      role="listbox"
+      aria-label="Locations"
+    >
+      {list.items.map((item) => (
+        <button
+          type="button"
+          role="option"
+          aria-selected="false"
+          aria-label={[item.city, item.country].filter(Boolean).join(', ')}
+          key={item._id || item.id || `${item.city}-${item.country}`}
+          onClick={() => onSelect(item)}
+        >
+          <strong>{item.city}</strong>
+          <small>{item.country}</small>
+        </button>
+      ))}
+      <LocationFeedback list={list} />
+      <AutoLoadMore
+        hasMore={list.hasMore}
+        loading={list.loading}
+        error={list.error}
+        onLoadMore={list.loadMore}
+        label="Question locations"
+      />
+    </div>
+  )
+}
+
+function LocationFeedback({ list }) {
+  if (list.loading) return <LoadingSkeleton label="Loading locations…" variant="field" />
+  if (list.error)
+    return (
+      <p role="alert">
+        Unable to load locations.{' '}
+        <button type="button" onClick={list.loadMore}>
+          Retry locations
+        </button>
+      </p>
+    )
+  if (!list.items.length) return <p role="status">No locations found.</p>
+  return null
+}
+
 function QuestionTopics({ selected, onChange, disabled }) {
+  const triggerRef = useRef(null)
   const [open, setOpen] = useState(false)
   const [topics, setTopics] = useState([])
   const [loading, setLoading] = useState(true)
@@ -170,7 +231,8 @@ function QuestionTopics({ selected, onChange, disabled }) {
   const [retry, setRetry] = useState(0)
   useEffect(() => {
     let active = true
-    getTopics()
+    Promise.resolve()
+      .then(() => (active ? getTopics() : null))
       .then((response) => {
         if (active) setTopics((response.data || []).filter(topicId))
       })
@@ -190,20 +252,42 @@ function QuestionTopics({ selected, onChange, disabled }) {
     else if (selected.length < 5) onChange([...selected, topic])
   }
   return (
-    <div className="ask-category-dropdown">
-      <button
-        className="community-modal-input ask-category-trigger"
-        type="button"
-        aria-label="Categories"
-        aria-expanded={open}
-        disabled={disabled}
-        onClick={() => setOpen(!open)}
-      >
-        <span>
-          {selected.length ? selected.map(topicLabel).join(', ') : 'Choose up to 5 Categories'}
-        </span>
-        <img src="/assets/logo_icons/postadddropdown.svg" alt="" />
-      </button>
+    <div
+      className={`ask-category-dropdown${open ? ' is-open' : ''}`}
+      onKeyDownCapture={(event) => {
+        if (event.key === 'Escape' && open) {
+          event.preventDefault()
+          event.stopPropagation()
+          setOpen(false)
+          triggerRef.current?.focus()
+        }
+      }}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false)
+      }}
+    >
+      <div className="ask-category-field">
+        <CategoryChips
+          selected={selected}
+          disabled={disabled}
+          onRemove={(topic) => {
+            toggle(topic)
+            triggerRef.current?.focus()
+          }}
+        />
+        <button
+          ref={triggerRef}
+          className="community-modal-input ask-category-trigger"
+          type="button"
+          aria-label="Categories"
+          aria-expanded={open}
+          disabled={disabled}
+          onClick={() => setOpen(!open)}
+        >
+          <span>{selected.length ? 'Categories' : 'Choose up to 5 Categories'}</span>
+          <img src="/assets/logo_icons/postadddropdown.svg" alt="" />
+        </button>
+      </div>
       {open && (
         <div className="ask-category-menu" role="group" aria-label="Choose up to 5 categories">
           {loading && <LoadingSkeleton label="Loading categories…" variant="field" />}
@@ -234,7 +318,13 @@ function QuestionTopics({ selected, onChange, disabled }) {
               onToggle={toggle}
             />
           ))}
-          <button type="button" onClick={() => setOpen(false)}>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false)
+              triggerRef.current?.focus()
+            }}
+          >
             Done
           </button>
         </div>
@@ -243,17 +333,40 @@ function QuestionTopics({ selected, onChange, disabled }) {
   )
 }
 
+function CategoryChips({ selected, disabled, onRemove }) {
+  if (!selected.length) return null
+  return (
+    <div className="ask-category-chips">
+      {selected.map((topic) => (
+        <span className="ask-category-chip" key={topicId(topic)}>
+          {topicLabel(topic)}
+          <button
+            type="button"
+            aria-label={`Remove ${topicLabel(topic)}`}
+            disabled={disabled}
+            onClick={() => onRemove(topic)}
+          >
+            ×
+          </button>
+        </span>
+      ))}
+    </div>
+  )
+}
+
 function CategoryOption({ topic, selected, disabled, onToggle }) {
   const checked = selected.some((item) => topicId(item) === topicId(topic))
   return (
-    <label className="ask-category-option">
-      <input
-        type="checkbox"
-        checked={checked}
-        disabled={disabled || (!checked && selected.length >= 5)}
-        onChange={() => onToggle(topic)}
-      />
+    <button
+      className={`ask-category-option${checked ? ' selected' : ''}`}
+      type="button"
+      role="checkbox"
+      aria-checked={checked}
+      disabled={disabled || (!checked && selected.length >= 5)}
+      onClick={() => onToggle(topic)}
+    >
       {topicLabel(topic)}
-    </label>
+      {checked && <span aria-hidden="true">✓</span>}
+    </button>
   )
 }

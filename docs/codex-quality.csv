@@ -8,3 +8,4 @@ date,task,rework_cycles,known_escaped_defects,human_intervention_minutes,evidenc
 2026-11-27,Remaining web API contract audit and integration fixes,unknown,unknown,unknown,docs/verification.md;305 unit tests;46 Chrome checks;build and lint passed with warnings;independent reviews;private API audit screenshots
 2026-11-27,Replace manual pagination with scroll loading,unknown,unknown,unknown,docs/verification.md;321 unit tests;48 Chrome checks;build and lint passed with warnings;independent review;private before-after gallery
 2026-11-27,Live scroll audit and duplicate mount-read fix,unknown,unknown,unknown,docs/verification.md;323 unit tests;48 Chrome checks;real API counts;independent review
+2026-11-27,Align Ask Share location and category dropdowns,unknown,unknown,unknown,docs/verification.md;327 unit tests;2 Chrome composer checks;real API selection;independent review;12 private visual captures

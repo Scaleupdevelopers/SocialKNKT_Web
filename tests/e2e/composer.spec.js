@@ -6,6 +6,11 @@ test('question composer submits topic IDs and refreshes KNKT after success', asy
 }, info) => {
   await page.route(/^https?:\/\/(?!127\.0\.0\.1:5175)/, (route) => route.abort())
   const { calls } = await mockApi(page)
+  await page.route('**/api/v1/user/threads/locations?*', (route) =>
+    route.fulfill({
+      json: { data: [{ _id: 'location-1', city: 'Mumbai', country: 'India' }] },
+    }),
+  )
   const runtimeErrors = []
   const consoleErrors = []
   page.on('pageerror', (error) => runtimeErrors.push(error.message))
@@ -24,8 +29,16 @@ test('question composer submits topic IDs and refreshes KNKT after success', asy
   const dialog = page.getByRole('dialog', { name: 'Ask or Share on KNKT(n)' })
   await expect(dialog).toBeVisible()
   await dialog.getByLabel('Question', { exact: true }).fill('How do we test this?')
-  await dialog.getByLabel('Location', { exact: true }).fill('Mumbai, India')
+  await dialog.getByLabel('Location', { exact: true }).fill('Mum')
+  await dialog.getByRole('option', { name: 'Mumbai, India' }).click()
+  await expect(dialog.getByLabel('Location', { exact: true })).toHaveValue('Mumbai, India')
+  await expect(dialog.getByRole('listbox')).toHaveCount(0)
   await dialog.getByRole('button', { name: 'Categories' }).click()
+  await dialog.getByRole('checkbox', { name: 'Technology' }).check()
+  await expect(dialog.getByRole('button', { name: 'Remove Technology' })).toBeVisible()
+  await dialog.getByRole('button', { name: 'Remove Technology' }).focus()
+  await page.keyboard.press('Enter')
+  await expect(dialog.getByRole('checkbox', { name: 'Technology' })).not.toBeChecked()
   await dialog.getByRole('checkbox', { name: 'Technology' }).check()
   await dialog.getByRole('button', { name: 'Done', exact: true }).click()
   const bounds = await dialog.boundingBox()
