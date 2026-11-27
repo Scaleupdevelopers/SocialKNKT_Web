@@ -26,7 +26,7 @@ function ListFeedback({ list, empty }) {
           Unable to load. <button onClick={list.loadMore}>Retry</button>
         </p>
       )}
-      {!list.loading && !list.error && !list.items.length && (
+      {empty && !list.loading && !list.error && !list.items.length && (
         <p className="chat-empty">{empty}</p>
       )}
       <AutoLoadMore
@@ -40,8 +40,7 @@ function ListFeedback({ list, empty }) {
   )
 }
 
-function NewConversation({ onSelect, onClose }) {
-  const [query, setQuery] = useState('')
+function NewConversation({ onSelect, query, existingUsers }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(false)
   const mounted = useRef(true)
@@ -79,35 +78,29 @@ function NewConversation({ onSelect, onClose }) {
   }
   return (
     <section className="chat-new" aria-label="New conversation">
-      <div className="chat-title">
-        <h2>New message</h2>
-        <button onClick={onClose}>Cancel</button>
-      </div>
-      <input
-        autoFocus
-        aria-label="Search connections"
-        placeholder="Search connections"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-      />
-      {users.items.map((user) => (
-        <button
-          className="chat-room"
-          key={itemId(user)}
-          disabled={busy}
-          onClick={() => start(user)}
-        >
-          <Avatar user={user} />
-          <span>
-            {userName(user)}
-            <small>@{user.username}</small>
-          </span>
-        </button>
-      ))}
+      {users.items
+        .filter((user) => !existingUsers.includes(itemId(user)))
+        .map((user) => (
+          <button
+            className="chat-room"
+            key={itemId(user)}
+            disabled={busy}
+            onClick={() => start(user)}
+          >
+            <Avatar user={user} />
+            <span>
+              {userName(user)}
+              <small>@{user.username}</small>
+            </span>
+          </button>
+        ))}
       {error && (
         <p role="alert">Could not start this conversation. Select the person to retry.</p>
       )}
-      <ListFeedback list={users} empty="No connections found." />
+      <ListFeedback
+        list={users}
+        empty={existingUsers.length ? null : 'No connections found.'}
+      />
     </section>
   )
 }
@@ -116,11 +109,13 @@ function Conversation({ room, userId, onBack, onDeleted, onRoomsChanged }) {
   const chat = useConversation(room.id, userId, Boolean(room.blockedBy), onRoomsChanged)
   const [draft, setDraft] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [messageQuery, setMessageQuery] = useState('')
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState(false)
   const deleteLock = useRef(false)
   const mounted = useRef(true)
   const end = useRef(null)
+  const optionsTrigger = useRef(null)
   useEffect(() => {
     mounted.current = true
     return () => {
@@ -155,30 +150,34 @@ function Conversation({ room, userId, onBack, onDeleted, onRoomsChanged }) {
       className="chat-conversation"
       aria-label={`Conversation with ${userName(room.user)}`}
     >
-      <div className="chat-title">
-        <button className="chat-back" onClick={onBack}>
-          Back
-        </button>
-        <Avatar user={room.user} />
-        <strong>@{room.user.username || userName(room.user)}</strong>
-        <span>{userName(room.user)}</span>
-        <button className="chat-delete" onClick={() => setConfirmDelete(true)}>
-          Delete chat
-        </button>
-      </div>
+      <ConversationHeader
+        user={room.user}
+        onBack={onBack}
+        menuTrigger={optionsTrigger}
+        onDelete={() => setConfirmDelete(true)}
+        onRefresh={chat.refresh}
+        query={messageQuery}
+        setQuery={setMessageQuery}
+      />
       {confirmDelete && (
         <div className="chat-notice" role="alert">
           <p>Delete this conversation history for your account?</p>
-          <button disabled={deleting} onClick={remove}>
+          <button autoFocus disabled={deleting} onClick={remove}>
             {deleting ? 'Deleting…' : 'Confirm delete'}
           </button>
-          <button disabled={deleting} onClick={() => setConfirmDelete(false)}>
+          <button
+            disabled={deleting}
+            onClick={() => {
+              setConfirmDelete(false)
+              optionsTrigger.current?.focus()
+            }}
+          >
             Cancel
           </button>
           {deleteError && <p>Unable to delete. Try again.</p>}
         </div>
       )}
-      <ConversationHistory chat={chat} userId={userId} end={end} />
+      <ConversationHistory chat={chat} userId={userId} end={end} query={messageQuery} />
       <ConversationComposer
         room={room}
         userId={userId}
@@ -191,7 +190,104 @@ function Conversation({ room, userId, onBack, onDeleted, onRoomsChanged }) {
   )
 }
 
-function ConversationHistory({ chat, userId, end }) {
+function ConversationHeader({
+  user,
+  onBack,
+  onDelete,
+  onRefresh,
+  query,
+  setQuery,
+  menuTrigger,
+}) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
+  return (
+    <>
+      <div className="chat-title chat-conversation-title">
+        <button className="chat-back" aria-label="Back to conversations" onClick={onBack}>
+          Back
+        </button>
+        <div className="chat-identity">
+          <Avatar user={user} />
+          <div className="chat-identity-text">
+            <strong>@{user.username || userName(user)}</strong>
+            <span>{userName(user)}</span>
+          </div>
+        </div>
+        <div className="chat-header-actions">
+          <button
+            className="chat-icon-button"
+            aria-label="Search messages"
+            aria-expanded={searchOpen}
+            onClick={() => {
+              setSearchOpen(!searchOpen)
+              setQuery('')
+            }}
+          >
+            <img src="/assets/logo_icons/chat-search.svg" alt="" />
+          </button>
+          <div
+            className="chat-menu-wrap"
+            onBlur={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget)) setMenuOpen(false)
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                setMenuOpen(false)
+                menuTrigger.current?.focus()
+              }
+            }}
+          >
+            <button
+              ref={menuTrigger}
+              className="chat-icon-button"
+              aria-label="Conversation options"
+              aria-expanded={menuOpen}
+              aria-haspopup="true"
+              onClick={() => setMenuOpen(!menuOpen)}
+            >
+              <img src="/assets/logo_icons/chat-more.svg" alt="" />
+            </button>
+            {menuOpen && (
+              <div className="chat-options">
+                <button
+                  onClick={() => {
+                    setMenuOpen(false)
+                    menuTrigger.current?.focus()
+                    onRefresh()
+                  }}
+                >
+                  Refresh messages
+                </button>
+                <button
+                  onClick={() => {
+                    setMenuOpen(false)
+                    onDelete()
+                  }}
+                >
+                  Delete chat
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      {searchOpen && (
+        <div className="chat-message-search">
+          <input
+            autoFocus
+            aria-label="Search loaded messages"
+            placeholder="Search loaded messages"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </div>
+      )}
+    </>
+  )
+}
+
+function ConversationHistory({ chat, userId, end, query }) {
   const history = useRef(null)
   const scrollAnchor = useRef(null)
   function loadOlder() {
@@ -208,7 +304,7 @@ function ConversationHistory({ chat, userId, end }) {
   return (
     <div ref={history} className="chat-history" aria-label="Messages">
       <AutoLoadMore
-        hasMore={chat.more}
+        hasMore={chat.more && !query}
         loading={chat.loading}
         error={chat.error}
         onLoadMore={loadOlder}
@@ -223,15 +319,21 @@ function ConversationHistory({ chat, userId, end }) {
       {!chat.loading && !chat.error && !chat.messages.length && (
         <p className="chat-empty">Start your conversation.</p>
       )}
-      {chat.messages.map((message) => (
-        <article
-          className={`chat-message ${message.userId === userId ? 'chat-mine' : ''}`}
-          key={itemId(message)}
-        >
-          <p>{typeof message.message === 'string' ? message.message : 'Unsupported message'}</p>
-          <time>{formatTime(message.createdAt)}</time>
-        </article>
-      ))}
+      {chat.messages
+        .filter((message) =>
+          String(message.message).toLowerCase().includes(query.toLowerCase()),
+        )
+        .map((message) => (
+          <article
+            className={`chat-message ${message.userId === userId ? 'chat-mine' : ''}`}
+            key={itemId(message)}
+          >
+            <p>
+              {typeof message.message === 'string' ? message.message : 'Unsupported message'}
+            </p>
+            <time>{formatTime(message.createdAt)}</time>
+          </article>
+        ))}
       {chat.pending && (
         <article className="chat-message chat-mine">
           <p>{chat.pending.text}</p>
@@ -244,6 +346,8 @@ function ConversationHistory({ chat, userId, end }) {
 }
 
 function ConversationComposer({ room, userId, chat, draft, setDraft, submit }) {
+  const [emojiOpen, setEmojiOpen] = useState(false)
+  const inputRef = useRef(null)
   return room.blockedBy ? (
     <div className="chat-blocked">
       <strong>
@@ -262,7 +366,6 @@ function ConversationComposer({ room, userId, chat, draft, setDraft, submit }) {
       {!chat.connected && (
         <div className="chat-notice" role="status">
           Chat is offline. <button onClick={chat.reconnect}>Reconnect</button>
-          <button onClick={chat.refresh}>Refresh messages</button>
         </div>
       )}
       {chat.uncertain && (
@@ -276,7 +379,47 @@ function ConversationComposer({ room, userId, chat, draft, setDraft, submit }) {
         </div>
       )}
       <form className="chat-composer" onSubmit={submit}>
+        <div className="chat-composer-tools">
+          <button
+            type="button"
+            className="chat-icon-button"
+            aria-label="Choose emoji"
+            aria-expanded={emojiOpen}
+            disabled={Boolean(chat.pending)}
+            onClick={() => setEmojiOpen(!emojiOpen)}
+          >
+            <img src="/assets/logo_icons/chat-emoji.svg" alt="" />
+          </button>
+          <button
+            type="button"
+            className="chat-icon-button"
+            aria-label="Attachments unavailable"
+            title="Attachments unavailable"
+            disabled
+          >
+            <img src="/assets/logo_icons/chat-add.svg" alt="" />
+          </button>
+          {emojiOpen && (
+            <div className="chat-emoji-menu" aria-label="Emojis">
+              {['😀', '😊', '❤️', '👍', '🎉', '🙏', '👋', '😂'].map((emoji) => (
+                <button
+                  type="button"
+                  key={emoji}
+                  aria-label={emoji}
+                  onClick={() => {
+                    setDraft(draft + emoji)
+                    setEmojiOpen(false)
+                    inputRef.current?.focus()
+                  }}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <input
+          ref={inputRef}
           aria-label="Message"
           placeholder="Message"
           value={draft}
@@ -284,11 +427,12 @@ function ConversationComposer({ room, userId, chat, draft, setDraft, submit }) {
           disabled={Boolean(chat.pending)}
         />
         <button
+          className="chat-send"
           type="submit"
           aria-label="Send message"
           disabled={!draft.trim() || !chat.connected || Boolean(chat.pending)}
         >
-          <img src="/assets/logo_icons/send_icon.svg" alt="" />
+          <img src="/assets/logo_icons/chat-send.svg" alt="" />
         </button>
       </form>
     </>
@@ -301,73 +445,74 @@ export function Chat() {
   const rooms = useChatList(() => getChatRooms(), userId, false)
   const [selected, setSelected] = useState(null)
   const [query, setQuery] = useState('')
-  const [creating, setCreating] = useState(false)
   const room = rooms.items.find((r) => r.id === selected?.id) || selected
   const shown = rooms.items.filter((r) =>
-    `${userName(r.user)} ${r.user?.username}`.toLowerCase().includes(query.toLowerCase()),
+    `${userName(r.user)} ${r.user?.username}`
+      .toLowerCase()
+      .includes(query.trim().toLowerCase()),
   )
+
   useEffect(() => {
     setSelected(null)
-    setCreating(false)
   }, [userId])
   return (
     <div className="chat-page">
       <Header />
       <main className={`chat-shell ${room ? 'chat-selected' : ''}`}>
         <aside className="chat-sidebar">
-          {creating ? (
-            <NewConversation
-              onClose={() => setCreating(false)}
-              onSelect={(next) => {
-                setSelected(next)
-                setCreating(false)
-                rooms.refresh()
-              }}
+          <div className="chat-title">
+            <h1>All Messages</h1>
+          </div>
+          <div className="chat-search">
+            <img src="/assets/logo_icons/chat-search-field.svg" alt="" />
+            <input
+              aria-label="Search chat"
+              placeholder="Search chat"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
             />
-          ) : (
-            <>
-              <div className="chat-title">
-                <h1>All Messages</h1>
-                <button onClick={() => setCreating(true)}>New message</button>
-              </div>
-              <div className="chat-search">
-                <img src="/assets/logo_icons/search.svg" alt="" />
-                <input
-                  aria-label="Search chat"
-                  placeholder="Search chat"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                />
-              </div>
-              <div className="chat-rooms">
-                {shown.map((r) => (
-                  <button
-                    className={`chat-room ${room?.id === r.id ? 'active' : ''}`}
-                    key={r.id}
-                    aria-pressed={room?.id === r.id}
-                    onClick={() => setSelected(r)}
-                  >
-                    <Avatar user={r.user} />
-                    <span>
-                      <strong>{userName(r.user)}</strong>
-                      {r.lastMessage && r.readBy !== userId && room?.id !== r.id && (
-                        <small className="chat-unread">Unread</small>
-                      )}
-                      <small>{r.lastMessage || 'Start a conversation'}</small>
-                      <time>{formatTime(r.lastMessageTime)}</time>
+          </div>
+          <div className="chat-rooms">
+            {shown.map((r) => (
+              <button
+                className={`chat-room ${room?.id === r.id ? 'active' : ''}`}
+                key={r.id}
+                aria-pressed={room?.id === r.id}
+                onClick={() => setSelected(r)}
+              >
+                <Avatar user={r.user} />
+                <span>
+                  <strong>{userName(r.user)}</strong>
+                  {r.lastMessage && r.readBy !== userId && room?.id !== r.id && (
+                    <small className="chat-unread">Unread</small>
+                  )}
+                  <small>{r.lastMessage || 'Start a conversation'}</small>
+                  <time>
+                    <span className="chat-time-icon">
+                      <img src="/assets/logo_icons/chat-time.svg" alt="" />
                     </span>
-                  </button>
-                ))}
-                <ListFeedback list={rooms} empty="No messages yet. Start a new conversation." />
-                {query && !shown.length && rooms.items.length > 0 && (
-                  <p className="chat-empty">No matching chats.</p>
-                )}
-              </div>
-              <button className="chat-refresh" disabled={rooms.loading} onClick={rooms.refresh}>
-                Refresh conversations
+                    {formatTime(r.lastMessageTime)}
+                  </time>
+                </span>
               </button>
-            </>
-          )}
+            ))}
+            {query.trim() ? (
+              <NewConversation
+                query={query}
+                existingUsers={shown.map((r) => itemId(r.user))}
+                onSelect={(next) => {
+                  setSelected(next)
+                  setQuery('')
+                  rooms.refresh()
+                }}
+              />
+            ) : (
+              <ListFeedback
+                list={rooms}
+                empty="No messages yet. Search for a connection to start a conversation."
+              />
+            )}
+          </div>
         </aside>
         {room ? (
           <Conversation

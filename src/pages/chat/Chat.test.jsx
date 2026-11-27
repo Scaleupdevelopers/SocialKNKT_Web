@@ -155,14 +155,14 @@ describe('chat flow', () => {
       })
       .mockResolvedValueOnce({ data: [{ id: 'last', fname: 'Final person' }] })
     render(<Chat />)
-    fireEvent.click(screen.getByRole('button', { name: 'New message' }))
+    fireEvent.change(screen.getByLabelText('Search chat'), { target: { value: 'Bob' } })
     await screen.findByRole('button', { name: /^Person 0/ })
     const observer = intersections.findLast(
       (entry) => entry.target?.dataset.paginationSentinel === 'Chat list pagination',
     )
     act(() => observer.callback([{ isIntersecting: true }]))
     await screen.findByRole('button', { name: /^Final person/ })
-    expect(api.searchChatUsers).toHaveBeenLastCalledWith('', 1)
+    expect(api.searchChatUsers).toHaveBeenLastCalledWith('Bob', 1)
     expect(screen.queryByRole('button', { name: /Load more/i })).toBeNull()
   })
   it('shows accessible row shimmers for rooms and message history', async () => {
@@ -237,7 +237,7 @@ describe('chat flow', () => {
       data: [{ _id: 'other', fname: 'Alice', roomId: 'a' }],
     })
     render(<Chat />)
-    fireEvent.click(screen.getByRole('button', { name: 'New message' }))
+    fireEvent.change(screen.getByLabelText('Search chat'), { target: { value: 'Bob' } })
     fireEvent.click(await screen.findByRole('button', { name: /Alice/ }))
     await screen.findByText('Start your conversation.')
     expect(api.createChatRoom).not.toHaveBeenCalled()
@@ -246,6 +246,7 @@ describe('chat flow', () => {
     api.deleteChat.mockResolvedValue({ status: true })
     render(<Chat />)
     fireEvent.click(await screen.findByRole('button', { name: /Alice/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Conversation options' }))
     fireEvent.click(screen.getByRole('button', { name: 'Delete chat' }))
     expect(api.deleteChat).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'Confirm delete' }))
@@ -476,4 +477,91 @@ describe('conversation consistency', () => {
     await act(async () => finishOld({ data: [{ id: 'old' }] }))
     expect(result.current.items[0].id).toBe('new')
   })
+})
+
+it('uses the design header icons, hides delete in options and searches loaded messages', async () => {
+  api.getChatMessages.mockResolvedValue({
+    data: [
+      { id: 'm1', userId: 'other', message: 'First message' },
+      { id: 'm2', userId: 'other', message: 'Second message' },
+    ],
+  })
+  render(<Chat />)
+  fireEvent.click(await screen.findByRole('button', { name: /Alice/ }))
+  await screen.findByText('First message')
+  expect(screen.queryByRole('button', { name: 'Delete chat' })).not.toBeInTheDocument()
+  const search = screen.getByRole('button', { name: 'Search messages' })
+  expect(search.querySelector('img')).toHaveAttribute(
+    'src',
+    '/assets/logo_icons/chat-search.svg',
+  )
+  fireEvent.click(search)
+  fireEvent.change(screen.getByLabelText('Search loaded messages'), {
+    target: { value: 'Second' },
+  })
+  expect(screen.queryByText('First message')).not.toBeInTheDocument()
+  expect(screen.getByText('Second message')).toBeInTheDocument()
+  fireEvent.click(search)
+  expect(screen.getByText('First message')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Conversation options' }))
+  expect(screen.getByRole('button', { name: 'Delete chat' })).toBeVisible()
+  expect(api.deleteChat).not.toHaveBeenCalled()
+})
+
+it('adds an emoji to the draft without sending and keeps unsupported attachments disabled', async () => {
+  render(<Chat />)
+  fireEvent.click(await screen.findByRole('button', { name: /Alice/ }))
+  fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Hello ' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Choose emoji' }))
+  fireEvent.click(screen.getByRole('button', { name: '😊' }))
+  expect(screen.getByLabelText('Message')).toHaveValue('Hello 😊')
+  expect(screen.getByLabelText('Message')).toHaveFocus()
+  expect(screen.getByRole('button', { name: 'Attachments unavailable' })).toBeDisabled()
+  expect(sockets[0].emit.mock.calls.some(([event]) => event === 'message')).toBe(false)
+})
+
+it('does not auto-page history while searching loaded messages and restores menu focus', async () => {
+  api.getChatMessages.mockResolvedValue({
+    data: Array.from({ length: 20 }, (_, i) => ({
+      id: `m${i}`,
+      userId: 'other',
+      message: `Message ${i}`,
+    })),
+  })
+  render(<Chat />)
+  fireEvent.click(await screen.findByRole('button', { name: /Alice/ }))
+  await screen.findByText('Message 0')
+  fireEvent.click(screen.getByRole('button', { name: 'Search messages' }))
+  fireEvent.change(screen.getByLabelText('Search loaded messages'), {
+    target: { value: 'Missing' },
+  })
+  expect(
+    document.querySelector('[data-pagination-sentinel="Older messages pagination"]'),
+  ).toBeNull()
+  const before = api.getChatMessages.mock.calls.length
+  await act(async () => {})
+  expect(api.getChatMessages).toHaveBeenCalledTimes(before)
+  const options = screen.getByRole('button', { name: 'Conversation options' })
+  fireEvent.click(options)
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh messages' }))
+  expect(options).toHaveFocus()
+  fireEvent.click(options)
+  fireEvent.click(screen.getByRole('button', { name: 'Delete chat' }))
+  expect(screen.getByRole('button', { name: 'Confirm delete' })).toHaveFocus()
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+  expect(options).toHaveFocus()
+})
+
+it('keeps matching existing conversations searchable without duplicate connection results', async () => {
+  api.searchChatUsers.mockResolvedValue({
+    data: [{ id: 'other', fname: 'Alice', username: 'alice' }],
+  })
+  render(<Chat />)
+  await screen.findByRole('button', { name: /Alice/ })
+  fireEvent.change(screen.getByLabelText('Search chat'), { target: { value: 'Alice' } })
+  await waitFor(() => expect(api.searchChatUsers).toHaveBeenCalledWith('Alice', 0))
+  await act(async () => {})
+  expect(screen.getAllByRole('button', { name: /Alice/ })).toHaveLength(1)
+  fireEvent.click(screen.getByRole('button', { name: /Alice/ }))
+  expect(api.createChatRoom).not.toHaveBeenCalled()
 })

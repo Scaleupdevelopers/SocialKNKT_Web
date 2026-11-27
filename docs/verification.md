@@ -171,3 +171,28 @@ From baseline `e642a34`: 31 affected unit tests passed; both desktop/mobile comp
 
 
 The subsequent screenshot report also fixes the location field's protruding input focus ring (focus now outlines the full rounded control), prevents re-focusing a selected city from querying its full label and showing a false empty result, and puts selected-category chips and the dropdown arrow in one compact wrapping row. Chrome verified the reported Indore, India selection with no re-opened listbox; mobile had no horizontal overflow. Regression coverage re-focuses selected locations and checks the category-row alignment.
+
+
+## Chat Figma alignment (2026-11-27)
+
+Baseline `b46e075`. Reference: Final UI chat frame `213:4935` in Social-Knkt-web (`bboKaTs6bIBPPVITnAKsQZ`), with high-fidelity design context and screenshot; clock instance `213:5054`. The chat shell, room-list spacing, conversation identity/actions and composer now follow those nodes. Seven SVG files were downloaded directly from the tool-provided Figma asset URLs into the existing `public/assets/logo_icons` directory, without editing their paths or dimensions. Runtime code uses only local paths. User avatars and message content remain API-driven; the global site Header was not restyled.
+
+| Local asset | Design slot | Native width × height |
+| --- | --- | --- |
+| chat-search.svg | 213:5129, conversation search | 32.1409 × 32.1409 |
+| chat-more.svg | 213:5130, conversation options | 32.1409 × 32.1409 |
+| chat-emoji.svg | 674:660, emoji control | 32 × 32 |
+| chat-add.svg | 674:675, attachment control | 32 × 32 |
+| chat-send.svg | 674:671, send control | 38 × 38 |
+| chat-search-field.svg | 493:5939 live area, sidebar search | 16.6667 × 16.6667 |
+| chat-time.svg | 213:5054, room timestamp | 47.266 × 42.8545, within the design overflow wrapper |
+
+The extra sidebar New message/Refresh conversations buttons were removed. Search chat retains matching existing rooms and searches connections through the existing action, excluding duplicate users. Choosing an existing room does not create another room. Delete chat remains available under the three-dot menu, with its confirmation and double-submit protection. Conversation search filters loaded history only and suspends automatic older-message reads while filtering. The emoji control appends to the existing text draft without sending. Menu actions restore focus or focus the delete confirmation; cancellation returns to the trigger.
+
+Attachments and audio-message sending remain unsupported by the existing verified text-chat implementation: the exact attachment icon is shown disabled, rather than introducing an unverified media contract. Offline/reconnect and uncertain-delivery recovery remain visible only in those states. Real Chrome verified the existing room/header and nonempty local SVG rendering without sending a message or deleting history. Existing backend ownership findings remain separate and unchanged.
+
+Synthetic desktop/mobile browser checks cover history, offline recovery, menu/search/emoji interactions and exact rendered action-icon geometry. Unit regressions cover user search/deduplication, no extra history reads during message search, menu focus and unchanged send/delete/pagination behavior. Independent review cleared the final runtime changes. Private before/after evidence and hashes are under `outputs/chat-figma-evidence`; no real-user screenshots are committed.
+
+Final evidence: 21 chat unit tests passed; four desktop/mobile chat browser tests passed; build, lint and diff checks passed (existing warnings remain). The broad `npm test -- --maxWorkers=2` run had 328 passes and three ConnectionRequestsPanel failures: its observer callback was not installed before the first assertion, then queued mock responses affected later cases. All three passed in an isolated single-worker rerun without changing that unrelated source/test. Do not treat the initial broad run as a clean full-suite pass.
+
+The final private gallery contains 10 captures. Measured desktop shell x132/y116/width1176, sidebar359, room135.69 and header65.078px match the design within browser rounding; mobile header65px and no horizontal overflow. All seven nonempty SVGs retain their intrinsic rendered geometry and expected callsites. Header search/menu and emoji interactions passed, with no JavaScript page errors. No message was sent and no live conversation was deleted during verification.

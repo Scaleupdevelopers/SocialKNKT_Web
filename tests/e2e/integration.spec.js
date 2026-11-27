@@ -203,6 +203,39 @@ test('chat history and offline recovery render', async ({ page }, info) => {
   await expect(page.getByText('Hello from history')).toBeVisible()
   await expect(page.getByLabel('Send message', { exact: true })).toBeDisabled()
   await expect(page.getByRole('button', { name: 'Reconnect', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'New message', exact: true })).toHaveCount(0)
+  await expect(
+    page.getByRole('button', { name: 'Refresh conversations', exact: true }),
+  ).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Delete chat', exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Conversation options' }).click()
+  await page.getByRole('button', { name: 'Delete chat', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Confirm delete' })).toBeFocused()
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await page.getByRole('button', { name: 'Search messages' }).click()
+  await page.getByLabel('Search loaded messages').fill('missing')
+  await expect(page.getByText('Hello from history')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Search messages' }).click()
+  await expect(page.getByText('Hello from history')).toBeVisible()
+  await page.getByRole('button', { name: 'Choose emoji' }).click()
+  await page.getByRole('button', { name: '😊', exact: true }).click()
+  await expect(page.getByLabel('Message', { exact: true })).toHaveValue('😊')
+  const sizes = {
+    'chat-search.svg': 32.1409,
+    'chat-more.svg': 32.1409,
+    'chat-emoji.svg': 32,
+    'chat-add.svg': 32,
+    'chat-send.svg': 38,
+  }
+  for (const [file, size] of Object.entries(sizes)) {
+    const icon = page.locator(`.chat-conversation img[src$="${file}"]`)
+    await expect(icon).toBeVisible()
+    const box = await icon.boundingBox()
+    expect(box.width).toBeCloseTo(size, 1)
+    expect(box.height).toBeCloseTo(size, 1)
+    expect(await icon.evaluate((image) => image.complete && image.naturalWidth > 0)).toBe(true)
+  }
+
   await page.screenshot({ path: info.outputPath('chat-after.png'), fullPage: true })
 })
 test('contact form offers email composition with existing contact details', async ({
