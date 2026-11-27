@@ -14,3 +14,4 @@ date,task,rework_cycles,known_escaped_defects,human_intervention_minutes,evidenc
 2026-11-27,Private profile lock state with mobile asset,1,unknown,unknown,docs/verification.md;23 profile tests;2 Chrome cases;backend contract mismatch recorded;independent review
 2026-11-27,Connections upgrade and filter mobile parity,1,unknown,unknown,docs/verification.md;26 focused tests;2 Chrome cases;independent review;outgoing reload contract gap
 2026-11-27,Connected private profile audience access,1,unknown,unknown,docs/verification.md;42 focused tests;368 full suite before final chronology regression;4 Chrome cases;independent review;backend authorization gap remains
+2026-11-27,Profile connection dropdown mobile parity,1,unknown,unknown,docs/verification.md;26 focused tests;4 Chrome cases;independent review;mocked mutations

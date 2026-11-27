@@ -18,6 +18,7 @@ vi.mock('../../../action/action', () => ({
 }))
 vi.mock('../../../components/modals/ConnectionManager', () => ({
   ConnectionManager: () => null,
+  ConnectionDropdown: () => <div role="menu" aria-label="Manage Connection"><button role="menuitem">Remove Personal</button></div>,
 }))
 vi.mock('react-toastify', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 
@@ -177,4 +178,19 @@ it('preserves the default Post Other fallback', async () => {
   render(<ReportPostModal postId="post" onClose={vi.fn()} />)
   fireEvent.click(screen.getByRole('button', { name: 'Post' }))
   await waitFor(() => expect(reportPost).toHaveBeenCalledWith('post', 'Other'))
+})
+
+it('opens an anchored connection menu and closes on Escape or outside click', async () => {
+  render(header({ personalConnection: 'accepted' }))
+  const trigger = screen.getByRole('button', { name: 'Manage Connection' })
+  fireEvent.click(trigger)
+  expect(screen.getByRole('menu', { name: 'Manage Connection' })).toBeVisible()
+  expect(trigger).toHaveAttribute('aria-expanded', 'true')
+  expect(screen.queryByRole('dialog')).toBeNull()
+  fireEvent.keyDown(document, { key: 'Escape' })
+  expect(screen.queryByRole('menu')).toBeNull()
+  expect(trigger).toHaveFocus()
+  fireEvent.click(trigger)
+  fireEvent.pointerDown(document.body)
+  expect(screen.queryByRole('menu')).toBeNull()
 })

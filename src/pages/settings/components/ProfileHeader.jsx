@@ -4,7 +4,10 @@ import { useProfile } from '../../../context/ProfileContext'
 import { blockUser, reportUser, uploadFile, updateBannerImage } from '../../../action/action'
 import { toast } from 'react-toastify'
 import { ReportPostModal } from '../../../components/modals/ReportPostModal/ReportPostModal'
-import { ConnectionManager } from '../../../components/modals/ConnectionManager'
+import {
+  ConnectionDropdown,
+  ConnectionManager,
+} from '../../../components/modals/ConnectionManager'
 
 export function ProfileHeader({
   editProfile = false,
@@ -75,6 +78,7 @@ function useProfileActions({
     setBlockOverride(null)
     setBlockError('')
     setReportOpen(false)
+    setManageOpen(false)
     setIsMoreMenuOpen(false)
   }, [
     ownerKey,
@@ -286,7 +290,7 @@ function ProfileActions({ profile, isLoading, isOtherProfile, editProfile, actio
       </p>
       <div>
         {isOtherProfile ? (
-          <OtherProfileActions actions={actions} />
+          <OtherProfileActions profile={profile} actions={actions} />
         ) : (
           !editProfile && (
             <button type="button" onClick={() => navigate('/edit-profile')}>
@@ -309,16 +313,25 @@ function ProfileActions({ profile, isLoading, isOtherProfile, editProfile, actio
   )
 }
 
-function OtherProfileActions({ actions }) {
+function OtherProfileActions({ profile, actions }) {
   return (
     <>
-      <button
-        className="manage-connection-button"
-        type="button"
-        onClick={() => actions.setManageOpen(true)}
-      >
-        Manage Connection
-      </button>
+      {profile?.personalConnection || profile?.professionalConnection ? (
+        <ConnectedProfileActions
+          key={actions.ownerKey}
+          profile={profile}
+          userId={actions.userId}
+        />
+      ) : (
+        <button
+          className="manage-connection-button"
+          type="button"
+          disabled={!actions.userId}
+          onClick={() => actions.setManageOpen(true)}
+        >
+          {profile?.connectionId ? 'Manage Request' : 'Send Request'}
+        </button>
+      )}
       <div className="profile-more-wrap">
         <button
           ref={actions.moreButton}
@@ -333,6 +346,72 @@ function OtherProfileActions({ actions }) {
         {actions.isMoreMenuOpen && <ProfileMoreMenu actions={actions} />}
       </div>
     </>
+  )
+}
+
+function ConnectedProfileActions({ profile, userId }) {
+  const [open, setOpen] = useState(false)
+  const wrap = useRef(null)
+  const trigger = useRef(null)
+  const busy = useRef(false)
+  const [pending, setPending] = useState(false)
+  function pendingChanged(value) {
+    busy.current = value
+    setPending(value)
+  }
+  function close() {
+    setOpen(false)
+    trigger.current?.focus()
+  }
+  useEffect(() => {
+    if (!open) return
+    function outside(event) {
+      if (!busy.current && !wrap.current?.contains(event.target)) setOpen(false)
+    }
+    function escape(event) {
+      if (
+        !busy.current &&
+        event.key === 'Escape' &&
+        !event.target.closest?.('[role="dialog"]')
+      ) {
+        event.preventDefault()
+        setOpen(false)
+        trigger.current?.focus()
+      }
+    }
+    document.addEventListener('pointerdown', outside)
+    document.addEventListener('focusin', outside)
+    document.addEventListener('keydown', escape)
+    return () => {
+      document.removeEventListener('pointerdown', outside)
+      document.removeEventListener('focusin', outside)
+      document.removeEventListener('keydown', escape)
+    }
+  }, [open])
+  return (
+    <div className="profile-connection-wrap" ref={wrap}>
+      <button
+        ref={trigger}
+        className="manage-connection-button"
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        disabled={pending || profile.isUserBlocked || !!profile.blockedBy}
+        onClick={() => {
+          if (!busy.current) setOpen((value) => !value)
+        }}
+      >
+        Manage Connection <span aria-hidden="true">▾</span>
+      </button>
+      {open && (
+        <ConnectionDropdown
+          profile={profile}
+          userId={userId}
+          onClose={close}
+          onPendingChange={pendingChanged}
+        />
+      )}
+    </div>
   )
 }
 
