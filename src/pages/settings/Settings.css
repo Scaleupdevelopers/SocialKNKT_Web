@@ -96,6 +96,7 @@
 
 .settings-profile-skeleton-name { width: 180px; height: 24px; }
 .settings-profile-skeleton-username { width: 100px; height: 14px; }
+.settings-profile-skeleton-joined { width: 140px; height: 14px; }
 
 .settings-name-row {
   display: flex;

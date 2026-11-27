@@ -38,6 +38,8 @@ export const getCities = async (data) => {
   return postRequest('user/get-cities', data)
 }
 
+//------------------|| PROFILE ||------------------//
+
 export const getProfileMedia = async (page = 0, limit = 10, userId) => {
   return getRequest('user/profile/media', { page, limit, ...(userId ? { userId } : {}) })
 }
@@ -50,20 +52,32 @@ export const getPosts = async (page = 0, limit = 10) => {
   return getRequest('user/post', { page, limit })
 }
 
+//------------------|| HOME FEED & POSTS ||------------------//
+
 export const getAllMyFeed = async (page = 0, limit = 10) => {
   return getRequest('user/post/get-all-my-feed', { page, limit })
 }
+
+export const getOtherUserFeed = async (userId, page = 0, limit = 10) => {
+  return postRequest('user/post/get-all-other-feed', { userId, page, limit })
+}
+
+//------------------|| FLICKS ||------------------//
 
 export const getAllMyFlicks = async (page = 0, limit = 10) => {
   return getRequest('user/flick/get-all-my-flick', { page, limit })
 }
 
-export const getMyAllPosts = async (page = 0, limit = 10) => {
-  return getRequest('user/post/get-my-all-post', { page, limit })
+export const getOtherUserFlicks = async (userId, page = 0, limit = 10) => {
+  return postRequest('user/flick/get-all-other-user-flick', { userId, page, limit, postType: 1 })
 }
 
-export const getOtherUserPosts = async (userId, page = 0, limit = 10) => {
-  return postRequest('user/post/get-all-other-user-post', { userId, page, limit })
+export const getMyAllPosts = async (page = 0, limit = 10, postType) => {
+  return getRequest('user/post/get-my-all-post', { page, limit, ...(postType ? { postType } : {}) })
+}
+
+export const getOtherUserPosts = async (userId, page = 0, limit = 10, postType) => {
+  return postRequest('user/post/get-all-other-user-post', { userId, page, limit, ...(postType ? { postType } : {}) })
 }
 
 export const deletePost = async (postId) => {
@@ -73,6 +87,8 @@ export const deletePost = async (postId) => {
 export const updatePostLike = async (postId, likeStatus) => {
   return putRequest('user/post/like', { postId, likeStatus })
 }
+
+//------------------|| POST ACTIONS ||------------------//
 
 export const savePost = async (postId) => {
   return postRequest('user/post/saved', { postId })
@@ -110,6 +126,8 @@ export const getCommentReplies = async (commentId, page = 0) => {
   return getRequest('user/post/comment/reply', { page, commentId })
 }
 
+//------------------|| PROFILE ACTIONS & UPLOADS ||------------------//
+
 export const getUploadUrl = async (ext) => getRequest('upload/sign', { ext })
 
 export const updateBannerImage = async (banner_image) => {
@@ -137,6 +155,8 @@ export const getUserProfile = async () => getRequest('user/profile/get-my-profil
 export const getOtherUserProfile = async (userId) => {
   return postRequest('user/profile/get-other-user-profile', { userId })
 }
+
+//------------------|| BLOCKED USERS ||------------------//
 
 export const blockUser = async (blockedUserId, blockStatus) => {
   return postRequest('user/block', { blockedUserId, blockStatus })
@@ -205,6 +225,8 @@ export const deleteThreadComment = async (threadId, commentId) => {
 export const updateThreadCommentLike = async (threadId, commentId, likeStatus) => {
   return putRequest('user/thread/comment/like', { commentId, threadId, likeStatus })
 }
+
+//------------------|| PASSWORD & OTP ||------------------//
 
 export const sendForgotPasswordOtp = async (data) => {
   return postRequest('forget-password/send-otp', data)

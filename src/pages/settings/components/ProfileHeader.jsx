@@ -100,7 +100,10 @@ export function ProfileHeader({ editProfile = false, profileOverride = null, isL
         </div>
 
         <div className="settings-profile-actions">
-          <p>Joined March 2025</p>
+          <p>{displayedIsLoading
+            ? <span className="settings-profile-skeleton settings-profile-skeleton-joined" aria-label="Loading joined date" />
+            : `Joined ${formatJoinedDate(displayedProfile?.createdAt)}`}
+          </p>
           <div>
             {isOtherProfile ? (
               <>
@@ -133,6 +136,22 @@ export function ProfileHeader({ editProfile = false, profileOverride = null, isL
       </div>
     </>
   )
+}
+
+function formatJoinedDate(createdAt) {
+  if (!createdAt) return '—'
+
+  // API timestamps are normally milliseconds, but support seconds too.
+  const timestamp = Number(createdAt)
+  const date = Number.isFinite(timestamp)
+    ? new Date(timestamp < 1e12 ? timestamp * 1000 : timestamp)
+    : new Date(createdAt)
+  if (Number.isNaN(date.getTime())) return '—'
+
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'long',
+    year: 'numeric',
+  }).format(date)
 }
 
 function getLocationLabel(profile) {

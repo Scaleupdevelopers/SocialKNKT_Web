@@ -28,7 +28,7 @@ function PostTypeIcons({ postType }) {
   )
 }
 
-export function PostCard({ post, onDeleted, showReport = true }) {
+export function PostCard({ post, onDeleted, showReport = true, reportInMenu = false, fallbackAuthorImage = '' }) {
   const { profile } = useProfile()
   const [isReportOpen, setIsReportOpen] = useState(false)
   const [isShareOpen, setIsShareOpen] = useState(false)
@@ -125,7 +125,7 @@ export function PostCard({ post, onDeleted, showReport = true }) {
     || post.username
     || post.name
     || 'User'
-  const authorImage = post.userImage || post.authorImage || profileIcon
+  const authorImage = post.userImage || post.authorImage || fallbackAuthorImage || profileIcon
   const mediaUrl = post.media
     ? post.mediaType === 'flicks' ? post.thumbnail || post.media : post.media
     : post.image
@@ -149,7 +149,7 @@ export function PostCard({ post, onDeleted, showReport = true }) {
             <PostTypeIcons postType={post.postType} />
           </p>
         </div>
-        {isOwnPost && <div className="post-options" ref={optionsRef}>
+        {(isOwnPost || (showReport && reportInMenu && !isOwnPost)) && <div className="post-options" ref={optionsRef}>
           <button
             className="more-button"
             type="button"
@@ -161,10 +161,17 @@ export function PostCard({ post, onDeleted, showReport = true }) {
           </button>
           {isOptionsOpen && (
             <div className="post-options-menu" role="menu">
-              <button className="post-delete-option" type="button" role="menuitem" onClick={() => { setIsOptionsOpen(false); setIsDeleteModalOpen(true) }} disabled={isDeleting}>
-                <img src="/assets/logo_icons/red_delete_icon.svg" alt="" />
-                <span>{isDeleting ? 'Deleting...' : 'Delete Post'}</span>
-              </button>
+              {isOwnPost ? (
+                <button className="post-delete-option" type="button" role="menuitem" onClick={() => { setIsOptionsOpen(false); setIsDeleteModalOpen(true) }} disabled={isDeleting}>
+                  <img src="/assets/logo_icons/red_delete_icon.svg" alt="" />
+                  <span>{isDeleting ? 'Deleting...' : 'Delete Post'}</span>
+                </button>
+              ) : (
+                <button className="post-report-option" type="button" role="menuitem" onClick={() => { setIsOptionsOpen(false); setIsReportOpen(true) }}>
+                  <img src="/assets/logo_icons/report.svg" alt="" />
+                  <span>Report</span>
+                </button>
+              )}
             </div>
           )}
         </div>}
@@ -200,7 +207,7 @@ export function PostCard({ post, onDeleted, showReport = true }) {
           <img src="/assets/logo_icons/share_icon.svg" alt="" />
           Share
         </button>
-        {showReport && !isOwnPost && (
+        {showReport && !isOwnPost && !reportInMenu && (
           <button type="button" onClick={() => setIsReportOpen(true)}>
             <img src="/assets/logo_icons/report.svg" alt="" />
             Report
