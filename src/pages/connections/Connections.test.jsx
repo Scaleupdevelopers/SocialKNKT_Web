@@ -1,10 +1,12 @@
 import { act, render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { toast } from 'react-toastify'
 import { Connections } from './Connections'
 import { getProfileConnections, sendConnection } from '../../action/action'
 import { useProfile } from '../../context/ProfileContext'
 
+vi.mock('react-toastify', () => ({ toast: { error: vi.fn() } }))
 vi.mock('../../layouts/Header', () => ({ Header: () => null }))
 vi.mock('../../context/ProfileContext', () => ({
   useProfile: vi.fn(),
@@ -113,11 +115,15 @@ describe('Connections integration', () => {
     resolve({ status: true })
     expect(await screen.findByRole('button', { name: 'Request sent' })).toBeDisabled()
   })
-  it('keeps row and offers retry after API failure', async () => {
-    sendConnection.mockRejectedValueOnce(new Error('failure'))
+  it.each(['Request already exists', 'Requests already exists', ''])('shows backend error toast and allows retry: %s', async (message) => {
+    sendConnection.mockRejectedValueOnce(new Error(message))
     mount()
     fireEvent.click(await screen.findByRole('button', { name: 'Add Professional' }))
-    await screen.findByRole('alert')
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+      message || 'Unable to send request. Please try again.',
+      { position: 'bottom-center' },
+    ))
+    expect(document.querySelector('.connection-row [role="alert"]')).toBeNull()
     expect(screen.getByText('Sample Member')).toBeVisible()
     fireEvent.click(screen.getByRole('button', { name: 'Add Professional' }))
     await screen.findByRole('button', { name: 'Request sent' })
@@ -231,4 +237,17 @@ it('isolates pending request state when the signed-in account changes', async ()
   await act(async () => finishOld({ status: true }))
   expect(screen.queryByRole('button', { name: 'Request sent' })).toBeNull()
   expect(newButton).toBeEnabled()
+})
+
+it('does not toast a stale request failure after switching accounts', async () => {
+  let reject
+  sendConnection.mockImplementationOnce(() => new Promise((_, fail) => { reject = fail }))
+  const view = mount()
+  fireEvent.click(await screen.findByRole('button', { name: 'Add Professional' }))
+  useProfile.mockReturnValue({ profile: { id: 'new-account' }, authToken: 'session-b', refreshProfile: vi.fn() })
+  view.rerender(<MemoryRouter><Connections /></MemoryRouter>)
+  await screen.findByRole('button', { name: 'Add Professional' })
+  await act(async () => reject(new Error('Request already exists')))
+  expect(toast.error).not.toHaveBeenCalled()
+  expect(screen.getByRole('button', { name: 'Add Professional' })).toBeEnabled()
 })

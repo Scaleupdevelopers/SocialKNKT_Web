@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { toast } from 'react-toastify'
 import { Header } from '../../layouts/Header'
 import { getProfileConnections, sendConnection } from '../../action/action'
 
@@ -24,7 +25,6 @@ function ConnectionRow({ connection, ownList, onManage, request = {}, onSend }) 
   const addType = missingConnectionType(personalConnection, professionalConnection)
   const pending = request.status === 'pending'
   const sent = request.status === 'sent'
-  const error = request.error
 
   return (
     <article className="connection-row">
@@ -67,7 +67,6 @@ function ConnectionRow({ connection, ownList, onManage, request = {}, onSend }) 
           >
             ×
           </button>
-          {error && <p role="alert">{error}</p>}
         </div>
       )}
     </article>
@@ -83,21 +82,30 @@ function connectionActionLabel(status, type) {
 function useConnectionRequests() {
   const [items, setItems] = useState({})
   const locked = useRef(new Set())
+  const active = useRef(true)
+  useEffect(() => {
+    active.current = true
+    return () => { active.current = false }
+  }, [])
   async function send(userId, type) {
     if (locked.current.has(userId)) return
     locked.current.add(userId)
     setItems((current) => ({ ...current, [userId]: { status: 'pending' } }))
     try {
       await sendConnection(userId, type)
+      if (!active.current) return
       setItems((current) => ({ ...current, [userId]: { status: 'sent' } }))
       connectionsChanged()
-    } catch {
+    } catch (error) {
+      if (!active.current) return
+      toast.error(error?.message || 'Unable to send request. Please try again.', {
+        position: 'bottom-center',
+      })
       locked.current.delete(userId)
       setItems((current) => ({
         ...current,
         [userId]: {
           status: 'error',
-          error: 'Unable to send request. Please try again.',
         },
       }))
     }

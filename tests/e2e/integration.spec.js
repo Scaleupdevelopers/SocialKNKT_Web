@@ -423,3 +423,19 @@ test('private profile shows the mobile lock state without content requests', asy
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   await page.screenshot({ path: info.outputPath('private-profile.png'), fullPage: true })
 })
+
+test('duplicate connection request shows backend toast without inline error', async ({ page }, info) => {
+  await mockApi(page)
+  await page.route('**/user/connection-request', async (route) => {
+    if (route.request().method() !== 'POST') return route.fallback()
+    await route.fulfill({ json: { status: false, message: 'Request already exists' } })
+  })
+  await page.goto('/connections')
+  const button = page.getByRole('button', { name: 'Add Professional' })
+  await button.click()
+  await expect(page.getByRole('alert')).toHaveText('Request already exists')
+  await expect(page.locator('.connection-row [role="alert"]')).toHaveCount(0)
+  await expect(button).toBeEnabled()
+  await expect(page.getByRole('button', { name: 'Request sent' })).toHaveCount(0)
+  await page.screenshot({ path: info.outputPath('connection-error-toast.png'), fullPage: true })
+})
