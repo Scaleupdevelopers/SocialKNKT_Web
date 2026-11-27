@@ -33,6 +33,11 @@
   overflow-wrap: anywhere;
 }
 
+.profile-content-private .profile-private-state {
+  justify-content: center;
+  min-height: 320px;
+}
+
 @media (max-width: 760px) {
   .profile-content.profile-content-private {
     display: flex;

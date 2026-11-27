@@ -401,6 +401,12 @@ test('private profile shows the mobile lock state without content requests', asy
     await expect(locked).toBeVisible()
   }
   expect(calls.filter(call => /get-all-other/.test(call.path))).toHaveLength(0)
+  const stateBox = await locked.boundingBox()
+  const iconBox = await icon.boundingBox()
+  const copyBox = await locked.locator('p').boundingBox()
+  expect(Math.abs((iconBox.y + copyBox.y + copyBox.height) / 2 -
+    (stateBox.y + stateBox.height / 2))).toBeLessThan(2)
+  expect(stateBox.height).toBeGreaterThanOrEqual(320)
   await expect(page.getByText('Retry posts', { exact: true })).toHaveCount(0)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   await page.screenshot({ path: info.outputPath('private-profile.png'), fullPage: true })
