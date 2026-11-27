@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { AskShareModal } from '../../components/modals/AskShareModal/AskShareModal'
-import { createPost, getFlicks, getPosts, getUploadUrl } from '../../action/action'
+import { createPost, getFlicks, getPosts, uploadFile, getPost } from '../../action/action'
 import { createPdfThumbnail } from '../../utils/pdfThumbnail'
 import { toast } from 'react-toastify'
 import { Header } from '../../layouts/Header'
@@ -10,13 +10,13 @@ import { ProfileCard } from './components/ProfileCard'
 import { SidebarMenu } from './components/SidebarMenu'
 import './Home.css'
 import { useProfile } from '../../context/ProfileContext'
+import { Link, useSearchParams } from 'react-router-dom'
 
 const FEED_PAGE_SIZE = 10
 
 const professionalIcon = '/assets/logo_icons/Professional.svg'
 const connectionIcon = '/assets/logo_icons/connection.svg'
 const dropdownIcon = '/assets/logo_icons/postadddropdown.svg'
-
 
 const addOptions = [
   ['post_card_img.svg', 'Add a photo'],
@@ -62,6 +62,11 @@ function EmptyFeedState() {
 }
 
 export function Home() {
+  const [searchParams] = useSearchParams()
+  const postId = searchParams.get('postId')
+  const [feedError, setFeedError] = useState(false)
+  const [retry, setRetry] = useState(0)
+  const feedRequest = useRef(0)
   const [feedPosts, setFeedPosts] = useState([])
   const [isLoadingFeed, setIsLoadingFeed] = useState(true)
   const [feedPage, setFeedPage] = useState(0)
@@ -72,27 +77,37 @@ export function Home() {
   const feedEndRef = useRef(null)
 
   useEffect(() => {
+    const requestId = ++feedRequest.current
+    let active = true
+    setIsLoadingFeed(true)
+    setFeedError(false)
+    setFeedPosts([])
     const loadProfileMedia = async () => {
       try {
-        const response = await getPosts(0, FEED_PAGE_SIZE)
-        const posts = response.data || []
+        const response = postId !== null ? await getPost(postId) : await getPosts(0, FEED_PAGE_SIZE)
+        if (!active || requestId !== feedRequest.current) return
+        const posts = postId !== null ? [response.data] : response.data || []
 
         setFeedPosts(posts)
         setFeedPage(0)
-        setHasMoreFeed(posts.length >= FEED_PAGE_SIZE)
-      } catch (error) {
-        toast.error(error.message || 'Unable to load posts.')
+        setHasMoreFeed(postId === null && posts.length >= FEED_PAGE_SIZE)
+      } catch {
+        if (active) setFeedError(true)
       } finally {
-        setIsLoadingFeed(false)
+        if (active) setIsLoadingFeed(false)
       }
     }
 
     loadProfileMedia()
-  }, [])
+    return () => {
+      active = false
+      feedRequest.current++
+    }
+  }, [postId, retry])
 
   useEffect(() => {
     const loadMoreFeed = async () => {
-      if (isLoadingFeed || isLoadingMoreFeed || !hasMoreFeed) {
+      if (postId !== null || isLoadingFeed || isLoadingMoreFeed || !hasMoreFeed) {
         return
       }
 
@@ -100,7 +115,9 @@ export function Home() {
 
       try {
         const nextPage = feedPage + 1
+        const requestId = feedRequest.current
         const response = await getPosts(nextPage, FEED_PAGE_SIZE)
+        if (requestId !== feedRequest.current) return
         const nextPosts = response.data || []
 
         setFeedPosts((currentPosts) => [...currentPosts, ...nextPosts])
@@ -127,7 +144,7 @@ export function Home() {
     }
 
     return () => observer.disconnect()
-  }, [feedPage, hasMoreFeed, isLoadingFeed, isLoadingMoreFeed])
+  }, [postId, feedPage, hasMoreFeed, isLoadingFeed, isLoadingMoreFeed])
 
   useEffect(() => {
     const loadFlicks = async () => {
@@ -155,10 +172,11 @@ export function Home() {
         </aside>
 
         <section className="home-feed" aria-label="Home feed">
-          <CreatePost />
+          {postId === null ? <CreatePost /> : <Link to="/home">Back to feed</Link>}
           <div className="feed-posts">
             {isLoadingFeed && <PostSkeleton />}
-            {!isLoadingFeed && feedPosts.length === 0 && <EmptyFeedState />}
+            {feedError && <div role="alert">Unable to load this post or feed. It may no longer be available. <button onClick={() => setRetry((value) => value + 1)}>Retry</button></div>}
+            {!isLoadingFeed && !feedError && feedPosts.length === 0 && <EmptyFeedState />}
             {!isLoadingFeed && feedPosts.map((post) => (
               <PostCard
               key={post._id || post.id}
@@ -170,7 +188,7 @@ export function Home() {
             {isLoadingMoreFeed && <PostSkeleton />}
           </div>
 
-          {flicks.length > 0 && (
+          {postId === null && flicks.length > 0 && (
             <FlicksSection
               flicks={flicks}
               isLoading={isLoadingFlicks}
@@ -216,20 +234,10 @@ export function CreatePost() {
         payload.thumbnail = link.trim()
       } else if (selectedFile) {
         const ext = selectedFile.name.split('.').pop().toLowerCase()
-        const signedUrl = await getUploadUrl(ext)
-        const upload = await fetch(signedUrl.data, { method: 'PUT', headers: { 'Content-Type': selectedFile.type || 'application/octet-stream' }, body: selectedFile })
-        if (!upload.ok) throw new Error('Unable to upload media.')
-        payload.media = signedUrl.data.split('?')[0]
+        payload.media = await uploadFile(selectedFile)
         if (selectedFile.type === 'application/pdf' || ext === 'pdf') {
           const thumbnailBlob = await createPdfThumbnail(selectedFile)
-          const thumbnailUrl = await getUploadUrl('png')
-          const thumbnailUpload = await fetch(thumbnailUrl.data, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'image/png' },
-            body: thumbnailBlob,
-          })
-          if (!thumbnailUpload.ok) throw new Error('Unable to upload document preview.')
-          payload.thumbnail = thumbnailUrl.data.split('?')[0]
+          payload.thumbnail = await uploadFile(thumbnailBlob, 'png', 'image/png')
         }
       }
       await createPost(payload)

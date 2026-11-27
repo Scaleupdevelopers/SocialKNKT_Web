@@ -22,6 +22,8 @@ import { KnktFund } from './pages/knktfund/KnktFund'
 import { Connections } from './pages/connections/Connections'
 import { Knkt } from './pages/knkt/Knkt'
 import { PopularTopics } from './pages/knkt/PopularTopics'
+import { Search } from './pages/search/Search'
+import { Chat } from './pages/chat/Chat'
 import { AppToast } from './components/common/AppToast'
 import { ProtectedRoute } from './components/common/ProtectedRoute'
 import { PublicOnlyRoute } from './components/common/PublicOnlyRoute'
@@ -35,35 +37,37 @@ function App() {
       <ProfileProvider>
         <AppToast />
         <Routes>
-        <Route element={<PublicOnlyRoute />}>
-          <Route path="/" element={<SignIn />} />
-          <Route path="/signin" element={<SignIn />} />
-        </Route>
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/verify-code" element={<VerifyCode />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/password-success" element={<PasswordSuccess />} />
-        <Route path="/contact-us" element={<ContactUs />} />
-        <Route path="/sign-up" element={<SignUp />} />
-        <Route path="/verify-account" element={<VerifyAccount />} />
-        <Route path="/account-created" element={<AccountCreated />} />
+          <Route element={<PublicOnlyRoute />}>
+            <Route path="/" element={<SignIn />} />
+            <Route path="/signin" element={<SignIn />} />
+          </Route>
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/verify-code" element={<VerifyCode />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/password-success" element={<PasswordSuccess />} />
+          <Route path="/contact-us" element={<ContactUs />} />
+          <Route path="/sign-up" element={<SignUp />} />
+          <Route path="/verify-account" element={<VerifyAccount />} />
+          <Route path="/account-created" element={<AccountCreated />} />
 
-        <Route element={<ProtectedRoute />}>
-          <Route path="/work-experience" element={<WorkExperience />} />
-          <Route path="/education" element={<Education />} />
-          <Route path="/location" element={<Location />} />
-          <Route path="/pronunciation" element={<Pronunciation />} />
-          <Route path="/add-media" element={<AddMedia />} />
-          <Route path="/home" element={<Home />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/connections" element={<Connections />} />
-          <Route path="/knkt" element={<Knkt />} />
-          <Route path="/knkt/topics" element={<PopularTopics />} />
-          <Route path="/edit-profile" element={<Settings editProfile />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/flicks" element={<Flicks />} />
-          <Route path="/knktfund" element={<KnktFund />} />
-        </Route>
+          <Route element={<ProtectedRoute />}>
+            <Route path="/work-experience" element={<WorkExperience />} />
+            <Route path="/education" element={<Education />} />
+            <Route path="/location" element={<Location />} />
+            <Route path="/pronunciation" element={<Pronunciation />} />
+            <Route path="/add-media" element={<AddMedia />} />
+            <Route path="/home" element={<Home />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/connections" element={<Connections />} />
+            <Route path="/search" element={<Search />} />
+            <Route path="/chat" element={<Chat />} />
+            <Route path="/knkt" element={<Knkt />} />
+            <Route path="/knkt/topics" element={<PopularTopics />} />
+            <Route path="/edit-profile" element={<Settings editProfile />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/flicks" element={<Flicks />} />
+            <Route path="/knktfund" element={<KnktFund />} />
+          </Route>
         </Routes>
       </ProfileProvider>
     </BrowserRouter>

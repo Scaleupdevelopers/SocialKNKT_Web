@@ -1,92 +1,239 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Header } from '../../layouts/Header'
-import { getProfileConnections } from '../../action/action'
+import { getProfileConnections, sendConnection } from '../../action/action'
+
+import { connectionsChanged } from '../../utils/helper'
 import { useProfile } from '../../context/ProfileContext'
+import { usePagedList } from '../../utils/usePagedList'
+import { ConnectionManager } from '../../components/modals/ConnectionManager'
 import './Connections.css'
 
-const PAGE_SIZE = 10
-const FALLBACK_IMAGE = '/assets/logo_icons/profile_alt.avif'
-const filters = [{ key: 'all', value: null, label: 'All' }, { key: 'personal', value: 2, label: 'Personal' }, { key: 'professional', value: 3, label: 'Professional' }]
+const filters = [
+  { value: null, label: 'All' },
+  { value: 2, label: 'Personal' },
+  { value: 1, label: 'Professional' },
+]
 
-function getCtaType(connection) {
-  if (connection.personalConnection) return 'Professional'
-  if (connection.professionalConnection) return 'Personal'
-  return Number(connection.status) === 2 ? 'Professional' : 'Personal'
-}
-
-function ConnectionRow({ connection, isAdded, onAdd, onRemove }) {
+function ConnectionRow({ connection, ownList, onManage }) {
   const navigate = useNavigate()
-  const addType = getCtaType(connection)
-  const userId = connection.userId || connection.id || connection._id || connection.connectionId
-  const name = `${connection.fname || ''} ${connection.lname || ''}`.trim() || connection.username || 'Unknown user'
-  const location = [connection.cityName || connection.city, connection.countryName || connection.country].filter(Boolean).join(', ')
-  const openProfile = () => {
-    if (userId) navigate(`/profile?userId=${encodeURIComponent(userId)}`)
+  const [pending, setPending] = useState(false)
+  const [sent, setSent] = useState(false)
+  const [error, setError] = useState('')
+  const busy = useRef(false)
+  const { userId, personalConnection, professionalConnection } = connection
+  const name = [connection.fname, connection.lname].filter(Boolean).join(' ') || connection.username
+  const addType = personalConnection ? 'professional' : 'personal'
+  const hasBoth = personalConnection && professionalConnection
+
+  async function add() {
+    if (busy.current) return
+    busy.current = true
+    setPending(true)
+    setError('')
+    try {
+      await sendConnection(userId, addType)
+      setSent(true)
+      connectionsChanged()
+    } catch {
+      setError('Unable to send request. Please try again.')
+    } finally {
+      busy.current = false
+      setPending(false)
+    }
   }
-  return <article className="connection-row">
-    <button className="connection-profile-trigger" type="button" onClick={openProfile} disabled={!userId} aria-label={`Open ${name}'s profile`}>
-      <img className="connection-avatar" src={connection.image || FALLBACK_IMAGE} alt="" />
-      <div className="connection-info"><div className="connection-name-line"><strong>{name}</strong><span>@{connection.username || connection.userName}</span></div><p>{connection.jobTitle || 'SocialKNKT member'} <b>•</b> {connection.totalNoOfConnections ?? connection.totalConnections ?? 0} Connections</p>{location && <small className="connection-location"><img src="/assets/logo_icons/location.svg" alt="" />{location}</small>}</div>
-    </button>
-    <button className={`connection-add ${isAdded ? 'added' : ''}`} type="button" onClick={onAdd}>{isAdded ? `Added ${addType}` : `Add ${addType}`}</button>
-    <button className="connection-remove" type="button" aria-label={`Remove ${name}`} onClick={onRemove}>×</button>
-  </article>
+
+  return (
+    <article className="connection-row">
+      <button
+        className="connection-profile-trigger"
+        type="button"
+        onClick={() => navigate('/profile?userId=' + encodeURIComponent(userId))}
+      >
+        <img
+          className="connection-avatar"
+          src={connection.image || '/assets/logo_icons/profile_alt.avif'}
+          alt=""
+        />
+        <div className="connection-info">
+          <div className="connection-name-line">
+            <strong>{name}</strong>
+            <span>@{connection.username}</span>
+          </div>
+          <p>
+            {connection.jobTitle || 'SocialKNKT member'} · {connection.totalNoOfConnections ?? 0}{' '}
+            Connections
+          </p>
+          {connection.cityName && (
+            <small className="connection-location">
+              <img src="/assets/logo_icons/location.svg" alt="" />
+              {connection.cityName}
+            </small>
+          )}
+        </div>
+      </button>
+      {ownList && (
+        <div className="connection-row-actions">
+          {!hasBoth && (
+            <button
+              className="connection-add"
+              type="button"
+              disabled={pending || sent}
+              onClick={add}
+            >
+              {sent
+                ? 'Request sent'
+                : pending
+                  ? 'Sending…'
+                  : 'Add ' + addType[0].toUpperCase() + addType.slice(1)}
+            </button>
+          )}
+          <button
+            className="connection-remove"
+            type="button"
+            aria-label={'Manage connection with ' + name}
+            onClick={onManage}
+          >
+            ×
+          </button>
+          {error && <p role="alert">{error}</p>}
+        </div>
+      )}
+    </article>
+  )
 }
 
-function ConnectionSkeleton() {
-  return <article className="connection-row connection-row-skeleton" aria-label="Loading connection">
-    <span className="connection-skeleton-avatar" />
-    <div className="connection-skeleton-info"><span /><span /><span /></div>
-    <span className="connection-skeleton-button" />
-  </article>
+function ConnectionList({ userId, ownList, query, filter }) {
+  const [selected, setSelected] = useState(null)
+  const loadPage = useCallback(
+    (page) => getProfileConnections(page, filter, query, 10, userId),
+    [userId, filter, query],
+  )
+  const list = usePagedList(loadPage)
+  const end = useRef(null)
+  useEffect(() => {
+    if (!list.hasMore || list.loading || list.error) return
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) list.loadMore()
+    })
+    if (end.current) observer.observe(end.current)
+    return () => observer.disconnect()
+  }, [list])
+  return (
+    <>
+      <section className="connections-list">
+        {list.items.map((connection) => (
+          <ConnectionRow
+            key={connection.userId}
+            connection={connection}
+            ownList={ownList}
+            onManage={() => setSelected(connection)}
+          />
+        ))}
+        {list.loading && <p role="status">Loading connections…</p>}
+        {list.error && (
+          <div role="alert">
+            <p>{list.error}</p>
+            <button type="button" onClick={list.loadMore}>
+              Try again
+            </button>
+          </div>
+        )}
+        {!list.loading && !list.error && !list.items.length && (
+          <div className="connections-empty">
+            <strong>No Connection</strong>
+            <span>No connections match this search.</span>
+          </div>
+        )}
+        {list.hasMore && (
+          <button type="button" disabled={list.loading} onClick={list.loadMore}>
+            Load more
+          </button>
+        )}
+        <div ref={end} />
+      </section>
+      {selected && (
+        <ConnectionManager
+          userId={selected.userId}
+          onClose={() => setSelected(null)}
+          onChanged={list.reload}
+        />
+      )}
+    </>
+  )
 }
 
 export function Connections() {
   const { profile } = useProfile()
-  const [searchParams] = useSearchParams()
-  const userId = searchParams.get('userId') || profile?.id || profile?._id || profile?.userId
-  const [connections, setConnections] = useState([])
+  const [params] = useSearchParams()
+  const currentId = profile?.id || profile?._id
+  const userId = params.get('userId') || currentId
+  const ownList = !!currentId && String(userId) === String(currentId)
   const [query, setQuery] = useState('')
-  const [filter, setFilter] = useState(filters[0])
+  const [debounced, setDebounced] = useState('')
+  const [filter, setFilter] = useState(null)
   const [filterOpen, setFilterOpen] = useState(false)
-  const [added, setAdded] = useState({})
-  const [page, setPage] = useState(0)
-  const [loading, setLoading] = useState(true)
-  const [hasMore, setHasMore] = useState(true)
-  const endRef = useRef(null)
-
   useEffect(() => {
-    let active = true
-    setLoading(true)
-    const timer = setTimeout(async () => {
-      try {
-        const response = await getProfileConnections(0, filter.value, query.trim(), PAGE_SIZE, userId)
-        const next = response.data || []
-        if (active) { setConnections(next); setPage(0); setHasMore(next.length >= PAGE_SIZE) }
-      } catch { if (active) { setConnections([]); setHasMore(false) } } finally { if (active) setLoading(false) }
-    }, query ? 300 : 0)
-    return () => { active = false; clearTimeout(timer) }
-  }, [filter.value, query, userId])
+    const timer = setTimeout(() => setDebounced(query.trim()), 300)
+    return () => clearTimeout(timer)
+  }, [query])
 
-  useEffect(() => {
-    const observer = new IntersectionObserver(async ([entry]) => {
-      if (!entry.isIntersecting || loading || !hasMore) return
-      setLoading(true)
-      try {
-        const nextPage = page + 1
-        const response = await getProfileConnections(nextPage, filter.value, query.trim(), PAGE_SIZE, userId)
-        const next = response.data || []
-        setConnections((current) => [...current, ...next]); setPage(nextPage); setHasMore(next.length >= PAGE_SIZE)
-      } finally { setLoading(false) }
-    }, { rootMargin: '240px' })
-    if (endRef.current) observer.observe(endRef.current)
-    return () => observer.disconnect()
-  }, [filter.value, hasMore, loading, page, query, userId])
-
-  return <div className="connections-page"><Header /><main className="connections-content">
-    <div className="connections-search"><img src="/assets/logo_icons/search.svg" alt="" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search users" /></div>
-    <div className="connections-heading"><h1>{connections.length} Connections</h1><div className="connections-filter-wrap"><button className="connections-filter-button" type="button" aria-label="Filter connections" onClick={() => setFilterOpen((open) => !open)}><img src="/assets/logo_icons/solar_sort-linear.svg" alt="" /></button>{filterOpen && <div className="connections-filter-menu">{filters.map((option) => <button key={option.key} type="button" className={filter.key === option.key ? 'active' : ''} onClick={() => { setFilter(option); setFilterOpen(false) }}>{option.label}</button>)}</div>}</div></div>
-    <section className={`connections-list ${!loading && !connections.length ? 'connections-list-empty' : ''}`}>{loading && Array.from({ length: 4 }, (_, index) => <ConnectionSkeleton key={index} />)}{!loading && connections.map((connection) => { const id = connection.connectionId || connection.userId; return <ConnectionRow key={id} connection={connection} isAdded={added[id]} onAdd={() => setAdded((current) => ({ ...current, [id]: !current[id] }))} onRemove={() => setConnections((items) => items.filter((item) => (item.connectionId || item.userId) !== id))} /> })}{!loading && !connections.length && <div className="connections-empty"><strong>No Connection</strong><span>You don't have any connection yet</span></div>}<div ref={endRef} className="feed-end-marker" aria-hidden="true" /></section>
-  </main></div>
+  return (
+    <div className="connections-page">
+      <Header />
+      <main className="connections-content">
+        <div className="connections-search">
+          <img src="/assets/logo_icons/search.svg" alt="" />
+          <input
+            aria-label="Search connections"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search users"
+          />
+        </div>
+        <div className="connections-heading">
+          <h1>Connections</h1>
+          <div className="connections-filter-wrap">
+            <button
+              className="connections-filter-button"
+              type="button"
+              aria-label="Filter connections"
+              aria-expanded={filterOpen}
+              onClick={() => setFilterOpen(!filterOpen)}
+            >
+              <img src="/assets/logo_icons/solar_sort-linear.svg" alt="" />
+            </button>
+            {filterOpen && (
+              <div className="connections-filter-menu">
+                {filters.map((option) => (
+                  <button
+                    key={option.label}
+                    className={filter === option.value ? 'active' : ''}
+                    type="button"
+                    onClick={() => {
+                      setFilter(option.value)
+                      setFilterOpen(false)
+                    }}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+        {userId ? (
+          <ConnectionList
+            key={userId + ':' + debounced + ':' + filter}
+            userId={userId}
+            ownList={ownList}
+            query={debounced}
+            filter={filter}
+          />
+        ) : (
+          <p role="status">Loading profile…</p>
+        )}
+      </main>
+    </div>
+  )
 }

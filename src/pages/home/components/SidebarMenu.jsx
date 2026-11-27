@@ -15,6 +15,7 @@ export function SidebarMenu() {
           type="button"
           key={label}
           onClick={() => {
+            if (label === 'Saved Flicks') navigate('/flicks?saved=true')
             if (label === 'Connections') navigate('/connections')
             if (label === 'Settings') navigate('/settings')
           }}

@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { ReportPostModal } from '../../../components/modals/ReportPostModal/ReportPostModal'
 import { CommentsModal } from '../../../components/modals/CommentsModal/CommentsModal'
-import { deletePost, updatePostLike } from '../../../action/action'
+import { deletePost, updatePostLike, recordPostShare } from '../../../action/action'
 import { toast } from 'react-toastify'
 import { useProfile } from '../../../context/ProfileContext'
-import { AUTH_STORAGE_KEY } from '../../../utils/helper'
+import { AUTH_STORAGE_KEY, postLink } from '../../../utils/helper'
 import * as pdfjsLib from 'pdfjs-dist'
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
@@ -94,30 +94,49 @@ export function PostCard({ post, onDeleted, showReport = true, reportInMenu = fa
     }
   }
 
-  const shareUrl = `${window.location.origin}/home?postId=${post._id || post.id}`
+  const shareUrl = postLink(post._id || post.id)
+  const shareRecorded = useRef(Boolean(post.isShared || post.isshared))
+  const shareBusy = useRef(false)
+  const recordShare = () => {
+    if (shareRecorded.current) return
+    shareRecorded.current = true
+    recordPostShare(post._id || post.id).catch(() => {
+      shareRecorded.current = false
+    })
+  }
 
   const handleShare = async () => {
     const postId = post._id || post.id
-    if (!postId) return
+    if (!postId || shareBusy.current) return
+    shareBusy.current = true
     const shareText = `📢 Social Knkt Notification\nNew Post Shared by: ${authorName}\nPost: ${postDescription || ''}\nMedia:\n${mediaUrl || ''}\nStay connected and check out the latest activity on Social Knkt.`
     try {
       if (navigator.share) {
         await navigator.share({ title: `${authorName}'s post`, text: shareText, url: shareUrl })
       } else {
-        await navigator.clipboard.writeText(shareText)
+        await navigator.clipboard.writeText(shareUrl)
       }
-    } catch {
-      // Sharing can be cancelled or unavailable; keep the feed quiet.
+      recordShare()
+      setIsShareOpen(false)
+    } catch (error) {
+      if (error.name !== 'AbortError') toast.error('Unable to share. Try Copy Link.')
+    } finally {
+      shareBusy.current = false
     }
   }
 
   const copyShareLink = async () => {
+    if (shareBusy.current) return
+    shareBusy.current = true
     try {
-      const shareText = `📢 Social Knkt Notification\nNew Post Shared by: ${authorName}\nPost: ${postDescription || ''}\nMedia:\n${mediaUrl || ''}\nStay connected and check out the latest activity on Social Knkt.`
-      await navigator.clipboard.writeText(shareText)
+      await navigator.clipboard.writeText(shareUrl)
+      recordShare()
       setIsShareOpen(false)
+      toast.success('Link copied.')
     } catch {
-      // Clipboard may be unavailable in some browsers.
+      toast.error('Unable to copy link. Check clipboard permissions and retry.')
+    } finally {
+      shareBusy.current = false
     }
   }
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)

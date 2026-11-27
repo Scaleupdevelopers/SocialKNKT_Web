@@ -1,57 +1,323 @@
-.connections-page { min-height: 100vh; background: #1a1a1a; color: #fff; }
-.connections-content { width: min(100% - 48px, 1000px); margin: 68px auto 40px; }
-.connections-search { height: 64px; border: 1px solid #666; border-radius: 7px; display: flex; align-items: center; gap: 18px; padding: 0 20px; }
-.connections-search img { width: 25px; height: 25px; opacity: .65; }
-.connections-search input { flex: 1; background: none; border: 0; outline: 0; color: #fff; font-size: 18px; }
-.connections-search input::placeholder { color: #777; }
-.connections-heading { display: flex; align-items: center; justify-content: space-between; margin: 24px 0 18px; position: relative; }
-.connections-heading h1 { font-size: 25px; margin: 0; }
-.connections-filter-wrap { position: relative; }
-.connections-filter-button { width: 42px; height: 34px; padding: 4px; color: #fff; background: none; border: 0; cursor: pointer; }
-.connections-filter-button img { display: block; width: 100%; height: 100%; object-fit: contain; }
-.connections-filter-menu { position: absolute; z-index: 3; right: 0; top: 38px; width: 170px; background: #171717; border: 1px solid #444; border-radius: 8px; overflow: hidden; box-shadow: 0 10px 24px #0008; }
-.connections-filter-menu button { display: block; width: 100%; padding: 14px 18px; text-align: left; border: 0; color: #ddd; background: transparent; font-size: 16px; cursor: pointer; }
-.connections-filter-menu button:hover { background: #3a3a3a; color: #fff; }
-.connections-filter-menu button.active { background: #262626; color: #fff; font-weight: 600; }
-.connections-list { background: #111; border-radius: 5px; padding: 0 22px; }
-.connections-list-empty { background: transparent; }
-.connection-row { min-height: 104px; display: flex; align-items: center; gap: 16px; padding: 10px 0; }
-.connection-profile-trigger { display: flex; flex: 1; min-width: 0; align-items: center; gap: 16px; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
-.connection-profile-trigger:disabled { cursor: default; }
-.connection-profile-trigger:not(:disabled):hover .connection-name-line strong { color: #ff6254; }
-.connection-row-skeleton > span, .connection-skeleton-info span { background: linear-gradient(90deg, #292929 25%, #454545 50%, #292929 75%); background-size: 200% 100%; animation: connections-shimmer 1.4s infinite; }
-.connection-skeleton-avatar { width: 52px; height: 52px; flex: 0 0 52px; border-radius: 50%; }
-.connection-skeleton-info { flex: 1; display: grid; gap: 9px; }
-.connection-skeleton-info span { display: block; width: 42%; height: 12px; border-radius: 6px; }
-.connection-skeleton-info span:nth-child(2) { width: 58%; }
-.connection-skeleton-info span:nth-child(3) { width: 30%; }
-.connection-skeleton-button { width: 188px; height: 40px; border-radius: 24px; }
-@keyframes connections-shimmer { to { background-position: -200% 0; } }
-.connection-avatar { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; flex: 0 0 auto; }
-.connection-info { flex: 1; min-width: 0; }
-.connection-name-line { display: flex; align-items: baseline; gap: 12px; }
-.connection-name-line strong { font-size: 20px; font-weight: 500; }
-.connection-name-line span, .connection-info p, .connection-info small { color: #aaa; }
-.connection-name-line span { font-size: 12px; }
-.connection-info p { margin: 7px 0 5px; font-size: 13px; }
-.connection-info p b { margin: 0 8px; }
-.connection-info small { font-size: 12px; }
-.connection-location-dot { margin-right: 8px; color: #999; font-size: 11px; }
-.connection-add { width: 188px; padding: 11px 18px; border: 0; border-radius: 24px; color: #fff; background: linear-gradient(100deg, #ff6254, #f000d7); font-size: 15px; cursor: pointer; }
-.connection-add.added { background: #444; }
-.connection-location { display: inline-flex; align-items: center; gap: 8px; }
-.connection-location img { width: 14px; height: 14px; object-fit: contain; opacity: .7; }
-.connection-remove { align-self: center; display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; flex: 0 0 26px; padding: 0 0 2px; border: 0; border-radius: 50%; background: #aaa; color: #222; font-size: 20px; font-family: Arial, sans-serif; line-height: 1; cursor: pointer; }
-.connections-empty { color: #aaa; padding: 72px 0 90px; text-align: center; }
-.connections-empty strong, .connections-empty span { display: block; }
-.connections-empty strong { color: #fff; font-size: 20px; font-weight: 700; margin-bottom: 8px; }
-.connections-empty span { color: #999; font-size: 14px; }
+.connections-page {
+  min-height: 100vh;
+  background: #1a1a1a;
+  color: #fff;
+}
+.connections-content {
+  width: min(100% - 48px, 776px);
+  margin: 40px auto;
+}
+.connections-search {
+  height: 64px;
+  border: 1px solid #666;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 0 20px;
+}
+.connections-search img {
+  width: 25px;
+  height: 25px;
+  opacity: 0.65;
+}
+.connections-search input {
+  flex: 1;
+  background: none;
+  border: 0;
+  outline: 0;
+  color: #fff;
+  font-size: 18px;
+}
+.connections-search input::placeholder {
+  color: #777;
+}
+.connections-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 24px 0 18px;
+  position: relative;
+}
+.connections-heading h1 {
+  font-size: 20px;
+  margin: 0;
+}
+.connections-filter-wrap {
+  position: relative;
+}
+.connections-filter-button {
+  width: 42px;
+  height: 34px;
+  padding: 4px;
+  color: #fff;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.connections-filter-button img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.connections-filter-menu {
+  position: absolute;
+  z-index: 3;
+  right: 0;
+  top: 38px;
+  width: 170px;
+  background: #171717;
+  border: 1px solid #444;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 10px 24px #0008;
+}
+.connections-filter-menu button {
+  display: block;
+  width: 100%;
+  padding: 14px 18px;
+  text-align: left;
+  border: 0;
+  color: #ddd;
+  background: transparent;
+  font-size: 16px;
+  cursor: pointer;
+}
+.connections-filter-menu button:hover {
+  background: #3a3a3a;
+  color: #fff;
+}
+.connections-filter-menu button.active {
+  background: #262626;
+  color: #fff;
+  font-weight: 600;
+}
+.connections-list {
+  background: #111;
+  border-radius: 5px;
+  padding: 0 22px;
+}
+.connections-list-empty {
+  background: transparent;
+}
+.connection-row {
+  min-height: 104px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 0;
+}
+.connection-profile-trigger {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 16px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.connection-profile-trigger:disabled {
+  cursor: default;
+}
+.connection-profile-trigger:not(:disabled):hover .connection-name-line strong {
+  color: #ff6254;
+}
+.connection-row-skeleton > span,
+.connection-skeleton-info span {
+  background: linear-gradient(90deg, #292929 25%, #454545 50%, #292929 75%);
+  background-size: 200% 100%;
+  animation: connections-shimmer 1.4s infinite;
+}
+.connection-skeleton-avatar {
+  width: 52px;
+  height: 52px;
+  flex: 0 0 52px;
+  border-radius: 50%;
+}
+.connection-skeleton-info {
+  flex: 1;
+  display: grid;
+  gap: 9px;
+}
+.connection-skeleton-info span {
+  display: block;
+  width: 42%;
+  height: 12px;
+  border-radius: 6px;
+}
+.connection-skeleton-info span:nth-child(2) {
+  width: 58%;
+}
+.connection-skeleton-info span:nth-child(3) {
+  width: 30%;
+}
+.connection-skeleton-button {
+  width: 188px;
+  height: 40px;
+  border-radius: 24px;
+}
+@keyframes connections-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+.connection-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: 0 0 auto;
+}
+.connection-info {
+  flex: 1;
+  min-width: 0;
+}
+.connection-name-line {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.connection-name-line strong {
+  font-size: 16px;
+  font-weight: 500;
+}
+.connection-name-line span,
+.connection-info p,
+.connection-info small {
+  color: #aaa;
+}
+.connection-name-line span {
+  font-size: 12px;
+}
+.connection-info p {
+  margin: 7px 0 5px;
+  font-size: 13px;
+}
+.connection-info p b {
+  margin: 0 8px;
+}
+.connection-info small {
+  font-size: 12px;
+}
+.connection-location-dot {
+  margin-right: 8px;
+  color: #999;
+  font-size: 11px;
+}
+.connection-add {
+  width: 188px;
+  padding: 11px 18px;
+  border: 0;
+  border-radius: 24px;
+  color: #fff;
+  background: linear-gradient(100deg, #ff6254, #f000d7);
+  font-size: 15px;
+  cursor: pointer;
+}
+.connection-add.added {
+  background: #444;
+}
+.connection-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  max-width: 240px;
+}
+.connection-row-actions [role='alert'] {
+  width: 100%;
+  color: #ffb5ac;
+  font-size: 12px;
+}
+.connection-add:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.connections-list > button {
+  background: #303030;
+  color: white;
+  border: 1px solid #777;
+  border-radius: 18px;
+  padding: 8px 20px;
+  margin: 12px;
+}
+.connection-location {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.connection-location img {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  opacity: 0.7;
+}
+.connection-remove {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  padding: 0 0 2px;
+  border: 0;
+  border-radius: 50%;
+  background: #aaa;
+  color: #222;
+  font-size: 20px;
+  font-family: Arial, sans-serif;
+  line-height: 1;
+  cursor: pointer;
+}
+.connections-empty {
+  color: #aaa;
+  padding: 72px 0 90px;
+  text-align: center;
+}
+.connections-empty strong,
+.connections-empty span {
+  display: block;
+}
+.connections-empty strong {
+  color: #fff;
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.connections-empty span {
+  color: #999;
+  font-size: 14px;
+}
 @media (max-width: 700px) {
-  .connections-content { width: calc(100% - 24px); margin-top: 28px; }
-  .connections-list { padding: 0 12px; }
-  .connection-row { gap: 10px; padding: 14px 0; flex-wrap: wrap; }
-  .connection-profile-trigger { gap: 10px; }
-  .connection-info { min-width: calc(100% - 70px); }
-  .connection-add { margin-left: 62px; width: 165px; }
-  .connection-remove { margin-left: auto; }
+  .connections-content {
+    width: calc(100% - 24px);
+    margin-top: 28px;
+  }
+  .connections-list {
+    padding: 0 12px;
+  }
+  .connection-row {
+    gap: 10px;
+    padding: 14px 0;
+    flex-wrap: wrap;
+  }
+  .connection-profile-trigger {
+    gap: 10px;
+  }
+  .connection-info {
+    min-width: calc(100% - 70px);
+  }
+  .connection-add {
+    margin-left: 62px;
+    width: 165px;
+  }
+  .connection-remove {
+    margin-left: auto;
+  }
 }

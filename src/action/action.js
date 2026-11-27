@@ -1,4 +1,10 @@
-import { deleteRequest, getRequest, getRequestAllowFailure, postRequest, putRequest } from '../utils/helper'
+import {
+  deleteRequest,
+  getRequest,
+  getRequestAllowFailure,
+  postRequest,
+  putRequest,
+} from '../utils/helper'
 
 //------------------|| USER AUTH ||------------------//
 
@@ -44,8 +50,20 @@ export const getProfileMedia = async (page = 0, limit = 10, userId) => {
   return getRequest('user/profile/media', { page, limit, ...(userId ? { userId } : {}) })
 }
 
-export const getProfileConnections = async (page = 0, filter = null, query = '', limit = 10, userId) => {
-  return getRequest('user/profile/connections', { page, ...(filter ? { filter } : {}), q: query, limit, ...(userId ? { userId } : {}) })
+export const getProfileConnections = async (
+  page = 0,
+  filter = null,
+  query = '',
+  limit = 10,
+  userId,
+) => {
+  return getRequest('user/profile/connections', {
+    page,
+    ...(filter ? { filter } : {}),
+    q: query,
+    limit,
+    ...(userId ? { userId } : {}),
+  })
 }
 
 export const getPosts = async (page = 0, limit = 10) => {
@@ -77,7 +95,12 @@ export const getMyAllPosts = async (page = 0, limit = 10, postType) => {
 }
 
 export const getOtherUserPosts = async (userId, page = 0, limit = 10, postType) => {
-  return postRequest('user/post/get-all-other-user-post', { userId, page, limit, ...(postType ? { postType } : {}) })
+  return postRequest('user/post/get-all-other-user-post', {
+    userId,
+    page,
+    limit,
+    ...(postType ? { postType } : {}),
+  })
 }
 
 export const deletePost = async (postId) => {
@@ -119,7 +142,9 @@ export const reportComment = async (postId, commentId, description) => {
 }
 
 export const deleteComment = async (postId, commentId) => {
-  return deleteRequest(`user/post/comment?commentId=${encodeURIComponent(commentId)}&postId=${encodeURIComponent(postId)}`)
+  return deleteRequest(
+    `user/post/comment?commentId=${encodeURIComponent(commentId)}&postId=${encodeURIComponent(postId)}`,
+  )
 }
 
 export const getCommentReplies = async (commentId, page = 0) => {
@@ -128,7 +153,9 @@ export const getCommentReplies = async (commentId, page = 0) => {
 
 //------------------|| PROFILE ACTIONS & UPLOADS ||------------------//
 
-export const getUploadUrl = async (ext) => getRequest('upload/sign', { ext })
+export const getUploadUrl = async (ext) => {
+  return getRequest('upload/sign', { ext })
+}
 
 export const updateBannerImage = async (banner_image) => {
   return postRequest('user/update-banner-image', { banner_image })
@@ -146,11 +173,17 @@ export const updatePassword = async (data) => {
   return putRequest('user/password', data)
 }
 
-export const deleteAccount = async () => deleteRequest('user/delete-account')
+export const deleteAccount = async () => {
+  return deleteRequest('user/delete-account')
+}
 
-export const createPost = async (data) => postRequest('user/post', data)
+export const createPost = async (data) => {
+  return postRequest('user/post', data)
+}
 
-export const getUserProfile = async () => getRequest('user/profile/get-my-profile')
+export const getUserProfile = async () => {
+  return getRequest('user/profile/get-my-profile')
+}
 
 export const getOtherUserProfile = async (userId) => {
   return postRequest('user/profile/get-other-user-profile', { userId })
@@ -162,7 +195,9 @@ export const blockUser = async (blockedUserId, blockStatus) => {
   return postRequest('user/block', { blockedUserId, blockStatus })
 }
 
-export const getBlockedUsers = async () => getRequest('user/block')
+export const getBlockedUsers = async () => {
+  return getRequest('user/block')
+}
 
 export const getFlicks = async (page = 0, limit = 10) => {
   return getRequest('user/flick', { page, limit })
@@ -219,7 +254,9 @@ export const reportThreadComment = async (threadId, commentId, description) => {
 }
 
 export const deleteThreadComment = async (threadId, commentId) => {
-  return deleteRequest(`user/thread/comment?commentId=${encodeURIComponent(commentId)}&threadId=${encodeURIComponent(threadId)}`)
+  return deleteRequest(
+    `user/thread/comment?commentId=${encodeURIComponent(commentId)}&threadId=${encodeURIComponent(threadId)}`,
+  )
 }
 
 export const updateThreadCommentLike = async (threadId, commentId, likeStatus) => {
@@ -244,3 +281,157 @@ export const changePassword = async (data) => {
   return postRequest('forget-password/change-password', data)
 }
 
+//------------------|| CHAT ||------------------//
+
+// Keep authentication and response handling in the existing request layer.
+// Reads are cancelled at the consumer boundary because the shared helper has no signal option.
+export const getChatRooms = () => {
+  return getRequest('user/chat/room')
+}
+
+export const searchChatUsers = (q, page = 0, limit = 20) => {
+  return getRequest('user/chat/search', { q, page, limit })
+}
+
+export const createChatRoom = (userId) => {
+  return postRequest('user/chat/room', { userId })
+}
+
+export const getChatMessages = (roomId, page = 0, limit = 20) => {
+  return getRequest('user/chat/messages', { roomId, page, limit })
+}
+
+export const deleteChat = (roomId, userId) => {
+  return deleteRequest('user/chat/delete', { roomId, userId })
+}
+
+//------------------|| CONNECTIONS ||------------------//
+
+export const getConnectionRequests = (page = 0) => {
+  return getRequest('user/connection-request', { page, limit: 10 })
+}
+
+export const getConnectionCount = () => {
+  return getRequest('user/connection-request/count')
+}
+
+export const sendConnection = (connectUserId, connectionType) => {
+  return postRequest('user/connection-request', { connectUserId, connectionType })
+}
+
+export const answerConnection = (connectionId, status) => {
+  return putRequest('user/connection-request', { connectionId, status })
+}
+
+export const removeConnection = (connectionId, connectionType) => {
+  return deleteRequest('user/connection-request', { connectionId, connectionType })
+}
+
+export async function getIncomingConnection(userId) {
+  let page = 0
+  while (true) {
+    const { data } = await getConnectionRequests(page++)
+    const requests = Array.isArray(data) ? data : []
+    const incoming = requests.find((item) => String(item.userId) === String(userId))
+    if (incoming || requests.length < 10) return incoming || null
+  }
+}
+
+//------------------|| DISCOVERY ||------------------//
+
+async function getEntity(kind, id) {
+  if (!/^[a-f\d]{24}$/i.test(id || '')) {
+    throw new Error('Invalid link.')
+  }
+  const response = await getRequest(`user/${kind}/${encodeURIComponent(id)}`)
+  if (!response.data || Array.isArray(response.data) || response.data.deletedAt) {
+    throw new Error('Content unavailable.')
+  }
+  return response
+}
+
+export const getPost = (id) => {
+  return getEntity('post', id)
+}
+
+export const getThread = (id) => {
+  return getEntity('thread', id)
+}
+
+export const getSavedPosts = (page = 0, limit = 10) => {
+  return getRequest('user/post/get-saved-posts', { page, limit })
+}
+
+export const recordPostShare = (postId) => {
+  return putRequest('user/post/share', { postId, shareStatus: true })
+}
+
+//------------------|| NOTIFICATIONS ||------------------//
+
+export const getNotifications = (page = 0) => {
+  return getRequest('user/notifications', { page })
+}
+
+export const getNotificationCount = () => {
+  return getRequest('user/notifications/count')
+}
+
+//------------------|| PROFILE ||------------------//
+
+export const updateProfile = (payload) => {
+  return putRequest('user/profile', payload)
+}
+
+export async function uploadFile(
+  file,
+  extension = file.name.split('.').pop().toLowerCase(),
+  contentType = file.type || 'application/octet-stream',
+) {
+  const response = await getUploadUrl(extension)
+  const upload = await fetch(response.data, {
+    method: 'PUT',
+    headers: { 'Content-Type': contentType },
+    body: file,
+  })
+  if (!upload.ok) {
+    throw new Error('Unable to upload file. Please try again.')
+  }
+  return response.data.split('?')[0]
+}
+
+//------------------|| SEARCH ||------------------//
+
+export const SEARCH_PAGE_SIZE = 10
+export function searchContent(kind, query, page = 0) {
+  const q = query.trim()
+  if (!q) {
+    return Promise.resolve({ data: [] })
+  }
+
+  if (kind === 'people') {
+    return getRequest('user/search', {
+      q,
+      type: 'people',
+      media: false,
+      page,
+      limit: SEARCH_PAGE_SIZE,
+    })
+  }
+  // These endpoints interpret q as a regular expression. Search literal user input.
+  const literalQuery = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  if (kind === 'threads') {
+    return getRequest('user/threads/search', { q: literalQuery, page, limit: SEARCH_PAGE_SIZE })
+  }
+  // media=false currently returns threads, not posts, at backend main 854ad9a.
+  return getRequest('user/search', {
+    q: literalQuery,
+    type: 'feeds',
+    media: true,
+    page,
+    limit: SEARCH_PAGE_SIZE,
+  })
+}
+
+export const getContactDetails = async () => {
+  return getRequest('user/profile/admin')
+}

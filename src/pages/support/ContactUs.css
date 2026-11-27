@@ -3,7 +3,13 @@
   padding: 22px 5.5vw 32px;
   background: #1b1b1b;
   color: #f8f8f8;
-  font-family: "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family:
+    'Inter',
+    'SF Pro Display',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
 }
 .contact-header {
   display: flex;
@@ -93,20 +99,28 @@
 }
 @media (max-width: 640px) {
   .contact-page {
-  padding: 22px 20px 48px;
-}
-.contact-brand {
-  width: 68px;
-  height: 68px;
-}
-.contact-card {
-  margin-top: 54px;
-}
-.contact-form input,
+    padding: 22px 20px 48px;
+  }
+  .contact-brand {
+    width: 68px;
+    height: 68px;
+  }
+  .contact-card {
+    margin-top: 54px;
+  }
+  .contact-form input,
   .contact-submit {
-  height: 64px;
+    height: 64px;
+  }
+  .contact-form textarea {
+    min-height: 150px;
+  }
 }
-.contact-form textarea {
-  min-height: 150px;
+.contact-details {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
 }
+.contact-submit:disabled {
+  opacity: 0.5;
+  cursor: default;
 }

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useProfile } from '../../../context/ProfileContext'
-import { blockUser, getUploadUrl, updateBannerImage } from '../../../action/action'
+import { blockUser, uploadFile, updateBannerImage } from '../../../action/action'
 import { toast } from 'react-toastify'
+import { ConnectionManager } from '../../../components/modals/ConnectionManager'
 
 export function ProfileHeader({ editProfile = false, profileOverride = null, isLoadingOverride = null, isOtherProfile = false }) {
   const navigate = useNavigate()
@@ -14,6 +15,7 @@ export function ProfileHeader({ editProfile = false, profileOverride = null, isL
   const [isBannerUploading, setIsBannerUploading] = useState(false)
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false)
   const [isBlocked, setIsBlocked] = useState(false)
+  const [manageOpen, setManageOpen] = useState(false)
 
   useEffect(() => {
     const blocked = profileOverride?.isBlocked ?? profileOverride?.isUserBlocked ?? profileOverride?.userBlocked
@@ -37,10 +39,7 @@ export function ProfileHeader({ editProfile = false, profileOverride = null, isL
     setIsBannerUploading(true)
     try {
       const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
-      const signedUrl = await getUploadUrl(ext)
-      const upload = await fetch(signedUrl.data, { method: 'PUT', headers: { 'Content-Type': file.type || 'application/octet-stream' }, body: file })
-      if (!upload.ok) throw new Error('Unable to upload banner image.')
-      const bannerUrl = signedUrl.data.split('?')[0]
+      const bannerUrl = await uploadFile(file, ext)
       await updateBannerImage(bannerUrl)
       setBannerImage(bannerUrl)
       setProfile((current) => current ? { ...current, banner_image: bannerUrl } : current)
@@ -107,7 +106,7 @@ export function ProfileHeader({ editProfile = false, profileOverride = null, isL
           <div>
             {isOtherProfile ? (
               <>
-                <button className="manage-connection-button" type="button">Manage Connection</button>
+                <button className="manage-connection-button" type="button" onClick={() => setManageOpen(true)}>Manage Connection</button>
                 <div className="profile-more-wrap">
                   <button className="profile-more-button" type="button" aria-label="More profile actions" aria-expanded={isMoreMenuOpen} onClick={() => setIsMoreMenuOpen((open) => !open)}>⋮</button>
                   {isMoreMenuOpen && <div className="profile-more-menu">
@@ -134,6 +133,7 @@ export function ProfileHeader({ editProfile = false, profileOverride = null, isL
           </div>
         </div>
       </div>
+      {manageOpen && <ConnectionManager key={displayedProfile?.id || displayedProfile?._id} userId={displayedProfile?.id || displayedProfile?._id} onClose={() => setManageOpen(false)} />}
     </>
   )
 }

@@ -1,21 +1,12 @@
 import { Navigate, Outlet } from 'react-router-dom'
 
-import { AUTH_STORAGE_KEY } from '../../utils/helper'
+import { useProfile } from '../../context/ProfileContext'
 
 export function ProtectedRoute() {
-  let authData = null
-
-  try {
-    authData = JSON.parse(
-      localStorage.getItem(AUTH_STORAGE_KEY) || 'null',
-    )
-  } catch {
-    localStorage.removeItem(AUTH_STORAGE_KEY)
-  }
-
-  if (!authData?.token) {
+  const { authToken } = useProfile()
+  if (!authToken) {
     return <Navigate to="/" replace />
   }
 
-  return <Outlet />
+  return <Outlet key={authToken} />
 }

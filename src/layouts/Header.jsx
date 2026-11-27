@@ -4,9 +4,11 @@ import { AskShareModal } from '../components/modals/AskShareModal/AskShareModal'
 import { AUTH_STORAGE_KEY } from '../utils/helper'
 import './Header.css'
 import { useProfile } from '../context/ProfileContext'
-import { createPost, getUploadUrl } from '../action/action'
+import { createPost, uploadFile, getConnectionCount, getNotificationCount } from '../action/action'
 import { createPdfThumbnail } from '../utils/pdfThumbnail'
 import { toast } from 'react-toastify'
+import { ConnectionRequestsPanel } from './ConnectionRequestsPanel'
+import { NotificationsPanel } from './NotificationsPanel'
 
 const navigationItems = [
   {
@@ -44,6 +46,18 @@ export function Header() {
   const [openPanel, setOpenPanel] = useState(null)
   const [isPostModalOpen, setIsPostModalOpen] = useState(false)
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false)
+  const counts = useHeaderCounts()
+  const headerRef = useRef(null)
+  useEffect(() => {
+    const close = event => {
+      if (event.key === 'Escape' || (event.type === 'pointerdown' && !headerRef.current?.contains(event.target))) {
+        setOpenPanel(null); setIsAccountMenuOpen(false)
+      }
+    }
+    document.addEventListener('keydown', close)
+    document.addEventListener('pointerdown', close)
+    return () => { document.removeEventListener('keydown', close); document.removeEventListener('pointerdown', close) }
+  }, [])
 
   const logout = () => {
     localStorage.removeItem(AUTH_STORAGE_KEY)
@@ -56,7 +70,7 @@ export function Header() {
   }
 
   return (
-    <header className="site-header">
+    <header className="site-header" ref={headerRef}>
       <button
         className="site-header-logo"
         type="button"
@@ -90,7 +104,7 @@ export function Header() {
       </nav>
 
       <div className="header-actions">
-        <button className="header-search" type="button" aria-label="Search">
+        <button className="header-search" type="button" aria-label="Search" onClick={() => navigate('/search')}>
           <img src="/assets/logo_icons/search.svg" alt="" />
         </button>
 
@@ -99,17 +113,18 @@ export function Header() {
         <HeaderAction
           label="Messages"
           icon="/assets/logo_icons/Chat.svg"
+          onClick={() => navigate('/chat')}
         />
         <HeaderAction
           label="Connections"
           icon="/assets/logo_icons/connection.svg"
-          count="1"
+          count={counts.connections || undefined}
           onClick={() => setOpenPanel(openPanel === 'connections' ? null : 'connections')}
         />
         <HeaderAction
           label="Notifications"
           icon="/assets/logo_icons/notification.svg"
-          count="9"
+          count={counts.notifications || undefined}
           onClick={() => setOpenPanel(openPanel === 'notifications' ? null : 'notifications')}
         />
 
@@ -139,8 +154,8 @@ export function Header() {
               </div>
             </div>
             <button className="account-view-profile" type="button" onClick={() => navigate('/profile')}>View Profile</button>
-            <button type="button">Privacy Policy</button>
-            <button type="button">Terms of Service</button>
+            <a href="https://socialknkt.com/privacy" target="_blank" rel="noreferrer">Privacy Policy</a>
+            <a href="https://socialknkt.com/terms" target="_blank" rel="noreferrer">Terms of Service</a>
             <button
               className="account-logout"
               type="button"
@@ -152,8 +167,8 @@ export function Header() {
           </div>
         )}
 
-        {openPanel === 'notifications' && <NotificationsPanel />}
-        {openPanel === 'connections' && <ConnectionsPanel />}
+        {openPanel === 'notifications' && <NotificationsPanel onClose={() => setOpenPanel(null)} />}
+        {openPanel === 'connections' && <ConnectionRequestsPanel onClose={() => setOpenPanel(null)} />}
       </div>
 
       {isPostModalOpen && (
@@ -223,24 +238,10 @@ function PostComposerModal({ onClose }) {
         payload.thumbnail = link.trim()
       } else if (selectedFile) {
         const ext = selectedFile.name.split('.').pop().toLowerCase()
-        const signedResponse = await getUploadUrl(ext)
-        const uploadResponse = await fetch(signedResponse.data, {
-          method: 'PUT',
-          headers: { 'Content-Type': selectedFile.type || 'application/octet-stream' },
-          body: selectedFile,
-        })
-        if (!uploadResponse.ok) throw new Error('Unable to upload media.')
-        payload.media = signedResponse.data.split('?')[0]
+        payload.media = await uploadFile(selectedFile)
         if (selectedFile.type === 'application/pdf' || ext === 'pdf') {
           const thumbnailBlob = await createPdfThumbnail(selectedFile)
-          const thumbnailUrl = await getUploadUrl('png')
-          const thumbnailUpload = await fetch(thumbnailUrl.data, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'image/png' },
-            body: thumbnailBlob,
-          })
-          if (!thumbnailUpload.ok) throw new Error('Unable to upload document preview.')
-          payload.thumbnail = thumbnailUrl.data.split('?')[0]
+          payload.thumbnail = await uploadFile(thumbnailBlob, 'png', 'image/png')
         }
       }
 
@@ -419,97 +420,44 @@ function ProfileTypeIcon({ type }) {
   return <img className="profile-type-icon" src={icon} alt="" />
 }
 
-const notificationItems = [
-  'Leila Berk, Talinda Newton and 4 others liked your Post.',
-  'Leila Berk, Talinda Newton and 4 others commented your Post.',
-  'Leila Berk sent a connection request.',
-  'Leila Berk sent a connection request.',
-  'Leila Berk, Talinda Newton and 4 others liked your Post.',
-]
-
-function NotificationsPanel() {
-  return (
-    <aside className="header-panel notifications-panel">
-      <PanelHeading title="Notification" />
-      <PanelSectionTitle title="Recent" />
-      <NotificationList items={notificationItems.slice(0, 3)} />
-      <PanelSectionTitle title="Yesterday" />
-      <NotificationList items={notificationItems.slice(3)} />
-    </aside>
-  )
-}
-
-function ConnectionsPanel() {
-  const [openRequest, setOpenRequest] = useState(null)
-
-  return (
-    <aside className="header-panel connections-panel">
-      <PanelHeading title="Connection Requests" />
-      {[1, 2, 3, 4].map((request) => (
-        <div className="connection-request" key={request}>
-          <img src="/assets/logo_icons/profile_avatar.png" alt="Leila Berk" />
-          <div className="connection-request-content">
-            <p>Leila Berk sent a connection request <span>30m</span></p>
-            <div>
-              <button
-                className="accept-button"
-                type="button"
-                onClick={() => setOpenRequest(openRequest === request ? null : request)}
-              >
-                Accept
-                <img src="/assets/logo_icons/dropdownHeader.svg" alt="" />
-              </button>
-              <button className="decline-button" type="button">Decline</button>
-            </div>
-            {openRequest === request && (
-              <div className="connection-type-menu">
-                <button type="button">Personal</button>
-                <button type="button">Professional</button>
-                <button type="button">Both</button>
-              </div>
-            )}
-          </div>
-        </div>
-      ))}
-    </aside>
-  )
-}
-
-function PanelHeading({ title }) {
-  return (
-    <div className="panel-heading">
-      <h2>{title}</h2>
-      <button type="button" aria-label="More options">•••</button>
-    </div>
-  )
-}
-
-function PanelSectionTitle({ title }) {
-  return <h3 className="panel-section-title">{title}</h3>
-}
-
-function NotificationList({ items }) {
-  return (
-    <div className="notification-list">
-      {items.map((item, index) => (
-        <div className="notification-item" key={`${item}-${index}`}>
-          <img src="/assets/logo_icons/profile_avatar.png" alt="" />
-          <p>{item} <span>30m</span></p>
-          {item.includes('request') ? (
-            <>
-              <button className="accept-button" type="button">
-                Accept
-                <img src="/assets/logo_icons/dropdownHeader.svg" alt="" />
-              </button>
-              <button className="close-request-button" type="button" aria-label="Dismiss request">
-                <img src="/assets/logo_icons/ci_close-big.svg" alt="" />
-              </button>
-            </>
-          ) : (
-            <span className="notification-thumbnail" />
-          )}
-        </div>
-      ))}
-    </div>
-  )
+function useHeaderCounts() {
+  const { authToken } = useProfile()
+  const [counts, setCounts] = useState({ connections: 0, notifications: 0 })
+  useEffect(() => {
+    let active = true
+    let request = 0
+    async function refresh() {
+      const id = ++request
+      if (!authToken) return
+      const results = await Promise.allSettled([getConnectionCount(), getNotificationCount()])
+      if (!active || id !== request) return
+      setCounts((current) => ({
+        connections:
+          results[0].status === 'fulfilled'
+            ? Number(results[0].value.data) || 0
+            : current.connections,
+        notifications:
+          results[1].status === 'fulfilled'
+            ? Number(results[1].value.data) || 0
+            : current.notifications,
+      }))
+    }
+    const read = (event) => {
+      if (event.detail?.token === authToken) {
+        request++
+        setCounts((current) => ({ ...current, notifications: 0 }))
+      }
+    }
+    refresh()
+    window.addEventListener('focus', refresh)
+    window.addEventListener('connections-change', refresh)
+    window.addEventListener('notifications-read', read)
+    return () => {
+      active = false
+      window.removeEventListener('focus', refresh)
+      window.removeEventListener('connections-change', refresh)
+      window.removeEventListener('notifications-read', read)
+    }
+  }, [authToken])
+  return counts
 }

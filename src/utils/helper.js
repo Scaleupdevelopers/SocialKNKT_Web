@@ -3,8 +3,16 @@ import config from './config'
 const serverPath = config.API_URL
 export const AUTH_STORAGE_KEY = 'socialknkt_auth'
 
+export function readAuth() {
+  try {
+    return JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) || 'null')
+  } catch {
+    return null
+  }
+}
+
 export const request = async (path, data, method, allowFailure = false) => {
-  const loginData = JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) || 'null')
+  const loginData = readAuth()
   const headers = { 'Content-Type': 'application/json' }
 
   if (loginData?.token) {
@@ -20,12 +28,25 @@ export const request = async (path, data, method, allowFailure = false) => {
     requestOptions.body = JSON.stringify(data)
   }
 
-  const response = await fetch(`${serverPath}/${path}`, requestOptions)
+  let response
+  try {
+    response = await fetch(`${serverPath}/${path}`, requestOptions)
+  } catch {
+    throw new Error('Unable to connect. Check your connection and try again.')
+  }
 
   const responseData = await response.json().catch(() => ({}))
 
+  if (response.status === 401 && loginData?.token === readAuth()?.token) {
+    localStorage.removeItem(AUTH_STORAGE_KEY)
+    window.dispatchEvent(new Event('auth-change'))
+  }
+
   if ((!response.ok || responseData.status === false) && !allowFailure) {
-    const message = responseData.message || 'Something went wrong.'
+    const message =
+      response.status >= 500
+        ? 'Unable to complete this request. Please try again.'
+        : responseData.message || 'Unable to complete this request. Please try again.'
     throw new Error(message)
   }
 
@@ -38,3 +59,26 @@ export const PatchRequest = async (path, data) => request(path, data, 'PATCH')
 export const deleteRequest = async (path, data) => request(path, data, 'DELETE')
 export const getRequest = async (path, data) => request(path, data, 'GET')
 export const getRequestAllowFailure = async (path, data) => request(path, data, 'GET', true)
+
+export const connectionsChanged = () => window.dispatchEvent(new Event('connections-change'))
+
+export function pendingConnection(profile, incoming) {
+  if (incoming) return { id: incoming._id || incoming.id, outgoing: false }
+  const accepted = [profile.personalConnection, profile.professionalConnection].filter(Boolean)
+  if (profile.connectionId && !accepted.includes(profile.connectionId))
+    return { id: profile.connectionId, outgoing: true }
+  return null
+}
+
+export const entityId = (item) => item._id || item.id
+export function mergeResults(current, next, getId = entityId) {
+  const itemsById = new Map()
+
+  for (const item of [...current, ...next]) {
+    itemsById.set(getId(item), item)
+  }
+
+  return [...itemsById.values()]
+}
+export const postLink = (id) =>
+  `${window.location.origin}/home?${new URLSearchParams({ postId: id })}`

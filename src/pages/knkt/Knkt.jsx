@@ -12,16 +12,18 @@ import {
   getThreadLocations,
   getThreads,
   getTopics,
-  getUploadUrl,
+  uploadFile,
   reportThread,
   reportThreadComment,
   updateThreadLike,
   updateThreadCommentLike,
+  getThread,
 } from "../../action/action";
 import { CommentsModal } from "../../components/modals/CommentsModal/CommentsModal";
 import { ReportPostModal } from "../../components/modals/ReportPostModal/ReportPostModal";
 import { useProfile } from "../../context/ProfileContext";
 import "./Knkt.css";
+
 
 const threadLabels = {
   1: "Popular Threads",
@@ -56,19 +58,6 @@ function isVideoThread(thread) {
     ["video", "videolink", "flicks", "link"].includes(mediaType) ||
     /\.(mp4|webm|ogg)(\?|$)/.test(media)
   );
-}
-
-async function uploadFile(file, extension, contentType) {
-  const signedUrl = await getUploadUrl(extension);
-  const upload = await fetch(signedUrl.data, {
-    method: "PUT",
-    headers: {
-      "Content-Type": contentType || file.type || "application/octet-stream",
-    },
-    body: file,
-  });
-  if (!upload.ok) throw new Error("Unable to upload media.");
-  return signedUrl.data.split("?")[0];
 }
 
 function createVideoThumbnail(file) {
@@ -156,6 +145,9 @@ export function Knkt() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const selectedTopicId = searchParams.get("topicId") || "";
+  const selectedThreadId = searchParams.get("threadId");
+  const [threadError, setThreadError] = useState(false);
+  const [threadRetry, setThreadRetry] = useState(0);
   const { profile } = useProfile();
 
   useEffect(() => {
@@ -211,16 +203,18 @@ export function Knkt() {
     threadRequestIdRef.current = requestId;
     let isActive = true;
     setThreadsLoading(true);
+    setThreadError(false);
     setThreadPage(0);
     setThreadData([]);
     setHasMoreThreads(false);
-    getThreads(0, threadFilter, 10, selectedTopicId)
+    (selectedThreadId !== null ? getThread(selectedThreadId) : getThreads(0, threadFilter, 10, selectedTopicId))
       .then((response) => {
         if (!isActive || threadRequestIdRef.current !== requestId) return;
-        const threads = response.data || [];
+        const threads = selectedThreadId !== null ? [response.data] : response.data || [];
         setThreadData(threads);
-        setHasMoreThreads(threads.length >= 10);
+        setHasMoreThreads(selectedThreadId === null && threads.length >= 10);
       })
+      .catch(() => { if (isActive) setThreadError(true); })
       .finally(() => {
         if (isActive && threadRequestIdRef.current === requestId) {
           setThreadsLoading(false);
@@ -228,22 +222,25 @@ export function Knkt() {
       });
     return () => {
       isActive = false;
+      threadRequestIdRef.current++;
     };
-  }, [selectedTopicId, threadFilter]);
+  }, [selectedTopicId, selectedThreadId, threadFilter, threadRetry]);
 
   useEffect(() => {
     const loadMoreThreads = async () => {
-      if (threadsLoading || isLoadingMoreThreads || !hasMoreThreads) return;
+      if (selectedThreadId !== null || threadsLoading || isLoadingMoreThreads || !hasMoreThreads || threadError) return;
       setIsLoadingMoreThreads(true);
+      const requestId = threadRequestIdRef.current;
       try {
         const nextPage = threadPage + 1;
-        const requestId = threadRequestIdRef.current;
         const response = await getThreads(nextPage, threadFilter, 10, selectedTopicId);
         if (threadRequestIdRef.current !== requestId) return;
         const nextThreads = response.data || [];
         setThreadData((currentThreads) => [...currentThreads, ...nextThreads]);
         setThreadPage(nextPage);
         setHasMoreThreads(nextThreads.length >= 10);
+      } catch {
+        if (threadRequestIdRef.current === requestId) setThreadError(true);
       } finally {
         setIsLoadingMoreThreads(false);
       }
@@ -260,6 +257,8 @@ export function Knkt() {
     return () => observer.disconnect();
   }, [
     hasMoreThreads,
+    selectedThreadId,
+    threadError,
     isLoadingMoreThreads,
     selectedTopicId,
     threadFilter,
@@ -798,6 +797,8 @@ export function Knkt() {
                 </button>
               </form>
             )}
+            {selectedThreadId !== null && <button onClick={() => navigate('/knkt')}>Back to threads</button>}
+            {threadError && <p role="alert">Unable to load thread. It may no longer be available. <button onClick={() => setThreadRetry((value) => value + 1)}>Retry</button></p>}
             {threadsLoading
               ? Array.from({ length: 3 }, (_, index) => (
                   <article
@@ -822,7 +823,7 @@ export function Knkt() {
                   );
                   const threadId = thread._id || thread.id;
                   return (
-                    <article className="knkt-thread" key={thread._id}>
+                    <article className="knkt-thread" key={thread._id || thread.id}>
                       <div className="knkt-thread-head">
                         <img
                           src={
