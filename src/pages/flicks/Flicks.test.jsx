@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useNavigate } from 'react-router-dom'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { Flicks } from './Flicks'
 import {
@@ -10,6 +10,23 @@ import {
   getComments,
   commentPost,
 } from '../../action/action'
+
+let paginationObservers
+async function intersectPagination() {
+  await act(async () => {})
+  let observer
+  await waitFor(() => {
+    observer = [...paginationObservers].find(
+      (item) => item.target?.dataset.paginationSentinel === 'Flicks pagination',
+    )
+    expect(observer).toBeDefined()
+  })
+  await act(async () => {
+    const entry = { target: observer.target, isIntersecting: true }
+    observer.callback([entry])
+    observer.callback([entry])
+  })
+}
 
 vi.mock('../../layouts/Header', () => ({ Header: () => null }))
 vi.mock('../../context/ProfileContext', () => ({
@@ -29,11 +46,22 @@ vi.mock('../../action/action', async (original) => ({
 
 beforeEach(() => {
   vi.clearAllMocks()
+  getFlicks.mockReset()
+  getSavedPosts.mockReset()
+  paginationObservers = new Set()
   vi.stubGlobal(
     'IntersectionObserver',
     class {
-      observe() {}
-      disconnect() {}
+      constructor(callback) {
+        this.callback = callback
+      }
+      observe(target) {
+        this.target = target
+        paginationObservers.add(this)
+      }
+      disconnect() {
+        paginationObservers.delete(this)
+      }
     },
   )
 })
@@ -129,7 +157,7 @@ it('removes by ID when overlapping pagination replaces a flick during deletion',
   fireEvent.click(screen.getAllByRole('button', { name: 'More', exact: true })[0])
   fireEvent.click(screen.getByRole('button', { name: 'Delete', exact: true }))
   fireEvent.click(screen.getByRole('button', { name: 'Delete', exact: true }))
-  fireEvent.click(screen.getByText('Load more flicks'))
+  await intersectPagination()
   await screen.findByText('Refreshed flick')
   await act(async () => resolve({ status: true }))
   expect(screen.queryByText('Refreshed flick')).toBeNull()
@@ -152,7 +180,8 @@ it('loads the next page, retries its failure, and deduplicates overlap', async (
       <Flicks />
     </MemoryRouter>,
   )
-  fireEvent.click(await screen.findByText('Load more flicks'))
+  await intersectPagination()
+  expect(screen.queryByRole('button', { name: /Load more/i })).not.toBeInTheDocument()
   fireEvent.click(await screen.findByText('Retry'))
   await screen.findByText('Next flick')
   expect(screen.getAllByText('Flick 0')).toHaveLength(1)
@@ -183,14 +212,14 @@ it('restarts offset pagination after deletion and ignores an older in-flight pag
     </MemoryRouter>,
   )
   await screen.findByText('Offset flick 0')
-  fireEvent.click(screen.getByText('Load more flicks'))
+  await intersectPagination()
   fireEvent.click(screen.getAllByRole('button', { name: 'More', exact: true })[0])
   fireEvent.click(screen.getByRole('button', { name: 'Delete', exact: true }))
   fireEvent.click(screen.getByRole('button', { name: 'Delete', exact: true }))
   await waitFor(() => expect(screen.queryByText('Offset flick 0')).toBeNull())
   await act(async () => oldPage({ data: [{ id: '0', description: 'Offset flick 0' }] }))
   expect(screen.queryByText('Offset flick 0')).toBeNull()
-  fireEvent.click(screen.getByText('Load more flicks'))
+  await intersectPagination()
   await screen.findByText('Offset flick 10')
   expect(getFlicks).toHaveBeenLastCalledWith(0, 10)
 })
@@ -206,17 +235,96 @@ it('reads saved records without calling the ordinary feed or inventing an unsave
   expect(await screen.findByText('No saved flicks on this page.')).toBeTruthy()
 })
 
-
 it('passes flick ownership to comment moderation while preserving reporting', async () => {
-  getFlicks.mockResolvedValue({ data: [{ id: 'mine', userId: 'viewer', description: 'Owned flick' }] })
+  getFlicks.mockResolvedValue({
+    data: [{ id: 'mine', userId: 'viewer', description: 'Owned flick' }],
+  })
   getComments.mockResolvedValue({
     data: [{ id: 'comment', userId: 'other', comment: 'Other member comment' }],
     totalCount: 1,
   })
-  render(<MemoryRouter><Flicks /></MemoryRouter>)
+  render(
+    <MemoryRouter>
+      <Flicks />
+    </MemoryRouter>,
+  )
   await screen.findByText('Owned flick')
   fireEvent.click(screen.getByRole('button', { name: 'Comments', exact: true }))
   fireEvent.click(await screen.findByLabelText('Comment options'))
   expect(screen.getByRole('button', { name: 'Delete Comment' })).toBeVisible()
   expect(screen.getByRole('button', { name: 'Report', exact: true })).toBeVisible()
+})
+
+it.each([false, true])(
+  'automatically appends flicks once with saved=%s and preserves loaded cards',
+  async (saved) => {
+    let finish
+    const read = saved ? getSavedPosts : getFlicks
+    const first = Array.from({ length: 10 }, (_, index) => ({
+      id: `first-${index}`,
+      description: `First ${index}`,
+      mediaType: 'flicks',
+      media: '/flick.mp4',
+    }))
+    read.mockResolvedValueOnce({ data: first }).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve
+        }),
+    )
+    render(
+      <MemoryRouter initialEntries={[`/flicks?saved=${saved}`]}>
+        <Flicks />
+      </MemoryRouter>,
+    )
+    await intersectPagination()
+    expect(read.mock.calls.map(([page]) => page)).toEqual([0, 1])
+    expect(screen.getByText('First 0')).toBeInTheDocument()
+    expect(screen.getByRole('status', { name: 'Loading more flicks…' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Load more/i })).not.toBeInTheDocument()
+    await act(async () =>
+      finish({ data: [first[0], { id: 'last', description: 'Last flick', mediaType: 'flicks' }] }),
+    )
+    expect(screen.getAllByText('First 0')).toHaveLength(1)
+    expect(screen.getByText('Last flick')).toBeInTheDocument()
+    expect(screen.queryByRole('status', { name: 'Loading more flicks…' })).not.toBeInTheDocument()
+  },
+)
+
+function FlickNavigation() {
+  const navigate = useNavigate()
+  return (
+    <>
+      <button onClick={() => navigate('/flicks?saved=true')}>Saved feed</button>
+      <Flicks />
+    </>
+  )
+}
+
+it('resets pagination when switching to saved flicks and ignores pending feed results', async () => {
+  let finish
+  getFlicks
+    .mockResolvedValueOnce({
+      data: Array.from({ length: 10 }, (_, index) => ({ id: String(index) })),
+    })
+    .mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve
+        }),
+    )
+  getSavedPosts.mockResolvedValue({
+    data: [{ id: 'saved', description: 'Saved result', mediaType: 'flicks' }],
+  })
+  render(
+    <MemoryRouter>
+      <FlickNavigation />
+    </MemoryRouter>,
+  )
+  await intersectPagination()
+  fireEvent.click(screen.getByText('Saved feed'))
+  await screen.findByText('Saved result')
+  await act(async () => finish({ data: [{ id: 'old', description: 'Stale feed result' }] }))
+  expect(screen.queryByText('Stale feed result')).not.toBeInTheDocument()
+  expect(getSavedPosts).toHaveBeenCalledExactlyOnceWith(0, 10)
 })

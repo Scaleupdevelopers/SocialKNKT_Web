@@ -18,6 +18,21 @@ vi.mock('../../../context/ProfileContext', () => ({
 }))
 vi.mock('react-toastify', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 
+const observers = []
+
+async function reachEnd(label, container = document) {
+  let observer
+  await waitFor(() => {
+    observer = observers.findLast((item) => item.active && container.contains(item.target) && item.target?.dataset.paginationSentinel === label)
+    expect(observer).toBeDefined()
+  })
+  act(() => {
+    observer.callback([{ isIntersecting: true }])
+    observer.callback([{ isIntersecting: true }])
+  })
+  return observer
+}
+
 const post = { id: 'post', username: 'Author' }
 const row = (text) => screen.getByText(text).closest('.comment-item')
 const comment = (id, fields = {}) => ({
@@ -58,7 +73,7 @@ async function offsetCollection(kind, size) {
     read,
     snapshot,
     options: kind === 'comments' ? 'Comment options' : 'Reply options',
-    more: `Load more ${kind}`,
+    more: `More ${kind}`,
   }
 }
 
@@ -69,6 +84,17 @@ function deleteFirst(options) {
 }
 beforeEach(() => {
   vi.resetAllMocks()
+  observers.length = 0
+  vi.stubGlobal('IntersectionObserver', class {
+    constructor(callback, options) {
+      this.callback = callback
+      this.options = options
+      this.active = true
+      observers.push(this)
+    }
+    observe(target) { this.target = target }
+    disconnect() { this.active = false }
+  })
   api.getComments.mockResolvedValue({ data: [], totalCount: 0 })
   api.getCommentReplies.mockResolvedValue({ data: [], totalCount: 0 })
   api.updateCommentLike.mockResolvedValue({ status: true })
@@ -76,7 +102,7 @@ beforeEach(() => {
 })
 
 describe('comment mutations', () => {
-  it('keeps comments visible beside a single next-page shimmer and disables load more', async () => {
+  it('keeps comments visible beside a single next-page shimmer and guards duplicate intersections', async () => {
     let finish
     api.getComments
       .mockResolvedValueOnce({
@@ -92,9 +118,10 @@ describe('comment mutations', () => {
     render(<CommentsModal post={post} />)
     expect(screen.getByLabelText('Loading comments')).toBeInTheDocument()
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
-    fireEvent.click(await screen.findByRole('button', { name: 'Load more comments' }))
+    await reachEnd('More comments')
     expect(screen.getByText('c0')).toBeVisible()
-    expect(screen.getByRole('button', { name: 'Load more comments' })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'Load more comments' })).not.toBeInTheDocument()
+    expect(api.getComments).toHaveBeenCalledTimes(2)
     expect(screen.getByRole('status', { name: 'Loading more comments...' })).toHaveClass(
       'loading-skeleton-rows',
     )
@@ -126,7 +153,7 @@ describe('comment mutations', () => {
         totalCount: 11,
       }),
     )
-    fireEvent.click(screen.getByRole('button', { name: 'Load more replies' }))
+    await reachEnd('More replies')
     expect(screen.getByText('r0')).toBeVisible()
     expect(screen.getAllByRole('status', { name: 'Loading replies…' })).toHaveLength(1)
     await act(async () => finish({ data: [comment('last reply')], totalCount: 11 }))
@@ -234,7 +261,7 @@ describe('comment and reply reads', () => {
       await screen.findByText('item-11')
       expect(screen.queryByText('item-1')).not.toBeInTheDocument()
       expect(collection.read.mock.calls.map((call) => call[1])).toEqual([0, 0])
-      expect(screen.queryByRole('button', { name: collection.more })).not.toBeInTheDocument()
+      expect(document.querySelector(`[data-pagination-sentinel="${collection.more}"]`)).not.toBeInTheDocument()
     },
   )
   it.each(['comments', 'replies'])(
@@ -249,14 +276,14 @@ describe('comment and reply reads', () => {
             finish = resolve
           }),
       )
-      fireEvent.click(screen.getByRole('button', { name: collection.more }))
+      await reachEnd(collection.more)
       deleteFirst(collection.options)
       await waitFor(() =>
         expect(collection.read.mock.calls.map((call) => call[1])).toEqual([0, 1, 0]),
       )
       await screen.findByText('item-11')
       await act(async () => finish(stale))
-      fireEvent.click(screen.getByRole('button', { name: collection.more }))
+      await reachEnd(collection.more)
       await screen.findByText('item-21')
       expect(collection.read.mock.calls.map((call) => call[1])).toEqual([0, 1, 0, 1])
       expect(screen.queryByText('item-1')).not.toBeInTheDocument()
@@ -310,7 +337,10 @@ describe('comment and reply reads', () => {
     render(<CommentsModal post={post} />)
     fireEvent.click(await screen.findByRole('button', { name: 'Retry comments' }))
     await screen.findByText('c0')
-    fireEvent.click(screen.getByRole('button', { name: 'Load more comments' }))
+    const failedObserver = await reachEnd('More comments')
+    await screen.findByRole('button', { name: 'Retry comments' })
+    act(() => failedObserver.callback([{ isIntersecting: true }]))
+    expect(api.getComments).toHaveBeenCalledTimes(3)
     fireEvent.click(await screen.findByRole('button', { name: 'Retry comments' }))
     await screen.findByText('last')
     expect(api.getComments.mock.calls).toEqual([
@@ -344,7 +374,7 @@ describe('comment and reply reads', () => {
     await screen.findByText('r0')
     fireEvent.click(within(row('b')).getByRole('button', { name: /View 1/ }))
     await screen.findByText('b-reply')
-    fireEvent.click(within(row('a')).getByRole('button', { name: 'Load more replies' }))
+    await reachEnd('More replies', row('a'))
     fireEvent.click(await within(row('a')).findByRole('button', { name: 'Retry replies' }))
     await screen.findByText('r10')
     expect(screen.getAllByText('r9')).toHaveLength(1)
@@ -375,6 +405,35 @@ describe('comment and reply reads', () => {
   })
 })
 
+
+it('keeps replies lazy and observes only the opened reply list inside the comments scroll area', async () => {
+  api.getComments.mockResolvedValue({
+    data: [comment('first', { commentReplies: 11 }), comment('collapsed', { commentReplies: 11 })],
+    totalCount: 2,
+  })
+  api.getCommentReplies.mockResolvedValueOnce({
+    data: Array.from({ length: 10 }, (_, index) => comment(`reply-${index}`)),
+    totalCount: 11,
+  }).mockResolvedValueOnce({ data: [comment('last-reply')], totalCount: 11 })
+  const { container } = render(<CommentsModal post={post} />)
+  await screen.findByText('first')
+  expect(api.getCommentReplies).not.toHaveBeenCalled()
+  expect(container.querySelector('[data-pagination-sentinel="More replies"]')).toBeNull()
+  const scrollArea = container.querySelector('.comments-list')
+  scrollArea.style.overflowY = 'auto'
+  Object.defineProperties(scrollArea, {
+    clientHeight: { value: 300 },
+    scrollHeight: { value: 900 },
+  })
+  fireEvent.click(within(row('first')).getByRole('button', { name: 'View 11 Replies' }))
+  await screen.findByText('reply-0')
+  expect(api.getCommentReplies).toHaveBeenCalledTimes(1)
+  const observer = await reachEnd('More replies', row('first'))
+  expect(observer.options.root).toBe(scrollArea)
+  await screen.findByText('last-reply')
+  expect(api.getCommentReplies.mock.calls).toEqual([['first', 0], ['first', 1]])
+  expect(screen.queryByRole('button', { name: /Load more/i })).not.toBeInTheDocument()
+})
 
 describe('post-owner moderation', () => {
   it.each(['comments', 'replies'])('lets the post owner delete others %s while retaining Report', async (kind) => {

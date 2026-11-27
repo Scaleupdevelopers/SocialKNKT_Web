@@ -59,6 +59,19 @@ function openComposer() {
   fireEvent.change(screen.getByLabelText('Body'), { target: { value: 'Keep body' } })
 }
 
+async function reachLocationEnd() {
+  let observer
+  await waitFor(() => {
+    observer = observers.findLast((item) => item.active && item.target?.dataset.paginationSentinel === 'More locations')
+    expect(observer).toBeDefined()
+  })
+  act(() => {
+    observer.callback([{ isIntersecting: true }])
+    observer.callback([{ isIntersecting: true }])
+  })
+  return observer
+}
+
 function queryLocation(value) {
   fireEvent.change(screen.getByLabelText('Location'), { target: { value } })
 }
@@ -79,10 +92,11 @@ beforeEach(() => {
     class {
       constructor(callback) {
         this.callback = callback
+        this.active = true
         observers.push(this)
       }
-      observe() {}
-      disconnect() {}
+      observe(target) { this.target = target }
+      disconnect() { this.active = false }
     },
   )
 })
@@ -333,8 +347,10 @@ it('retains location results while paging and retries the failed page without du
   setup()
   openComposer()
   queryLocation('City')
-  fireEvent.click(await screen.findByRole('button', { name: 'Load more locations' }))
+  const failedObserver = await reachLocationEnd()
   await screen.findByRole('button', { name: 'Retry locations' })
+  act(() => failedObserver.callback([{ isIntersecting: true }]))
+  expect(getThreadLocations).toHaveBeenCalledTimes(2)
   expect(screen.getByRole('button', { name: /City 0/ })).toBeVisible()
   fireEvent.click(screen.getByRole('button', { name: 'Retry locations' }))
   await screen.findByRole('button', { name: /Last City/ })
@@ -358,7 +374,7 @@ it('discards an old location page after the query changes', async () => {
   setup()
   openComposer()
   queryLocation('Old')
-  fireEvent.click(await screen.findByRole('button', { name: 'Load more locations' }))
+  await reachLocationEnd()
   queryLocation('New')
   await screen.findByRole('button', { name: /New City/ })
   await act(async () => page.resolve({ data: [{ _id: 'stale', city: 'Stale City' }] }))

@@ -11,7 +11,20 @@ vi.mock('../../components/modals/ConnectionManager', () => ({
   ConnectionManager: ({ userId }) => <div role="dialog">Connection for {userId}</div>,
 }))
 vi.mock('../../action/action', () => ({ searchContent: vi.fn(), SEARCH_PAGE_SIZE: 10 }))
-beforeEach(() => vi.clearAllMocks())
+let intersect
+beforeEach(() => {
+  vi.clearAllMocks()
+  vi.stubGlobal(
+    'IntersectionObserver',
+    class {
+      constructor(callback) {
+        intersect = callback
+      }
+      observe() {}
+      disconnect() {}
+    },
+  )
+})
 function Navigation() {
   const navigate = useNavigate()
   return <button onClick={() => navigate('/search?q=new&type=people')}>New query</button>
@@ -68,9 +81,18 @@ it('retries the same failed page and keeps existing results', async () => {
       <Search />
     </MemoryRouter>,
   )
-  fireEvent.click(await screen.findByText('Load more'))
+  await screen.findByText('Person 0')
+  expect(screen.queryByRole('button', { name: /Load more/i })).toBeNull()
+  act(() => {
+    intersect([{ isIntersecting: true }])
+    intersect([{ isIntersecting: true }])
+  })
+  await screen.findByText('Retry')
+  act(() => intersect([{ isIntersecting: true }]))
+  expect(searchContent).toHaveBeenCalledTimes(2)
   fireEvent.click(await screen.findByText('Retry'))
   await screen.findByText('Last person')
   expect(screen.getByText('Person 0')).toBeTruthy()
   await waitFor(() => expect(searchContent).toHaveBeenLastCalledWith('people', 'person', 1))
+  expect(searchContent.mock.calls.map((call) => call[2])).toEqual([0, 1, 1])
 })

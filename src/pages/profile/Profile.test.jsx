@@ -1,9 +1,26 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, useNavigate } from 'react-router-dom'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { Profile } from './Profile'
 import { useProfile } from '../../context/ProfileContext'
 import * as api from '../../action/action'
+
+let paginationObservers
+async function intersectPagination(label) {
+  await act(async () => {})
+  let observer
+  await waitFor(() => {
+    observer = [...paginationObservers].find(
+      (item) => item.target?.dataset.paginationSentinel === label,
+    )
+    expect(observer).toBeDefined()
+  })
+  await act(async () => {
+    const entry = { target: observer.target, isIntersecting: true }
+    observer.callback([entry])
+    observer.callback([entry])
+  })
+}
 
 vi.mock('../../action/action', () => ({
   getMyAllPosts: vi.fn(),
@@ -68,11 +85,20 @@ function mount(path = '/profile') {
 }
 beforeEach(() => {
   vi.clearAllMocks()
+  paginationObservers = new Set()
   vi.stubGlobal(
     'IntersectionObserver',
     class {
-      observe() {}
-      disconnect() {}
+      constructor(callback) {
+        this.callback = callback
+      }
+      observe(target) {
+        this.target = target
+        paginationObservers.add(this)
+      }
+      disconnect() {
+        paginationObservers.delete(this)
+      }
     },
   )
   useProfile.mockReturnValue({
@@ -135,7 +161,9 @@ it('retries the failed posts page without dropping existing posts or skipping of
     .mockRejectedValueOnce(new Error('offline'))
     .mockResolvedValueOnce({ data: [{ id: 'last', title: 'Last post' }] })
   mount()
-  fireEvent.click(await screen.findByText('Load more posts'))
+  await intersectPagination('posts pagination')
+  expect(screen.queryByRole('button', { name: /Load more/i })).not.toBeInTheDocument()
+  expect([...paginationObservers]).toHaveLength(0)
   fireEvent.click(await screen.findByText('Retry posts'))
   await screen.findByText('Last post')
   expect(screen.getByText('first0')).toBeVisible()
@@ -162,7 +190,7 @@ it('discards a previous user pagination response after navigation', async () => 
         })
   })
   mount('/profile?userId=a')
-  fireEvent.click(await screen.findByText('Load more posts'))
+  await intersectPagination('posts pagination')
   fireEvent.click(screen.getByText('Visit B'))
   await screen.findByText('B post')
   await act(async () => finish({ data: [{ id: 'stale', title: 'Stale A' }] }))
@@ -203,10 +231,10 @@ it('independently retries and paginates media and flicks without losing successf
   mount()
   fireEvent.click(screen.getByRole('button', { name: 'Media', exact: true }))
   fireEvent.click(await screen.findByText('Retry feed media'))
-  await screen.findByText('Load more feed media')
+  await screen.findByAltText('Feed media 1')
   expect(screen.getByLabelText('Preview Flick 1')).toBeVisible()
-  fireEvent.click(screen.getByText('Load more feed media'))
-  fireEvent.click(screen.getByText('Load more flicks'))
+  await intersectPagination('feed media pagination')
+  await intersectPagination('flicks pagination')
   await screen.findByAltText('Feed media 11')
   await screen.findByLabelText('Preview Flick 11')
   expect(api.getAllMyFeed.mock.calls.map((call) => call[0])).toEqual([0, 0, 1])
@@ -234,7 +262,6 @@ it('clears media previews and rejects old media results when changing profile', 
   expect(screen.queryByAltText('Feed media 1')).not.toBeInTheDocument()
 })
 
-
 it.each(['All', 'Personal', 'Professional'])(
   'reloads offset pagination after deletion in %s posts',
   async (tab) => {
@@ -254,8 +281,8 @@ it.each(['All', 'Personal', 'Professional'])(
     await screen.findByText('Eleventh post')
     expect(screen.queryByText('row0')).not.toBeInTheDocument()
     expect(api.getMyAllPosts.mock.calls.map((call) => call[0])).toEqual([0])
-    fireEvent.click(screen.getByText('Load more posts'))
-    await waitFor(() => expect(screen.queryByText('Load more posts')).not.toBeInTheDocument())
+    await intersectPagination('posts pagination')
+    await waitFor(() => expect([...paginationObservers]).toHaveLength(0))
     expect(api.getMyAllPosts.mock.calls.map((call) => call[0])).toEqual([0, 1])
     expect(screen.getAllByRole('article')).toHaveLength(10)
   },
@@ -265,18 +292,25 @@ it('invalidates a pending posts page when deletion restarts pagination', async (
   let finishOldPage
   api.getMyAllPosts
     .mockResolvedValueOnce({ data: posts('row') })
-    .mockImplementationOnce(() => new Promise((resolve) => { finishOldPage = resolve }))
-    .mockResolvedValueOnce({ data: [...posts('row').slice(1), { id: 'last', title: 'Eleventh post' }] })
+    .mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishOldPage = resolve
+        }),
+    )
+    .mockResolvedValueOnce({
+      data: [...posts('row').slice(1), { id: 'last', title: 'Eleventh post' }],
+    })
     .mockResolvedValueOnce({ data: [] })
   mount()
-  fireEvent.click(await screen.findByText('Load more posts'))
+  await intersectPagination('posts pagination')
   fireEvent.click(screen.getByRole('button', { name: 'Delete row0' }))
   await act(async () => finishOldPage({ data: [{ id: 'stale', title: 'Obsolete page' }] }))
   await screen.findByText('Eleventh post')
   expect(screen.queryByText('Obsolete page')).not.toBeInTheDocument()
   expect(screen.queryByText('row0')).not.toBeInTheDocument()
-  fireEvent.click(screen.getByText('Load more posts'))
-  await waitFor(() => expect(screen.queryByText('Load more posts')).not.toBeInTheDocument())
+  await intersectPagination('posts pagination')
+  await waitFor(() => expect([...paginationObservers]).toHaveLength(0))
   expect(api.getMyAllPosts.mock.calls.map((call) => call[0])).toEqual([0, 1, 0, 1])
 })
 
@@ -284,7 +318,12 @@ it('shows empty posts only after the deletion reload confirms an empty collectio
   let finishReload
   api.getMyAllPosts
     .mockResolvedValueOnce({ data: [{ id: 'only', title: 'Only post' }] })
-    .mockImplementationOnce(() => new Promise((resolve) => { finishReload = resolve }))
+    .mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishReload = resolve
+        }),
+    )
   mount()
   fireEvent.click(await screen.findByRole('button', { name: 'Delete Only post' }))
   expect(screen.queryByText('No posts yet')).not.toBeInTheDocument()
@@ -292,3 +331,32 @@ it('shows empty posts only after the deletion reload confirms an empty collectio
   await act(async () => finishReload({ data: [] }))
   await screen.findByText('No posts yet')
 })
+
+it.each([
+  ['feed media pagination', 'getAllMyFeed', 'Loading feed media…', 'My Feed media'],
+  ['flicks pagination', 'getAllMyFlicks', 'Loading flicks…', 'Your Flicks media'],
+])(
+  'appends %s once inside its independent scroll region',
+  async (label, action, loadingLabel, regionName) => {
+    let finish
+    api[action].mockResolvedValueOnce({ data: media('first') }).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve
+        }),
+    )
+    mount()
+    fireEvent.click(screen.getByRole('button', { name: 'Media', exact: true }))
+    await intersectPagination(label)
+    const region = screen.getByRole('region', { name: regionName })
+    expect(region).toHaveAttribute('tabindex', '0')
+    expect(region.querySelector(`[data-pagination-sentinel="${label}"]`)).toBeInTheDocument()
+    expect(api[action].mock.calls.map(([page]) => page)).toEqual([0, 1])
+    expect(within(region).getByRole('status', { name: loadingLabel })).toBeInTheDocument()
+    expect(region.querySelectorAll('.profile-media-cell, video')).toHaveLength(10)
+    expect(screen.queryByRole('button', { name: /Load more/i })).not.toBeInTheDocument()
+    await act(async () => finish({ data: [{ id: 'last', media: '/last.png' }] }))
+    expect(within(region).queryByRole('status', { name: loadingLabel })).not.toBeInTheDocument()
+    expect(region.querySelectorAll('.profile-media-cell, video')).toHaveLength(11)
+  },
+)

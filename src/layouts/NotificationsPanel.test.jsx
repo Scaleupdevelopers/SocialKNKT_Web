@@ -31,8 +31,43 @@ function mount(item = notification) {
     ),
   }
 }
+let intersect
 beforeEach(() => {
   vi.resetAllMocks()
+  vi.stubGlobal(
+    'IntersectionObserver',
+    class {
+      constructor(callback) {
+        intersect = callback
+      }
+      observe() {}
+      disconnect() {}
+    },
+  )
+})
+
+it('automatically pages notifications and stops observing after failure until retry', async () => {
+  getNotifications
+    .mockResolvedValueOnce({
+      data: Array.from({ length: 10 }, (_, index) => ({ ...notification, id: String(index) })),
+    })
+    .mockRejectedValueOnce(new Error('offline'))
+    .mockResolvedValueOnce({
+      data: [{ ...notification, id: 'last', user1: { fname: 'Final' } }],
+    })
+  mount()
+  await screen.findAllByText('Test liked your comment.')
+  expect(screen.queryByRole('button', { name: /Load more/i })).toBeNull()
+  act(() => {
+    intersect([{ isIntersecting: true }])
+    intersect([{ isIntersecting: true }])
+  })
+  await screen.findByRole('alert')
+  act(() => intersect([{ isIntersecting: true }]))
+  expect(getNotifications).toHaveBeenCalledTimes(2)
+  fireEvent.click(screen.getByText('Try again'))
+  await screen.findByText('Final liked your comment.')
+  expect(getNotifications.mock.calls.map((call) => call[0])).toEqual([0, 1, 1])
 })
 
 it('resolves a comment-like entity to its parent post and locks repeat clicks', async () => {

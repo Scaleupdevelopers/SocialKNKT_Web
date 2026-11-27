@@ -7,7 +7,7 @@ import { connectionsChanged } from '../../utils/helper'
 import { useProfile } from '../../context/ProfileContext'
 import { usePagedList } from '../../utils/usePagedList'
 import { ConnectionManager } from '../../components/modals/ConnectionManager'
-import { LoadingSkeleton } from '../../components/common/RequestState'
+import { AutoLoadMore, LoadingSkeleton } from '../../components/common/RequestState'
 import './Connections.css'
 
 const filters = [
@@ -112,15 +112,6 @@ function ConnectionList({ userId, ownList, query, filter }) {
     [userId, filter, query],
   )
   const list = usePagedList(loadPage)
-  const end = useRef(null)
-  useEffect(() => {
-    if (!list.hasMore || list.loading || list.error) return
-    const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) list.loadMore()
-    })
-    if (end.current) observer.observe(end.current)
-    return () => observer.disconnect()
-  }, [list])
   return (
     <>
       <section className="connections-list">
@@ -147,12 +138,13 @@ function ConnectionList({ userId, ownList, query, filter }) {
             <span>No connections match this search.</span>
           </div>
         )}
-        {list.hasMore && (
-          <button type="button" disabled={list.loading} onClick={list.loadMore}>
-            Load more
-          </button>
-        )}
-        <div ref={end} />
+        <AutoLoadMore
+          hasMore={list.hasMore}
+          loading={list.loading}
+          error={list.error}
+          onLoadMore={list.loadMore}
+          label="Connections pagination"
+        />
       </section>
       {selected && (
         <ConnectionManager

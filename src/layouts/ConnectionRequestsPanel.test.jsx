@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { ConnectionRequestsPanel } from './ConnectionRequestsPanel'
@@ -8,9 +8,22 @@ vi.mock('../action/action', () => ({
   answerConnection: vi.fn(),
   connectionsChanged: vi.fn(),
 }))
-vi.mock('../context/ProfileContext', () => ({ useProfile: () => ({ refreshProfile: vi.fn() }) }))
+vi.mock('../context/ProfileContext', () => ({
+  useProfile: () => ({ refreshProfile: vi.fn() }),
+}))
+let intersect
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.stubGlobal(
+    'IntersectionObserver',
+    class {
+      constructor(callback) {
+        intersect = callback
+      }
+      observe() {}
+      disconnect() {}
+    },
+  )
   getConnectionRequests.mockResolvedValue({
     data: [{ _id: 'rel', fname: 'Test', lname: 'Person' }],
   })
@@ -22,6 +35,30 @@ const mount = () =>
       <ConnectionRequestsPanel onClose={vi.fn()} />
     </MemoryRouter>,
   )
+it('automatically pages requests without retrying failures in a loop', async () => {
+  getConnectionRequests
+    .mockResolvedValueOnce({
+      data: Array.from({ length: 10 }, (_, index) => ({
+        _id: String(index),
+        fname: `Member ${index}`,
+      })),
+    })
+    .mockRejectedValueOnce(new Error('offline'))
+    .mockResolvedValueOnce({ data: [{ _id: 'last', fname: 'Final' }] })
+  mount()
+  await screen.findByText('Member 0 sent a connection request')
+  expect(screen.queryByRole('button', { name: /Load more/i })).toBeNull()
+  act(() => {
+    intersect([{ isIntersecting: true }])
+    intersect([{ isIntersecting: true }])
+  })
+  await screen.findByRole('alert')
+  act(() => intersect([{ isIntersecting: true }]))
+  expect(getConnectionRequests).toHaveBeenCalledTimes(2)
+  fireEvent.click(screen.getByText('Try again'))
+  await screen.findByText('Final sent a connection request')
+  expect(getConnectionRequests.mock.calls.map((call) => call[0])).toEqual([0, 1, 1])
+})
 it('persists chosen acceptance status before removing request', async () => {
   mount()
   fireEvent.click(await screen.findByText('Accept'))

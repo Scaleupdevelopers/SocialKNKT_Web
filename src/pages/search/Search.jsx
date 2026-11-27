@@ -5,7 +5,7 @@ import { PostCard } from '../home/components/PostCard'
 import { ConnectionManager } from '../../components/modals/ConnectionManager'
 import { searchContent, SEARCH_PAGE_SIZE } from '../../action/action'
 import { entityId, mergeResults } from '../../utils/helper'
-import { LoadingSkeleton } from '../../components/common/RequestState'
+import { AutoLoadMore, LoadingSkeleton } from '../../components/common/RequestState'
 import '../home/Home.css'
 import './Search.css'
 
@@ -167,11 +167,13 @@ function SearchResults({ kind, query, preview, onSeeAll, onMedia }) {
         count={items.length}
         onRetry={() => load(page)}
       />
-      {!preview && hasMore && !error && (
-        <button disabled={loading} onClick={() => load(page)}>
-          Load more
-        </button>
-      )}
+      <AutoLoadMore
+        hasMore={!preview && hasMore}
+        loading={loading}
+        error={error}
+        onLoadMore={() => load(page)}
+        label={`${kind} results pagination`}
+      />
     </section>
   )
 }

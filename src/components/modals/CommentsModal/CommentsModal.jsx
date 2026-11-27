@@ -11,7 +11,7 @@ import { deleteComment, reportComment } from '../../../action/action'
 import { toast } from 'react-toastify'
 import { useProfile } from '../../../context/ProfileContext'
 import { readAuth } from '../../../utils/helper'
-import { LoadingSkeleton } from '../../common/RequestState'
+import { AutoLoadMore, LoadingSkeleton } from '../../common/RequestState'
 
 export function CommentsModal(props) {
   const defaults = {
@@ -104,12 +104,6 @@ function CommentsContent({
       mounted.current = false
     }
   }, [loadComments])
-
-  const handleCommentsScroll = (event) => {
-    const element = event.currentTarget
-    if (!hasMoreComments || commentsError) return
-    if (element.scrollHeight - element.scrollTop - element.clientHeight < 80) loadComments()
-  }
 
   const handleComment = () => {
     const text = comment.trim()
@@ -296,7 +290,6 @@ function CommentsContent({
     isLoadingMoreComments,
     hasMoreComments,
     loadComments,
-    handleCommentsScroll,
     expandedReplies,
     replyPages,
     loadReplies,
@@ -498,21 +491,18 @@ function CommentListBody({ list }) {
     )
   }
   return (
-    <div className="comments-list" onScroll={list.handleCommentsScroll}>
+    <div className="comments-list">
       {list.comments.map((item) => (
         <CommentRow key={getId(item)} item={item} list={list} />
       ))}
       {list.isLoadingMoreComments && <LoadingSkeleton label="Loading more comments..." />}
-      {list.hasMoreComments && !list.commentsError && (
-        <button
-          className="comments-load-more"
-          type="button"
-          disabled={list.isLoadingMoreComments}
-          onClick={list.loadComments}
-        >
-          Load more comments
-        </button>
-      )}
+      <AutoLoadMore
+        hasMore={list.hasMoreComments}
+        loading={list.isLoadingMoreComments}
+        error={list.commentsError}
+        onLoadMore={list.loadComments}
+        label="More comments"
+      />
     </div>
   )
 }
@@ -551,10 +541,10 @@ function Replies({ item, list, id }) {
       )}
       {list.expandedReplies[id] && (
         <>
-          <ReplyPagination state={list.replyPages[id]} onLoad={() => list.loadReplies(item)} />
           {item.replies?.map((reply) => (
             <ReplyRow key={getId(reply)} reply={reply} actions={list.rowActions} />
           ))}
+          <ReplyPagination state={list.replyPages[id]} onLoad={() => list.loadReplies(item)} />
         </>
       )}
     </>
@@ -693,13 +683,15 @@ function ReplyPagination({ state, onLoad }) {
         </button>
       </div>
     )
-  if (state.more)
-    return (
-      <button className="comments-load-more" type="button" onClick={onLoad}>
-        Load more replies
-      </button>
-    )
-  return null
+  return (
+    <AutoLoadMore
+      hasMore={state.more}
+      loading={state.loading}
+      error={state.error}
+      onLoadMore={onLoad}
+      label="More replies"
+    />
+  )
 }
 
 function normalizeList(items) {

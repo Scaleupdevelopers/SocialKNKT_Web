@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Header } from '../../layouts/Header'
-import { LoadingSkeleton } from '../../components/common/RequestState'
+import { AutoLoadMore, LoadingSkeleton } from '../../components/common/RequestState'
 import { useProfile } from '../../context/ProfileContext'
 import { createChatRoom, deleteChat, getChatRooms, searchChatUsers } from '../../action/action'
 import { formatTime, itemId, userName } from './chatModel'
@@ -29,11 +29,13 @@ function ListFeedback({ list, empty }) {
       {!list.loading && !list.error && !list.items.length && (
         <p className="chat-empty">{empty}</p>
       )}
-      {list.more && (
-        <button disabled={list.loading} onClick={list.loadMore}>
-          Load more
-        </button>
-      )}
+      <AutoLoadMore
+        hasMore={list.more}
+        loading={list.loading}
+        error={list.error}
+        onLoadMore={list.loadMore}
+        label="Chat list pagination"
+      />
     </>
   )
 }
@@ -190,17 +192,32 @@ function Conversation({ room, userId, onBack, onDeleted, onRoomsChanged }) {
 }
 
 function ConversationHistory({ chat, userId, end }) {
+  const history = useRef(null)
+  const scrollAnchor = useRef(null)
+  function loadOlder() {
+    if (chat.loading || scrollAnchor.current !== null) return
+    const element = history.current
+    scrollAnchor.current = element.scrollHeight - element.scrollTop
+    chat.loadMore()
+  }
+  useLayoutEffect(() => {
+    if (chat.loading || scrollAnchor.current === null) return
+    history.current.scrollTop = history.current.scrollHeight - scrollAnchor.current
+    scrollAnchor.current = null
+  }, [chat.messages, chat.loading, chat.error])
   return (
-    <div className="chat-history" aria-label="Messages">
-      {chat.more && (
-        <button disabled={chat.loading} onClick={chat.loadMore}>
-          Load older messages
-        </button>
-      )}
+    <div ref={history} className="chat-history" aria-label="Messages">
+      <AutoLoadMore
+        hasMore={chat.more}
+        loading={chat.loading}
+        error={chat.error}
+        onLoadMore={loadOlder}
+        label="Older messages pagination"
+      />
       {chat.loading && <LoadingSkeleton label="Loading messages…" />}
       {chat.error && (
         <p role="alert">
-          Unable to load messages. <button onClick={chat.loadMore}>Retry</button>
+          Unable to load messages. <button onClick={loadOlder}>Retry</button>
         </p>
       )}
       {!chat.loading && !chat.error && !chat.messages.length && (

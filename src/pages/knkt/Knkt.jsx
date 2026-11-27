@@ -24,7 +24,7 @@ import {
 import { CommentsModal } from '../../components/modals/CommentsModal/CommentsModal'
 import { ReportPostModal } from '../../components/modals/ReportPostModal/ReportPostModal'
 import { useProfile } from '../../context/ProfileContext'
-import { LoadingSkeleton } from '../../components/common/RequestState'
+import { AutoLoadMore, LoadingSkeleton } from '../../components/common/RequestState'
 import { mergeResults, readAuth } from '../../utils/helper'
 import './Knkt.css'
 
@@ -732,12 +732,7 @@ function KnktContent() {
     if (locationsLoading) {
       return <LoadingSkeleton label="Loading locations…" variant="field" count={2} />
     }
-    if (!hasMoreLocations) return null
-    return (
-      <button type="button" onClick={loadMoreLocations}>
-        Load more locations
-      </button>
-    )
+    return null
   }
 
   function renderPopularTopics() {
@@ -853,6 +848,13 @@ function KnktContent() {
                   <small>{location.country}</small>
                 </button>
               ))}
+              <AutoLoadMore
+                hasMore={hasMoreLocations}
+                loading={locationsLoading}
+                error={locationsError}
+                onLoadMore={loadMoreLocations}
+                label="More locations"
+              />
             </div>
           )}
         </div>

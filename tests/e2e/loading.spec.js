@@ -24,6 +24,9 @@ async function deferredPage(page, endpoint, rows) {
 }
 
 async function visibleShimmer(loading) {
+  await expect(loading.page().getByRole('button', { name: /^Load (more|older)/i })).toHaveCount(
+    0,
+  )
   await loading.scrollIntoViewIfNeeded()
   await expect(loading).toBeVisible()
   const bounds = await loading.boundingBox()
@@ -79,9 +82,7 @@ test('profile posts and media retain loaded entries during pagination', async ({
   const finishPosts = await deferredPage(page, 'user/post/get-my-all-post', rows(post))
   await page.goto('/profile')
   await expect(page.getByText('Post 0', { exact: true })).toBeVisible()
-  await page
-    .getByRole('button', { name: 'Load more posts', exact: true })
-    .scrollIntoViewIfNeeded()
+  await page.locator('[data-pagination-sentinel="posts pagination"]').scrollIntoViewIfNeeded()
   await visibleShimmer(page.getByRole('status', { name: 'Loading posts…' }))
   await expect(page.getByText('Post 0', { exact: true })).toBeAttached()
   await finishPosts([post(10)])
@@ -95,13 +96,35 @@ test('profile posts and media retain loaded entries during pagination', async ({
       media: '/assets/logo_icons/profile_alt.avif',
     })),
   )
+  const finishProfileFlicks = await deferredPage(
+    page,
+    'user/flick/get-all-my-flick',
+    rows((index) => ({ _id: `flick-${index}`, media: '/synthetic-video.mp4' })),
+  )
   await page.getByRole('button', { name: 'Media', exact: true }).click()
-  await page.getByRole('button', { name: 'Load more feed media', exact: true }).click()
+  const feedPane = page.getByRole('region', { name: 'My Feed media', exact: true })
+  const flickPane = page.getByRole('region', { name: 'Your Flicks media', exact: true })
+  await feedPane.focus()
+  await page.keyboard.press('End')
+  await feedPane.locator('[data-pagination-sentinel]').scrollIntoViewIfNeeded()
   const loading = page.getByRole('status', { name: 'Loading feed media…' })
   await visibleShimmer(loading)
   await expect(page.getByAltText('Feed media 1', { exact: true })).toBeAttached()
   await finishMedia()
   await expect(loading).toBeHidden()
+  await flickPane.locator('[data-pagination-sentinel]').scrollIntoViewIfNeeded()
+  const flickLoading = flickPane.getByRole('status', { name: 'Loading flicks…' })
+  await visibleShimmer(flickLoading)
+  await expect(flickPane.getByLabel('Preview Flick 1', { exact: true })).toBeAttached()
+  await finishProfileFlicks()
+  await expect(flickLoading).toBeHidden()
+  for (const pane of [feedPane, flickPane]) {
+    expect(await pane.evaluate((element) => getComputedStyle(element).overflowY)).toBe('auto')
+    expect((await pane.boundingBox()).height).toBeLessThanOrEqual(
+      page.viewportSize().height * 0.6 + 1,
+    )
+  }
+  await expect(page.getByRole('button', { name: /^Load more/i })).toHaveCount(0)
 })
 
 test('flicks and saved flicks keep their cards while the next page loads', async ({ page }) => {
@@ -119,7 +142,7 @@ test('flicks and saved flicks keep their cards while the next page loads', async
     )
     await page.goto(`/flicks?saved=${saved}`)
     await expect(page.getByText('Post 0', { exact: true })).toBeAttached()
-    await page.getByRole('button', { name: 'Load more flicks' }).scrollIntoViewIfNeeded()
+    await page.locator('.flick-feed-card').last().scrollIntoViewIfNeeded()
     const loading = page.getByRole('status', { name: 'Loading more flicks…' })
     await visibleShimmer(loading)
     await expect(page.getByText('Post 0', { exact: true })).toBeAttached()
@@ -150,7 +173,7 @@ test('search keeps existing results during the next page', async ({ page }) => {
     })),
   )
   await page.goto('/search?q=Person&type=people')
-  await page.getByRole('button', { name: 'Load more', exact: true }).click()
+  await page.locator('[data-pagination-sentinel]').last().scrollIntoViewIfNeeded()
   const loading = page.getByRole('status', { name: 'Loading results…' })
   await visibleShimmer(loading)
   await expect(page.getByRole('link', { name: 'Person 0', exact: true })).toBeAttached()
@@ -177,11 +200,13 @@ test('chat retains history while older messages load', async ({ page }) => {
   )
   await page.goto('/chat')
   await page.getByRole('button', { name: /Sample Member/ }).click()
-  await page.getByRole('button', { name: 'Load older messages' }).click()
+  await page.locator('.chat-history').evaluate((element) => {
+    element.scrollTop = 0
+  })
   const loading = page.getByRole('status', { name: 'Loading messages…' })
   await visibleShimmer(loading)
   await expect(page.getByText('History 0', { exact: true })).toBeAttached()
-  await expect(page.getByRole('button', { name: 'Load older messages' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: /Load older messages/ })).toHaveCount(0)
   await finish([
     { id: 'oldest', userId: other, message: 'Oldest message', createdAt: 1600000000000 },
   ])
@@ -210,14 +235,14 @@ test('comments and replies retain loaded rows during pagination', async ({ page 
   )
   await page.goto(`/home?postId=${postId}`)
   await page.getByRole('button', { name: /\d+ Comments/ }).click()
-  await page.getByRole('button', { name: 'Load more comments' }).scrollIntoViewIfNeeded()
+  await page.locator('[data-pagination-sentinel="More comments"]').scrollIntoViewIfNeeded()
   const loading = page.getByRole('status', { name: 'Loading more comments...' })
   await visibleShimmer(loading)
   await expect(page.getByText('Comment 0', { exact: true })).toBeAttached()
   await finishComments()
   await expect(loading).toBeHidden()
   await page.getByRole('button', { name: 'View 11 Replies' }).first().click()
-  await page.getByRole('button', { name: 'Load more replies' }).click()
+  await page.locator('[data-pagination-sentinel="More replies"]').scrollIntoViewIfNeeded()
   const replyLoading = page.getByRole('status', { name: 'Loading replies…' })
   await visibleShimmer(replyLoading)
   await expect(page.getByText('Reply 0', { exact: true })).toBeAttached()
@@ -251,8 +276,8 @@ test('notification and request panels retain their rows while loading more', asy
     const panel = page.getByRole('complementary', {
       name: notifications ? 'Notifications' : 'Connection requests',
     })
-    await panel.getByRole('button', { name: 'Load more', exact: true }).click()
-    const loading = panel.getByRole('status', { name: `Loading more ${kind}…` })
+    await panel.locator('[data-pagination-sentinel]').scrollIntoViewIfNeeded()
+    const loading = panel.getByRole('status', { name: `Loading ${kind}…` })
     await visibleShimmer(loading)
     await expect(panel.getByText(/Panel 0 /)).toBeAttached()
     await finish()
@@ -341,11 +366,13 @@ test('shimmer replaces initial and pagination text without removing loaded conne
     ),
   )
   await expect(page.getByText('Member 0', { exact: true })).toBeVisible()
-  await page.getByRole('button', { name: 'Load more', exact: true }).scrollIntoViewIfNeeded()
+  await page
+    .locator('[data-pagination-sentinel="Connections pagination"]')
+    .scrollIntoViewIfNeeded()
   await expect.poll(() => pending.length).toBeGreaterThan(0)
   await visibleShimmer(loading)
   await expect(page.getByText('Member 0', { exact: true })).toBeAttached()
-  await expect(page.getByRole('button', { name: 'Load more', exact: true })).toBeDisabled()
+  await expect(page.getByRole('button', { name: /^Load more/i })).toHaveCount(0)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
     true,
   )
@@ -356,4 +383,40 @@ test('shimmer replaces initial and pagination text without removing loaded conne
   await pending.shift().fulfill({ json: { status: true, data: [] } })
   await expect(loading).toBeHidden()
   await expect(page.getByText('Member 0', { exact: true })).toBeAttached()
+})
+
+test('automatic pagination stops on failure and retries only when requested', async ({
+  page,
+}) => {
+  await mockApi(page)
+  let nextPageCalls = 0
+  const member = (index) => ({
+    userId: `member-${index}`,
+    fname: 'Member',
+    lname: String(index),
+  })
+  await page.route('**/user/profile/connections?*', async (route) => {
+    const number = Number(new URL(route.request().url()).searchParams.get('page'))
+    if (number === 0) return route.fulfill({ json: { status: true, data: rows(member) } })
+    nextPageCalls++
+    if (nextPageCalls === 1) return route.fulfill({ status: 503, json: { status: false } })
+    return route.fulfill({ json: { status: true, data: [member(10)] } })
+  })
+  await page.goto('/connections')
+  await expect(page.getByText('Member 0', { exact: true })).toBeVisible()
+  await page.waitForTimeout(350)
+  expect(nextPageCalls).toBe(0)
+  await page
+    .locator('[data-pagination-sentinel="Connections pagination"]')
+    .scrollIntoViewIfNeeded()
+  await expect(page.getByRole('button', { name: 'Try again', exact: true })).toBeVisible()
+  await page.mouse.wheel(0, 800)
+  await page.waitForTimeout(350)
+  expect(nextPageCalls).toBe(1)
+  await expect(page.getByText('Member 0', { exact: true })).toBeAttached()
+  await expect(page.getByRole('button', { name: /^Load more/i })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Try again', exact: true }).click()
+  await expect(page.getByText('Member 10', { exact: true })).toBeVisible()
+  expect(nextPageCalls).toBe(2)
+  await expect(page.locator('[data-pagination-sentinel]')).toHaveCount(0)
 })

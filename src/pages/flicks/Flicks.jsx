@@ -16,7 +16,7 @@ import { ReportPostModal } from '../../components/modals/ReportPostModal/ReportP
 import { useProfile } from '../../context/ProfileContext'
 
 import { Header } from '../../layouts/Header'
-import { LoadingSkeleton } from '../../components/common/RequestState'
+import { AutoLoadMore, LoadingSkeleton } from '../../components/common/RequestState'
 import './Flicks.css'
 import { CommentsModal } from '../../components/modals/CommentsModal/CommentsModal'
 
@@ -102,8 +102,6 @@ function FlickFeed({ saved }) {
     const direction = event.deltaY > 0 ? 1 : -1
     const pageHeight = feed.clientHeight
     const currentPage = Math.round(feed.scrollTop / pageHeight)
-    if (direction > 0 && currentPage >= flicks.length - 2 && hasMore && !loadError)
-      loadPage(page)
     const nextPage = Math.max(0, Math.min(flicks.length - 1, currentPage + direction))
 
     if (nextPage === currentPage) {
@@ -209,16 +207,6 @@ function FlickFeed({ saved }) {
         className="flicks-feed"
         aria-label={saved ? 'Saved Flicks' : 'Flicks feed'}
         onWheel={handleFeedWheel}
-        onScroll={() => {
-          const feed = feedRef.current
-          if (
-            feed &&
-            feed.scrollHeight - feed.scrollTop <= feed.clientHeight * 2 &&
-            hasMore &&
-            !loadError
-          )
-            loadPage(page)
-        }}
       >
         <FlickFeedStart
           isLoading={isLoading}
@@ -266,11 +254,13 @@ function FlickFeedFeedback({ isLoading, loadingMore, loadError, hasMore, onLoad 
       {!isLoading && loadingMore && (
         <LoadingSkeleton label="Loading more flicks…" variant="media" count={1} />
       )}
-      {!isLoading && hasMore && !loadError && (
-        <button disabled={loadingMore} onClick={onLoad}>
-          Load more flicks
-        </button>
-      )}
+      <AutoLoadMore
+        hasMore={hasMore}
+        loading={isLoading || loadingMore}
+        error={loadError}
+        onLoadMore={onLoad}
+        label="Flicks pagination"
+      />
     </>
   )
 }

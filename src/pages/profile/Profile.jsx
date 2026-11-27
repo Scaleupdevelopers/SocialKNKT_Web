@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Header } from '../../layouts/Header'
 import { CreatePost } from '../home/Home'
@@ -18,7 +18,7 @@ import '../home/Home.css'
 import '../settings/Settings.css'
 import './Profile.css'
 import { usePagedList } from '../../utils/usePagedList'
-import { LoadingSkeleton } from '../../components/common/RequestState'
+import { AutoLoadMore, LoadingSkeleton } from '../../components/common/RequestState'
 
 const PROFILE_PAGE_SIZE = 10
 
@@ -248,11 +248,13 @@ function ListFeedback({ list, label, variant = 'rows' }) {
           </button>
         </div>
       )}
-      {list.hasMore && !list.error && (
-        <button type="button" disabled={list.loading} onClick={list.loadMore}>
-          Load more {label}
-        </button>
-      )}
+      <AutoLoadMore
+        hasMore={list.hasMore}
+        loading={list.loading}
+        error={list.error}
+        onLoadMore={list.loadMore}
+        label={`${label} pagination`}
+      />
     </>
   )
 }
@@ -268,18 +270,6 @@ function ProfilePostList({ profile, isOwnProfile, viewedUserId, postType }) {
     [isOwnProfile, viewedUserId, postType],
   )
   const list = usePagedList(loadPage, PROFILE_PAGE_SIZE)
-  const end = useRef(null)
-  useEffect(() => {
-    if (!list.hasMore || list.loading || list.error) return
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) list.loadMore()
-      },
-      { rootMargin: '280px' },
-    )
-    if (end.current) observer.observe(end.current)
-    return () => observer.disconnect()
-  }, [list])
   const posts = list.items
   return (
     <>
@@ -298,7 +288,6 @@ function ProfilePostList({ profile, isOwnProfile, viewedUserId, postType }) {
         />
       ))}
       <ListFeedback list={list} label="posts" variant="card" />
-      <div ref={end} className="feed-end-marker" aria-hidden="true" />
     </>
   )
 }
@@ -459,11 +448,7 @@ function MediaContent({ isOwnProfile, viewedUserId }) {
     <section className="profile-media-content" aria-label="Profile media">
       <FeedMediaSection feed={feed} onPreview={setPreviewImage} />
 
-      <ListFeedback list={feed} label="feed media" variant="media" />
-
       <FlickMediaSection flicks={flicks} onPreview={setPreviewFlick} />
-
-      <ListFeedback list={flicks} label="flicks" variant="media" />
 
       {mediaCollectionsEmpty(feed, flicks) && (
         <div className="profile-media-empty">
@@ -571,16 +556,24 @@ function FeedMediaSection({ feed, onPreview }) {
             <h2>My Feed</h2>
           </div>
 
-          <div className="profile-page-media-grid">
-            {feed.loading && !feedMedia.length ? (
-              <ProfileMediaSkeleton />
-            ) : (
-              feedMedia.map((item, index) => (
-                <div className="profile-media-cell" key={item._id || item.id || index}>
-                  <FeedMediaItem item={item} index={index} onPreview={onPreview} />
-                </div>
-              ))
-            )}
+          <div
+            className="profile-media-scroll"
+            role="region"
+            aria-label="My Feed media"
+            tabIndex={0}
+          >
+            <div className="profile-page-media-grid">
+              {feed.loading && !feedMedia.length ? (
+                <ProfileMediaSkeleton />
+              ) : (
+                feedMedia.map((item, index) => (
+                  <div className="profile-media-cell" key={item._id || item.id || index}>
+                    <FeedMediaItem item={item} index={index} onPreview={onPreview} />
+                  </div>
+                ))
+              )}
+            </div>
+            <ListFeedback list={feed} label="feed media" variant="media" />
           </div>
         </>
       )}
@@ -649,25 +642,33 @@ function FlickMediaSection({ flicks, onPreview }) {
             </button>
           </div>
 
-          <div className="profile-flicks-grid">
-            {flicks.loading && !myFlicks.length ? (
-              <ProfileMediaSkeleton count={5} className="profile-flick-skeleton-cell" />
-            ) : (
-              myFlicks.map((flick, index) => (
-                <video
-                  key={flick._id || flick.id || index}
-                  className="profile-flick-preview-trigger"
-                  src={flick.media}
-                  poster={flick.thumbnail || undefined}
-                  muted
-                  playsInline
-                  controls
-                  preload="metadata"
-                  aria-label={`Preview Flick ${index + 1}`}
-                  onClick={() => onPreview(flick)}
-                />
-              ))
-            )}
+          <div
+            className="profile-media-scroll"
+            role="region"
+            aria-label="Your Flicks media"
+            tabIndex={0}
+          >
+            <div className="profile-flicks-grid">
+              {flicks.loading && !myFlicks.length ? (
+                <ProfileMediaSkeleton count={5} className="profile-flick-skeleton-cell" />
+              ) : (
+                myFlicks.map((flick, index) => (
+                  <video
+                    key={flick._id || flick.id || index}
+                    className="profile-flick-preview-trigger"
+                    src={flick.media}
+                    poster={flick.thumbnail || undefined}
+                    muted
+                    playsInline
+                    controls
+                    preload="metadata"
+                    aria-label={`Preview Flick ${index + 1}`}
+                    onClick={() => onPreview(flick)}
+                  />
+                ))
+              )}
+            </div>
+            <ListFeedback list={flicks} label="flicks" variant="media" />
           </div>
         </>
       )}

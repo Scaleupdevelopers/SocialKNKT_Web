@@ -29,8 +29,24 @@ vi.mock('../../context/ProfileContext', () => ({
 }))
 vi.mock('socket.io-client', () => ({ io: vi.fn() }))
 let sockets
+let intersections
 beforeEach(() => {
+  vi.resetAllMocks()
   sockets = []
+  intersections = []
+  vi.stubGlobal(
+    'IntersectionObserver',
+    class {
+      constructor(callback) {
+        this.callback = callback
+        intersections.push(this)
+      }
+      observe(target) {
+        this.target = target
+      }
+      disconnect() {}
+    },
+  )
   vi.stubEnv('VITE_SOCKET_URL', 'https://socket.example.test')
   localStorage.setItem('socialknkt_auth', JSON.stringify({ token: 'test-only' }))
   io.mockImplementation(() => {
@@ -70,6 +86,85 @@ afterEach(() => {
 })
 
 describe('chat flow', () => {
+  it('loads older messages at the top, retries the same page and preserves scroll position', async () => {
+    const messages = Array.from({ length: 20 }, (_, index) => ({
+      id: `message-${index}`,
+      message: `Message ${index}`,
+      userId: 'other',
+      createdAt: index + 1,
+    }))
+    let failOlder
+    let olderCalls = 0
+    api.getChatMessages.mockImplementation((room, page) => {
+      if (page === 0) return Promise.resolve({ data: messages })
+      olderCalls++
+      if (olderCalls === 1)
+        return new Promise((resolve, reject) => {
+          failOlder = reject
+        })
+      return Promise.resolve({
+        data: [{ id: 'oldest', message: 'Older message', userId: 'other', createdAt: -1 }],
+      })
+    })
+    render(<Chat />)
+    fireEvent.click(await screen.findByRole('button', { name: /Alice/ }))
+    await screen.findByText('Message 0')
+    await waitFor(() =>
+      expect(screen.queryByRole('status', { name: 'Loading messages…' })).toBeNull(),
+    )
+    const history = screen.getByLabelText('Messages')
+    Object.defineProperty(history, 'scrollHeight', {
+      configurable: true,
+      get: () => (history.querySelectorAll('article').length > 20 ? 1400 : 1000),
+    })
+    history.scrollTop = 120
+    const observer = intersections.findLast(
+      (entry) => entry.target?.dataset.paginationSentinel === 'Older messages pagination',
+    )
+    expect(history.firstElementChild).toBe(observer.target)
+    expect(screen.queryByRole('button', { name: /Load older|Load more/i })).toBeNull()
+    act(() => {
+      observer.callback([{ isIntersecting: true }])
+      observer.callback([{ isIntersecting: true }])
+    })
+    expect(olderCalls).toBe(1)
+    expect(screen.getByRole('status', { name: 'Loading messages…' })).toHaveClass(
+      'loading-skeleton',
+    )
+    await act(async () => failOlder(new Error('offline')))
+    act(() => observer.callback([{ isIntersecting: true }]))
+    expect(olderCalls).toBe(1)
+    expect(history.scrollTop).toBe(120)
+    fireEvent.click(screen.getByRole('button', { name: 'Retry', exact: true }))
+    await screen.findByText('Older message')
+    expect(history.scrollTop).toBe(520)
+    expect(api.getChatMessages.mock.calls.filter((call) => call[1] > 0)).toEqual([
+      ['a', 1],
+      ['a', 1],
+    ])
+    expect(history.querySelector('[data-pagination-sentinel]')).toBeNull()
+  })
+
+  it('automatically pages new-chat search results at the bottom', async () => {
+    api.searchChatUsers
+      .mockResolvedValueOnce({
+        data: Array.from({ length: 20 }, (_, index) => ({
+          id: String(index),
+          fname: `Person ${index}`,
+        })),
+      })
+      .mockResolvedValueOnce({ data: [{ id: 'last', fname: 'Final person' }] })
+    render(<Chat />)
+    fireEvent.click(screen.getByRole('button', { name: 'New message' }))
+    await screen.findByRole('button', { name: /^Person 0/ })
+    const observer = intersections.findLast(
+      (entry) => entry.target?.dataset.paginationSentinel === 'Chat list pagination',
+    )
+    act(() => observer.callback([{ isIntersecting: true }]))
+    await screen.findByRole('button', { name: /^Final person/ })
+    expect(api.searchChatUsers).toHaveBeenLastCalledWith('', 1)
+    expect(screen.queryByRole('button', { name: /Load more/i })).toBeNull()
+  })
   it('shows accessible row shimmers for rooms and message history', async () => {
     let finishRooms
     let finishHistory
