@@ -2,6 +2,7 @@ import {
   deleteRequest,
   getRequest,
   getRequestAllowFailure,
+  mergeResults,
   postRequest,
   putRequest,
 } from '../utils/helper'
@@ -48,6 +49,34 @@ export const getCities = async (data) => {
 
 export const getProfileMedia = async (page = 0, limit = 10, userId) => {
   return getRequest('user/profile/media', { page, limit, ...(userId ? { userId } : {}) })
+}
+
+function matchesProfileMedia(item, mediaKind) {
+  if (mediaKind === 'feed') return ['image', 'video'].includes(item.mediaType)
+  if (mediaKind === 'flicks') return item.mediaType === 'flick'
+  return true
+}
+
+function newestProfileContent(first, second) {
+  const firstTime = new Date(first.createdAt).getTime() || 0
+  const secondTime = new Date(second.createdAt).getTime() || 0
+  return secondTime - firstTime
+}
+
+// Accepted private connections use the mobile audience endpoint, one ten-item page per audience.
+export async function getConnectedProfileContent(userId, page, audiences, mediaKind = 'posts') {
+  const postTypes = [...new Set(audiences)].filter((audience) => [1, 2].includes(audience))
+  if (!postTypes.length) return { data: [], hasMore: false }
+  const responses = await Promise.all(
+    postTypes.map((postType) =>
+      getRequest('user/profile/posts', { userId, page, media: false, postType }),
+    ),
+  )
+  const pages = responses.map((response) => (Array.isArray(response.data) ? response.data : []))
+  const data = mergeResults([], pages.flat())
+    .filter((item) => matchesProfileMedia(item, mediaKind))
+    .sort(newestProfileContent)
+  return { data, hasMore: pages.some((items) => items.length >= 10) }
 }
 
 export const getProfileConnections = async (

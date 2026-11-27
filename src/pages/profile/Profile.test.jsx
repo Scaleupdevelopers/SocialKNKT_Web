@@ -24,6 +24,7 @@ async function intersectPagination(label) {
 }
 
 vi.mock('../../action/action', () => ({
+  getConnectedProfileContent: vi.fn().mockResolvedValue({ data: [], hasMore: false }),
   getMyAllPosts: vi.fn(),
   getOtherUserPosts: vi.fn(),
   getOtherUserProfile: vi.fn(),
@@ -382,8 +383,8 @@ it('reads profile lists once during StrictMode effect replay', async () => {
 
 it.each([
   { profileType: 2 },
-  { profileType: '2', personalConnection: 'accepted' },
-  { profileType: 2, professionalConnection: 'accepted' },
+  { profileType: '2', personalConnection: null },
+  { profileType: 2, professionalConnection: 'accepted', isUserBlocked: true },
   { profileType: 2, connectionStatus: 0, connectionId: 'pending' },
 ])('shows the private state without requesting protected content: %j', async (privacy) => {
   api.getOtherUserProfile.mockResolvedValue({ data: {
@@ -423,4 +424,66 @@ it('does not restore old public posts when a refreshed profile becomes private',
   await screen.findByRole('region', { name: 'Private account' })
   await act(async () => finishPosts({ data: [{ id: 'old', title: 'Stale private post' }] }))
   expect(screen.queryByText('Stale private post')).toBeNull()
+})
+
+it.each([
+  [{ personalConnection: 'personal-id' }, [2]],
+  [{ professionalConnection: 'professional-id' }, [1]],
+  [{ personalConnection: 'personal-id', professionalConnection: 'professional-id' }, [1, 2]],
+])('loads connected private content with only accepted audiences: %j', async (relationship, audiences) => {
+  api.getOtherUserProfile.mockResolvedValue({ data: { id: 'a', profileType: 2, ...relationship } })
+  api.getConnectedProfileContent.mockResolvedValue({ data: [{ id: 'allowed', title: 'Allowed post' }], hasMore: false })
+  mount('/profile?userId=a')
+  await screen.findByText('Allowed post')
+  expect(screen.queryByRole('region', { name: 'Private account' })).toBeNull()
+  expect(api.getConnectedProfileContent).toHaveBeenCalledWith('a', 0, audiences)
+  expect(api.getOtherUserPosts).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'Media', exact: true }))
+  await waitFor(() => expect(api.getConnectedProfileContent).toHaveBeenCalledWith('a', 0, audiences, 'feed'))
+  expect(api.getConnectedProfileContent).toHaveBeenCalledWith('a', 0, audiences, 'flicks')
+  expect(api.getOtherUserFeed).not.toHaveBeenCalled()
+  expect(api.getOtherUserFlicks).not.toHaveBeenCalled()
+})
+
+it('locks the unaccepted audience filter and unlocks after relationship refresh', async () => {
+  api.getOtherUserProfile.mockResolvedValue({ data: { id: 'a', profileType: 2, personalConnection: 'accepted' } })
+  mount('/profile?userId=a')
+  await waitFor(() => expect(api.getConnectedProfileContent).toHaveBeenCalled())
+  fireEvent.click(screen.getByRole('button', { name: 'Posts', exact: true }))
+  fireEvent.click(screen.getByRole('tab', { name: 'Professional', exact: true }))
+  expect(screen.getByRole('region', { name: 'Private account' })).toBeVisible()
+  expect(api.getConnectedProfileContent.mock.calls.some(call => call[2].includes(1))).toBe(false)
+  api.getOtherUserProfile.mockResolvedValue({ data: { id: 'a', profileType: 2, personalConnection: 'accepted', professionalConnection: 'accepted' } })
+  fireEvent.click(screen.getByText('Relationship changed'))
+  await waitFor(() => expect(screen.queryByRole('region', { name: 'Private account' })).toBeNull())
+  await waitFor(() => expect(api.getConnectedProfileContent.mock.calls.some(call => call[2].includes(1))).toBe(true))
+})
+
+it('continues private media pagination when a raw page has no matching media', async () => {
+  api.getOtherUserProfile.mockResolvedValue({ data: { id: 'a', profileType: 2, personalConnection: 'accepted' } })
+  api.getConnectedProfileContent.mockImplementation(async (_id, page, _audiences, kind) => ({
+    data: page === 1 && kind === 'feed' ? [{ id: 'image', mediaType: 'image', media: '/image.png' }] : [],
+    hasMore: page === 0,
+  }))
+  mount('/profile?userId=a')
+  await waitFor(() => expect(api.getConnectedProfileContent).toHaveBeenCalled())
+  fireEvent.click(screen.getByRole('button', { name: 'Media', exact: true }))
+  await intersectPagination('feed media pagination')
+  await screen.findByAltText('Feed media 1')
+})
+
+it('keeps combined private audiences chronological across pages', async () => {
+  api.getOtherUserProfile.mockResolvedValue({ data: { id: 'a', profileType: 2, personalConnection: 'p', professionalConnection: 'w' } })
+  api.getConnectedProfileContent.mockImplementation(async (_id, page) => ({
+    data: page === 0 ? [
+      { id: 'newest', title: 'Newest', createdAt: '2026-11-27' },
+      { id: 'oldest', title: 'Oldest', createdAt: '2026-01-01' },
+    ] : [{ id: 'middle', title: 'Middle', createdAt: '2026-06-01' }],
+    hasMore: page === 0,
+  }))
+  mount('/profile?userId=a')
+  await screen.findByText('Oldest')
+  await intersectPagination('posts pagination')
+  await screen.findByText('Middle')
+  expect(screen.getAllByRole('article').map(article => article.firstChild.textContent)).toEqual(['Newest', 'Middle', 'Oldest'])
 })

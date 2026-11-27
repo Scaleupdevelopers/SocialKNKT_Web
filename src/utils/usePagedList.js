@@ -5,8 +5,8 @@ function responseItems(response) {
   return Array.isArray(response.data) ? response.data : []
 }
 
-// Keep loadPage and custom getId callbacks stable; changing either reloads the list.
-export function usePagedList(loadPage, pageSize = 10, getId = entityId) {
+// Keep loadPage, getId and compareItems callbacks stable; changing them reloads the list.
+export function usePagedList(loadPage, pageSize = 10, getId = entityId, compareItems) {
   const [state, setState] = useState({
     items: [],
     page: -1,
@@ -33,11 +33,12 @@ export function usePagedList(loadPage, pageSize = 10, getId = entityId) {
         if (current !== version.current) return
         const next = responseItems(response)
         setState((s) => ({
-          items: mergeResults(reset ? [] : s.items, next, getId),
+          items: mergePagedItems(reset ? [] : s.items, next, getId, compareItems),
           page,
           loading: false,
           error: '',
-          hasMore: next.length >= pageSize,
+          hasMore:
+            typeof response.hasMore === 'boolean' ? response.hasMore : next.length >= pageSize,
         }))
       } catch {
         if (current === version.current)
@@ -50,7 +51,7 @@ export function usePagedList(loadPage, pageSize = 10, getId = entityId) {
         if (current === version.current) busy.current = false
       }
     },
-    [loadPage, pageSize, getId],
+    [loadPage, pageSize, getId, compareItems],
   )
   const reload = useCallback(() => load(0, true), [load])
   useEffect(() => {
@@ -70,4 +71,9 @@ export function usePagedList(loadPage, pageSize = 10, getId = entityId) {
     reload,
     loadMore: () => load(state.page + 1),
   }
+}
+
+function mergePagedItems(previous, next, getId, compareItems) {
+  const items = mergeResults(previous, next, getId)
+  return compareItems ? items.sort(compareItems) : items
 }

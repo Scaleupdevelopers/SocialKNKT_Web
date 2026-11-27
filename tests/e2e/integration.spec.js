@@ -399,7 +399,7 @@ test('private profile shows the mobile lock state without content requests', asy
     contentType: 'application/json',
     body: JSON.stringify({ status: true, data: {
       id: other, fname: 'Private', lname: 'Member', username: 'private_member',
-      profileType: 2, bio: 'Profile bio stays visible', personalConnection: relationId,
+      profileType: 2, bio: 'Profile bio stays visible', personalConnection: null,
     } }),
   }))
   await page.goto(`/profile?userId=${other}`)
@@ -439,4 +439,34 @@ test('duplicate connection request shows backend toast without inline error', as
   await expect(button).toBeEnabled()
   await expect(page.getByRole('button', { name: 'Request sent' })).toHaveCount(0)
   await page.screenshot({ path: info.outputPath('connection-error-toast.png'), fullPage: true })
+})
+
+test('accepted private profile loads mobile audience API and locks unaccepted filter', async ({ page }, info) => {
+  const { calls } = await mockApi(page)
+  const contentCalls = []
+  await page.route('**/user/profile/get-other-user-profile**', route => route.fulfill({ json: {
+    status: true, data: { id: other, fname: 'Private', lname: 'Member', profileType: 2, personalConnection: relationId },
+  } }))
+  await page.route('**/user/profile/posts?**', route => {
+    const query = Object.fromEntries(new URL(route.request().url()).searchParams)
+    contentCalls.push(query)
+    return route.fulfill({ json: { status: true, data: [{
+      _id: postId, userId: other, fname: 'Private', lname: 'Member', postType: 2,
+      description: 'Accepted personal content', mediaType: 'text', likeCount: 0, commentCount: 0,
+    }] } })
+  })
+  await page.goto(`/profile?userId=${other}`)
+  await expect(page.getByText('Accepted personal content', { exact: true })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Private account' })).toHaveCount(0)
+  await page.screenshot({ path: info.outputPath('connected-private-profile.png'), fullPage: true })
+  await page.getByRole('button', { name: 'Posts', exact: true }).click()
+  await page.getByRole('tab', { name: 'Professional', exact: true }).click()
+  await expect(page.getByRole('region', { name: 'Private account' })).toBeVisible()
+  await page.getByRole('tab', { name: 'Personal', exact: true }).click()
+  await expect(page.getByText('Accepted personal content', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Media', exact: true }).click()
+  await expect(page.getByText('No records found', { exact: true })).toBeVisible()
+  expect(contentCalls.length).toBeGreaterThan(2)
+  expect(contentCalls.every(query => query.userId === other && query.postType === '2' && query.media === 'false')).toBe(true)
+  expect(calls.filter(call => /get-all-other/.test(call.path))).toHaveLength(0)
 })

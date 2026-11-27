@@ -6,6 +6,7 @@ import { PostCard } from '../home/components/PostCard'
 import { ProfileHeader } from '../settings/components/ProfileHeader'
 import { normalizeProfile, useProfile } from '../../context/ProfileContext'
 import {
+  getConnectedProfileContent,
   getAllMyFeed,
   getAllMyFlicks,
   getMyAllPosts,
@@ -77,10 +78,32 @@ function PrivateProfileState({ profile }) {
   )
 }
 
+function privateProfileAudiences(profile) {
+  if (profile.isUserBlocked || profile.blockedBy) return []
+  return [
+    profile.professionalConnection ? 1 : null,
+    profile.personalConnection ? 2 : null,
+  ].filter(Boolean)
+}
+
 function isPrivateProfileLocked(profile) {
-  // The current backend denies all other-user private-profile media reads,
-  // including accepted connections. Do not fetch through an alternate route.
-  return Number(profile.profileType) === 2
+  return Number(profile.profileType) === 2 && privateProfileAudiences(profile).length === 0
+}
+
+function privatePostAudiences(profile, postType) {
+  const audiences = privateProfileAudiences(profile)
+  // Existing web filter values: personal=1, professional=2. Mobile API reverses them.
+  return postType ? audiences.filter((type) => type === (postType === 1 ? 2 : 1)) : audiences
+}
+
+function privateContentOrder(profile, isOwnProfile) {
+  return !isOwnProfile && Number(profile.profileType) === 2 ? newestContentFirst : undefined
+}
+
+function newestContentFirst(first, second) {
+  return (
+    (new Date(second.createdAt).getTime() || 0) - (new Date(first.createdAt).getTime() || 0)
+  )
 }
 
 function ProfileMediaSkeleton({ count = 5, className = '' }) {
@@ -223,13 +246,19 @@ function ProfileTabContent({ activeTab, profile, isOwnProfile, viewedUserId }) {
         <ProfileSummary profile={profile} />
         <PrivateProfileState profile={profile} />
       </div>
-    ) : <PrivateProfileState profile={profile} />
+    ) : (
+      <PrivateProfileState profile={profile} />
+    )
   }
   return (
     <>
       {' '}
       {activeTab === 'media' ? (
-        <MediaContent isOwnProfile={isOwnProfile} viewedUserId={viewedUserId} />
+        <MediaContent
+          profile={profile}
+          isOwnProfile={isOwnProfile}
+          viewedUserId={viewedUserId}
+        />
       ) : activeTab === 'posts' ? (
         <ProfilePostsContent
           profile={profile}
@@ -289,14 +318,26 @@ function ListFeedback({ list, label, variant = 'rows' }) {
 function ProfilePostList({ profile, isOwnProfile, viewedUserId, postType }) {
   const loadPage = useCallback(
     async (page) => {
+      if (!isOwnProfile && Number(profile.profileType) === 2) {
+        return getConnectedProfileContent(
+          viewedUserId,
+          page,
+          privatePostAudiences(profile, postType),
+        )
+      }
       const response = isOwnProfile
         ? await getMyAllPosts(page, PROFILE_PAGE_SIZE, postType)
         : await getOtherUserPosts(viewedUserId, page, PROFILE_PAGE_SIZE, postType)
       return { data: getResponseList(response) }
     },
-    [isOwnProfile, viewedUserId, postType],
+    [isOwnProfile, viewedUserId, postType, profile],
   )
-  const list = usePagedList(loadPage, PROFILE_PAGE_SIZE)
+  const list = usePagedList(
+    loadPage,
+    PROFILE_PAGE_SIZE,
+    undefined,
+    privateContentOrder(profile, isOwnProfile),
+  )
   const posts = list.items
   return (
     <>
@@ -351,13 +392,19 @@ function ProfilePostsContent({ profile, isOwnProfile, viewedUserId }) {
             <CreatePost />
           </div>
         )}
-        <ProfilePostList
-          key={postFilter}
-          profile={profile}
-          isOwnProfile={isOwnProfile}
-          viewedUserId={viewedUserId}
-          postType={postType}
-        />
+        {!isOwnProfile &&
+        Number(profile.profileType) === 2 &&
+        privatePostAudiences(profile, postType).length === 0 ? (
+          <PrivateProfileState profile={profile} />
+        ) : (
+          <ProfilePostList
+            key={postFilter}
+            profile={profile}
+            isOwnProfile={isOwnProfile}
+            viewedUserId={viewedUserId}
+            postType={postType}
+          />
+        )}
       </section>
       <ProfilePostsSidebar profile={profile} />
     </div>
@@ -447,27 +494,53 @@ function ProfileSidebarEmpty({ label }) {
   )
 }
 
-function MediaContent({ isOwnProfile, viewedUserId }) {
+function MediaContent({ profile, isOwnProfile, viewedUserId }) {
   const loadFeed = useCallback(
     async (page) => {
+      if (!isOwnProfile && Number(profile.profileType) === 2) {
+        return getConnectedProfileContent(
+          viewedUserId,
+          page,
+          privateProfileAudiences(profile),
+          'feed',
+        )
+      }
       const response = isOwnProfile
         ? await getAllMyFeed(page, PROFILE_PAGE_SIZE)
         : await getOtherUserFeed(viewedUserId, page, PROFILE_PAGE_SIZE)
       return { data: getResponseList(response) }
     },
-    [isOwnProfile, viewedUserId],
+    [isOwnProfile, viewedUserId, profile],
   )
   const loadFlicks = useCallback(
     async (page) => {
+      if (!isOwnProfile && Number(profile.profileType) === 2) {
+        return getConnectedProfileContent(
+          viewedUserId,
+          page,
+          privateProfileAudiences(profile),
+          'flicks',
+        )
+      }
       const response = isOwnProfile
         ? await getAllMyFlicks(page, PROFILE_PAGE_SIZE)
         : await getOtherUserFlicks(viewedUserId, page, PROFILE_PAGE_SIZE)
       return { data: getResponseList(response) }
     },
-    [isOwnProfile, viewedUserId],
+    [isOwnProfile, viewedUserId, profile],
   )
-  const feed = usePagedList(loadFeed, PROFILE_PAGE_SIZE)
-  const flicks = usePagedList(loadFlicks, PROFILE_PAGE_SIZE)
+  const feed = usePagedList(
+    loadFeed,
+    PROFILE_PAGE_SIZE,
+    undefined,
+    privateContentOrder(profile, isOwnProfile),
+  )
+  const flicks = usePagedList(
+    loadFlicks,
+    PROFILE_PAGE_SIZE,
+    undefined,
+    privateContentOrder(profile, isOwnProfile),
+  )
   const [previewImage, setPreviewImage] = useState(null)
   const [previewFlick, setPreviewFlick] = useState(null)
 
@@ -552,6 +625,8 @@ function mediaCollectionsEmpty(feed, flicks) {
     !flicks.loading &&
     !feed.error &&
     !flicks.error &&
+    !feed.hasMore &&
+    !flicks.hasMore &&
     feed.items.length === 0 &&
     flicks.items.length === 0
   )
@@ -577,7 +652,7 @@ function FeedMediaSection({ feed, onPreview }) {
   return (
     <>
       {' '}
-      {(feed.loading || feed.error || feedMedia.length > 0) && (
+      {(feed.loading || feed.error || feed.hasMore || feedMedia.length > 0) && (
         <>
           <div className="profile-media-section-heading">
             <h2>My Feed</h2>
@@ -656,7 +731,7 @@ function FlickMediaSection({ flicks, onPreview }) {
   return (
     <>
       {' '}
-      {(flicks.loading || flicks.error || myFlicks.length > 0) && (
+      {(flicks.loading || flicks.error || flicks.hasMore || myFlicks.length > 0) && (
         <>
           <div className="profile-flicks-heading">
             <h2>Flicks</h2>

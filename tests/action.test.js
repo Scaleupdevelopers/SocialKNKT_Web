@@ -4,6 +4,7 @@ import { resolve } from 'node:path'
 
 import {
   answerConnection,
+  getConnectedProfileContent,
   getIncomingConnection,
   removeConnection,
   sendConnection,
@@ -145,4 +146,56 @@ it('keeps HTTP calls out of UI components and hooks', () => {
     )
   })
   expect(violations).toEqual([])
+})
+
+it('reads connected audiences with the mobile GET query, deduplicates shared posts and sorts newest first', async () => {
+  const shared = { _id: 'shared', postType: 3, mediaType: 'text', createdAt: 200 }
+  fetch
+    .mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ status: true, data: [shared, { id: 'old', createdAt: 100 }] }),
+    })
+    .mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        status: true,
+        data: [{ ...shared, id: 'shared' }, { id: 'new', createdAt: 300 }],
+      }),
+    })
+  const result = await getConnectedProfileContent('user-a', 2, [1, 2])
+  expect(fetch).toHaveBeenCalledTimes(2)
+  for (const [index, audience] of [1, 2].entries()) {
+    expect(fetch).toHaveBeenNthCalledWith(
+      index + 1,
+      `/api/v1/user/profile/posts?userId=user-a&page=2&media=false&postType=${audience}`,
+      expect.objectContaining({ method: 'GET' }),
+    )
+  }
+  expect(result.data.map((item) => item.id || item._id)).toEqual(['new', 'shared', 'old'])
+  expect(result.hasMore).toBe(false)
+})
+
+it.each([
+  ['feed', ['image', 'video']],
+  ['flicks', ['flick']],
+])('filters %s but retains pagination from the raw ten-item page', async (kind, expected) => {
+  const types = ['image', 'video', 'flick', 'document', 'text', 'text', 'text', 'text', 'text', 'text']
+  fetch.mockResolvedValue({
+    ok: true,
+    status: 200,
+    json: async () => ({
+      status: true,
+      data: types.map((mediaType, index) => ({ id: String(index), mediaType, createdAt: 10 - index })),
+    }),
+  })
+  const result = await getConnectedProfileContent('user-a', 0, [1], kind)
+  expect(result.data.map((item) => item.mediaType)).toEqual(expected)
+  expect(result.hasMore).toBe(true)
+})
+
+it('makes no connected-profile requests without an accepted audience', async () => {
+  expect(await getConnectedProfileContent('user-a', 0, [])).toEqual({ data: [], hasMore: false })
+  expect(fetch).not.toHaveBeenCalled()
 })
