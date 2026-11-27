@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { SettingsContent } from './SettingsContent'
 import { getBlockedUsers, blockUser, deleteAccount } from '../../../action/action'
@@ -65,4 +65,23 @@ it('warns about immediate permanent deletion and requires confirmation', async (
   expect(deleteAccount).not.toHaveBeenCalled()
   fireEvent.click(screen.getByRole('button', { name: 'Delete', exact: true }))
   await waitFor(() => expect(deleteAccount).toHaveBeenCalledTimes(1))
+})
+
+it('shows a row shimmer while reading the block list and keeps write feedback intact', async () => {
+  let resolveList
+  getBlockedUsers.mockReturnValueOnce(
+    new Promise((resolve) => {
+      resolveList = resolve
+    }),
+  )
+  blockUser.mockReturnValueOnce(new Promise(() => {}))
+  renderSettings()
+  fireEvent.click(screen.getByRole('button', { name: 'Block List', exact: true }))
+  const skeleton = screen.getByRole('status', { name: 'Loading blocked users…' })
+  expect(skeleton).toHaveClass('loading-skeleton-rows')
+  expect(skeleton.querySelectorAll('.loading-skeleton-item')).toHaveLength(3)
+  await act(async () => resolveList({ data: [{ id: 'blocked', fname: 'Sample' }] }))
+  expect(skeleton).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Unblock' }))
+  expect(screen.getByRole('button', { name: 'Unblocking...' })).toBeDisabled()
 })

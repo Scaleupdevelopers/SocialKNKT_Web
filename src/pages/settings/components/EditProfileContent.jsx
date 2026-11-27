@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from '../../../components/common/RequestState'
 import { useRef, useState } from 'react'
 import { normalizeProfile, useProfile } from '../../../context/ProfileContext'
 import { completeProfile, updateProfile } from '../../../action/action'
@@ -9,7 +10,9 @@ export function EditProfileContent() {
   const { profile, isLoading, error, refreshProfile, setProfile } = useProfile()
   const [active, setActive] = useState('basic')
   const [busy, setBusy] = useState(false)
-  if (!profile && isLoading) return <p role="status">Loading profile…</p>
+  if (!profile && isLoading) {
+    return <LoadingSkeleton label="Loading profile…" variant="card" count={1} />
+  }
   if (!profile)
     return (
       <div role="alert">
@@ -22,7 +25,7 @@ export function EditProfileContent() {
   return (
     <div className="settings-content profile-editor">
       <h2>Edit Profile</h2>
-      {isLoading && <p role="status">Refreshing profile…</p>}
+      {isLoading && <LoadingSkeleton label="Refreshing profile…" variant="field" count={1} />}
       {!isLoading && error && (
         <div role="alert">
           Unable to refresh profile. Your edits are still available.{' '}

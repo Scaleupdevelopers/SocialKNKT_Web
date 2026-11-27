@@ -28,6 +28,24 @@ async function fillQuestion() {
   fireEvent.click(await screen.findByRole('checkbox', { name: 'Technology' }))
 }
 
+it('shows an accessible field shimmer while categories load', async () => {
+  let finish
+  getTopics.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve
+      }),
+  )
+  render(<AskShareModal onClose={vi.fn()} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Categories' }))
+  expect(screen.getByRole('status', { name: 'Loading categories…' })).toHaveClass(
+    'loading-skeleton-field',
+  )
+  await act(async () => finish({ data: [{ id: 'topic', title: 'Technology' }] }))
+  expect(screen.queryByRole('status', { name: 'Loading categories…' })).not.toBeInTheDocument()
+  expect(screen.getByRole('checkbox', { name: 'Technology' })).toBeEnabled()
+})
+
 it('validates required fields and submits trimmed question text, location and topic IDs once', async () => {
   let finish
   createThread.mockImplementation(

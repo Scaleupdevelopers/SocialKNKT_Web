@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from '../../components/common/RequestState'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { updateBannerImage, updateProfile, uploadFile } from '../../action/action'
@@ -106,7 +107,7 @@ function MediaSetup({ context }) {
         <p>Add a few details to finish setting up your account</p>
         {!profile &&
           (isLoading ? (
-            <p role="status">Loading profile…</p>
+            <LoadingSkeleton label="Loading profile…" variant="media" count={1} />
           ) : (
             <p role="alert">
               Unable to load profile.{' '}
@@ -115,6 +116,9 @@ function MediaSetup({ context }) {
               </button>
             </p>
           ))}
+        {profile && isLoading && (
+          <LoadingSkeleton label="Refreshing profile…" variant="field" count={1} />
+        )}
         <form className="media-form" onSubmit={submit}>
           <h2>Profile</h2>
           <div className="profile-media-grid">

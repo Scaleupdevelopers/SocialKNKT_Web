@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from '../../../components/common/RequestState'
 import { useEffect, useState } from 'react'
 import { getCountries, getStates, getCities } from '../../../action/action'
 
@@ -28,11 +29,12 @@ function LocationSelect({ label, value, name, options, disabled, onChange }) {
     <label>
       {label}
       <select
+        aria-label={label}
         value={value || ''}
         disabled={disabled || options.loading}
         onChange={(event) => onChange(event.target.value)}
       >
-        <option value="">{options.loading ? 'Loading…' : `Select ${label.toLowerCase()}`}</option>
+        <option value="">{`Select ${label.toLowerCase()}`}</option>
         {value && !options.data.some((item) => String(item.id) === String(value)) && (
           <option value={value}>{name || 'Saved location'}</option>
         )}
@@ -42,6 +44,9 @@ function LocationSelect({ label, value, name, options, disabled, onChange }) {
           </option>
         ))}
       </select>
+      {options.loading && (
+        <LoadingSkeleton label={`Loading ${label.toLowerCase()}…`} variant="field" count={1} />
+      )}
       {options.error && (
         <span role="alert">
           Unable to load {label.toLowerCase()}.{' '}
@@ -58,7 +63,9 @@ export function LocationFields({ value, onChange }) {
   const countries = useOptions(getCountries, [])
   const states = useOptions(
     () =>
-      value.countryId ? getStates({ countryId: value.countryId }) : Promise.resolve({ data: [] }),
+      value.countryId
+        ? getStates({ countryId: value.countryId })
+        : Promise.resolve({ data: [] }),
     [value.countryId],
   )
   const cities = useOptions(
@@ -79,7 +86,8 @@ export function LocationFields({ value, onChange }) {
           onChange({
             ...value,
             countryId,
-            countryName: countries.data.find((item) => String(item.id) === countryId)?.name || '',
+            countryName:
+              countries.data.find((item) => String(item.id) === countryId)?.name || '',
             stateId: '',
             cityId: '',
             stateName: '',

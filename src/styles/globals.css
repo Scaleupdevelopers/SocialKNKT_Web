@@ -1,6 +1,12 @@
 :root {
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system,
-    BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
   color: #172033;
   background: #1b1b1b;
   font-synthesis: none;
@@ -26,4 +32,132 @@ body {
 button,
 input {
   font: inherit;
+}
+
+/* Read-loading placeholders share Home's soft, sweeping highlight. */
+.loading-skeleton {
+  display: grid;
+  gap: 16px;
+  width: 100%;
+  min-width: 0;
+  grid-column: 1 / -1;
+  padding: 12px 0;
+  pointer-events: none;
+}
+.loading-skeleton-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.loading-skeleton-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  min-height: 64px;
+  padding: 12px;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #111111;
+}
+.loading-skeleton-item::after {
+  position: absolute;
+  inset: 0;
+  content: '';
+  transform: translateX(-100%);
+  background: linear-gradient(
+    105deg,
+    transparent 20%,
+    rgba(255, 255, 255, 0.025) 40%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0.025) 60%,
+    transparent 80%
+  );
+  animation: app-loading-shimmer 1.45s ease-in-out infinite;
+}
+.loading-skeleton-avatar,
+.loading-skeleton-lines > span,
+.loading-skeleton-image {
+  display: block;
+  background: #262626;
+  border-radius: 6px;
+}
+.loading-skeleton-avatar {
+  flex: 0 0 40px;
+  height: 40px;
+  border-radius: 50%;
+}
+.loading-skeleton-lines {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 9px;
+}
+.loading-skeleton-lines > span {
+  width: 75%;
+  height: 13px;
+}
+.loading-skeleton-lines > span + span {
+  width: 48%;
+  height: 10px;
+}
+.loading-skeleton-field {
+  padding: 6px 0;
+}
+.loading-skeleton-field .loading-skeleton-item {
+  min-height: 36px;
+  padding: 8px 12px;
+}
+.loading-skeleton-field .loading-skeleton-avatar,
+.loading-skeleton-field .loading-skeleton-lines > span + span {
+  display: none;
+}
+.loading-skeleton-media {
+  grid-template-columns: repeat(auto-fit, minmax(min(110px, 100%), 1fr));
+}
+.loading-skeleton-media .loading-skeleton-item {
+  min-height: 140px;
+  aspect-ratio: 3 / 4;
+}
+.loading-skeleton-media .loading-skeleton-avatar,
+.loading-skeleton-media .loading-skeleton-lines {
+  display: none;
+}
+.loading-skeleton-card .loading-skeleton-item {
+  flex-wrap: wrap;
+}
+.loading-skeleton-image {
+  width: 100%;
+  height: 180px;
+}
+@keyframes app-loading-shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .loading-skeleton-item::after,
+  .feed-post-skeleton::before,
+  .flick-feed-skeleton::before,
+  .profile-skeleton-line::after,
+  .header-profile-skeleton::after,
+  .settings-profile-skeleton::after,
+  .profile-media-skeleton-cell,
+  .knkt-thread-skeleton,
+  .topic-skeleton-circle,
+  .topic-skeleton-label,
+  .popular-topic-skeleton-image,
+  .popular-topic-skeleton-label,
+  .skeleton-avatar,
+  .skeleton-lines span,
+  .reply-skeleton-list span {
+    animation: none !important;
+  }
 }

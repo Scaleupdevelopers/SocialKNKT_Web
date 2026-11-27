@@ -35,6 +35,11 @@ function open(label) {
   )
 }
 async function select(label, text) {
+  await waitFor(() =>
+    expect(
+      within(screen.getByText(label, { exact: true }).parentElement).getByRole('button'),
+    ).toBeEnabled(),
+  )
   open(label)
   fireEvent.click(await within(screen.getByRole('listbox')).findByText(text, { exact: true }))
 }
@@ -152,47 +157,90 @@ describe.each([
   ['Location', Location, '/pronunciation'],
   ['WorkExperience', WorkExperience, '/education'],
 ])('%s async boundaries', (name, Component, nextPath) => {
+  it('shows field shimmers beside stable disabled geography controls', async () => {
+    const requests = [deferred(), deferred(), deferred()]
+    getCountries.mockReturnValue(requests[0].promise)
+    getStates.mockReturnValue(requests[1].promise)
+    getCities.mockReturnValue(requests[2].promise)
+    render(
+      <MemoryRouter>
+        <Component />
+      </MemoryRouter>,
+    )
+    const fields = [
+      ['Country', 'Canada', 'ca'],
+      ['State', 'Ontario', 'on'],
+      ['City', 'Toronto', 'to'],
+    ]
+    for (const [index, [label, option, id]] of fields.entries()) {
+      const control = within(screen.getByText(label).parentElement).getByRole('button')
+      expect(control).toBeDisabled()
+      expect(control).toHaveTextContent(`Select ${label.toLowerCase()}`)
+      const skeleton = screen.getByRole('status', { name: `Loading ${label.toLowerCase()}…` })
+      expect(skeleton).toHaveClass('loading-skeleton-field')
+      expect(skeleton.querySelector('.loading-skeleton-label')).toHaveTextContent('Loading')
+      await act(async () => requests[index].resolve({ data: [{ id, name: option }] }))
+      expect(skeleton).not.toBeInTheDocument()
+      await select(label, option)
+    }
+  })
+
   it.each([
     ['countries', getCountries, 'Country', 'Canada'],
     ['states', getStates, 'State', 'Ontario'],
     ['cities', getCities, 'City', 'Toronto'],
-  ])('retries failed %s without losing the draft or parent selection', async (kind, request, label, option) => {
-    request.mockRejectedValueOnce(new Error('private load details'))
-    render(<MemoryRouter><Component /></MemoryRouter>)
-    const draftInput = screen.queryAllByRole('textbox')[0]
-    if (draftInput) fireEvent.change(draftInput, { target: { value: 'Keep my draft' } })
-    fireEvent.click(screen.getByRole('checkbox'))
-    if (kind !== 'countries') await select('Country', 'Canada')
-    if (kind === 'cities') await select('State', 'Ontario')
-    const retry = await screen.findByRole('button', { name: `Retry ${kind}` })
-    expect(screen.getByRole('alert')).not.toHaveTextContent('private load details')
-    fireEvent.click(retry)
-    await select(label, option)
-    expect(request).toHaveBeenCalledTimes(2)
-    expect(screen.getByRole('checkbox')).toBeChecked()
-    if (draftInput) expect(draftInput).toHaveValue('Keep my draft')
-    expect(screen.queryByRole('button', { name: `Retry ${kind}` })).not.toBeInTheDocument()
-    if (kind !== 'countries') {
-      expect(within(screen.getByText('Country').parentElement).getByRole('button')).toHaveTextContent('Canada')
-      expect(getCountries).toHaveBeenCalledTimes(1)
-    }
-    if (kind === 'states') expect(request).toHaveBeenLastCalledWith({ countryId: 'ca' })
-    if (kind === 'cities') {
-      expect(request).toHaveBeenLastCalledWith({ countryId: 'ca', stateId: 'on' })
-      expect(getStates).toHaveBeenCalledTimes(1)
-    }
-  })
+  ])(
+    'retries failed %s without losing the draft or parent selection',
+    async (kind, request, label, option) => {
+      request.mockRejectedValueOnce(new Error('private load details'))
+      render(
+        <MemoryRouter>
+          <Component />
+        </MemoryRouter>,
+      )
+      const draftInput = screen.queryAllByRole('textbox')[0]
+      if (draftInput) fireEvent.change(draftInput, { target: { value: 'Keep my draft' } })
+      fireEvent.click(screen.getByRole('checkbox'))
+      if (kind !== 'countries') await select('Country', 'Canada')
+      if (kind === 'cities') await select('State', 'Ontario')
+      const retry = await screen.findByRole('button', { name: `Retry ${kind}` })
+      expect(screen.getByRole('alert')).not.toHaveTextContent('private load details')
+      fireEvent.click(retry)
+      await select(label, option)
+      expect(request).toHaveBeenCalledTimes(2)
+      expect(screen.getByRole('checkbox')).toBeChecked()
+      if (draftInput) expect(draftInput).toHaveValue('Keep my draft')
+      expect(screen.queryByRole('button', { name: `Retry ${kind}` })).not.toBeInTheDocument()
+      if (kind !== 'countries') {
+        expect(
+          within(screen.getByText('Country').parentElement).getByRole('button'),
+        ).toHaveTextContent('Canada')
+        expect(getCountries).toHaveBeenCalledTimes(1)
+      }
+      if (kind === 'states') expect(request).toHaveBeenLastCalledWith({ countryId: 'ca' })
+      if (kind === 'cities') {
+        expect(request).toHaveBeenLastCalledWith({ countryId: 'ca', stateId: 'on' })
+        expect(getStates).toHaveBeenCalledTimes(1)
+      }
+    },
+  )
 
   it('ignores a retry response when its country has changed', async () => {
     const retry = deferred()
     getStates.mockRejectedValueOnce(new Error('failed')).mockReturnValueOnce(retry.promise)
-    render(<MemoryRouter><Component /></MemoryRouter>)
+    render(
+      <MemoryRouter>
+        <Component />
+      </MemoryRouter>,
+    )
     await select('Country', 'Canada')
     fireEvent.click(await screen.findByRole('button', { name: 'Retry states' }))
     await select('Country', 'USA')
     await act(async () => retry.resolve({ data: [{ id: 'old', name: 'Stale state' }] }))
     open('State')
-    expect(within(screen.getByRole('listbox')).queryByText('Stale state')).not.toBeInTheDocument()
+    expect(
+      within(screen.getByRole('listbox')).queryByText('Stale state'),
+    ).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Retry states' })).not.toBeInTheDocument()
   })
 

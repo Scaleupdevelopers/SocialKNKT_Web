@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Header } from '../../layouts/Header'
+import { LoadingSkeleton } from '../../components/common/RequestState'
 import { useProfile } from '../../context/ProfileContext'
 import { createChatRoom, deleteChat, getChatRooms, searchChatUsers } from '../../action/action'
 import { formatTime, itemId, userName } from './chatModel'
@@ -19,13 +20,15 @@ function Avatar({ user }) {
 function ListFeedback({ list, empty }) {
   return (
     <>
-      {list.loading && <p role="status">Loading…</p>}
+      {list.loading && <LoadingSkeleton />}
       {list.error && (
         <p role="alert">
           Unable to load. <button onClick={list.loadMore}>Retry</button>
         </p>
       )}
-      {!list.loading && !list.error && !list.items.length && <p className="chat-empty">{empty}</p>}
+      {!list.loading && !list.error && !list.items.length && (
+        <p className="chat-empty">{empty}</p>
+      )}
       {list.more && (
         <button disabled={list.loading} onClick={list.loadMore}>
           Load more
@@ -99,7 +102,9 @@ function NewConversation({ onSelect, onClose }) {
           </span>
         </button>
       ))}
-      {error && <p role="alert">Could not start this conversation. Select the person to retry.</p>}
+      {error && (
+        <p role="alert">Could not start this conversation. Select the person to retry.</p>
+      )}
       <ListFeedback list={users} empty="No connections found." />
     </section>
   )
@@ -144,7 +149,10 @@ function Conversation({ room, userId, onBack, onDeleted, onRoomsChanged }) {
     if (chat.send(draft)) setDraft('')
   }
   return (
-    <section className="chat-conversation" aria-label={`Conversation with ${userName(room.user)}`}>
+    <section
+      className="chat-conversation"
+      aria-label={`Conversation with ${userName(room.user)}`}
+    >
       <div className="chat-title">
         <button className="chat-back" onClick={onBack}>
           Back
@@ -168,88 +176,105 @@ function Conversation({ room, userId, onBack, onDeleted, onRoomsChanged }) {
           {deleteError && <p>Unable to delete. Try again.</p>}
         </div>
       )}
-      <div className="chat-history" aria-label="Messages">
-        {chat.more && (
-          <button disabled={chat.loading} onClick={chat.loadMore}>
-            Load older messages
-          </button>
-        )}
-        {chat.loading && <p role="status">Loading messages…</p>}
-        {chat.error && (
-          <p role="alert">
-            Unable to load messages. <button onClick={chat.loadMore}>Retry</button>
-          </p>
-        )}
-        {!chat.loading && !chat.error && !chat.messages.length && (
-          <p className="chat-empty">Start your conversation.</p>
-        )}
-        {chat.messages.map((message) => (
-          <article
-            className={`chat-message ${message.userId === userId ? 'chat-mine' : ''}`}
-            key={itemId(message)}
-          >
-            <p>{typeof message.message === 'string' ? message.message : 'Unsupported message'}</p>
-            <time>{formatTime(message.createdAt)}</time>
-          </article>
-        ))}
-        {chat.pending && (
-          <article className="chat-message chat-mine">
-            <p>{chat.pending.text}</p>
-            <small>{chat.uncertain ? 'Delivery unconfirmed' : 'Sending…'}</small>
-          </article>
-        )}
-        <div ref={end} />
-      </div>
-      {room.blockedBy ? (
-        <div className="chat-blocked">
-          <strong>
-            {room.blockedBy === userId
-              ? 'You Blocked this User'
-              : `${userName(room.user)} Blocked You`}
-          </strong>
-          <p>
-            {room.blockedBy === userId
-              ? 'You cannot chat with this user. Unblock them from settings to resume.'
-              : 'You cannot chat with this user.'}
-          </p>
-        </div>
-      ) : (
-        <>
-          {!chat.connected && (
-            <div className="chat-notice" role="status">
-              Chat is offline. <button onClick={chat.reconnect}>Reconnect</button>
-              <button onClick={chat.refresh}>Refresh messages</button>
-            </div>
-          )}
-          {chat.uncertain && (
-            <div className="chat-notice" role="alert">
-              Delivery could not be confirmed. Check messages before sending again; resending may
-              duplicate your message.
-              <button disabled={chat.loading} onClick={chat.refresh}>
-                Check delivery
-              </button>
-              <button onClick={() => setDraft(chat.restoreDraft())}>Restore draft</button>
-            </div>
-          )}
-          <form className="chat-composer" onSubmit={submit}>
-            <input
-              aria-label="Message"
-              placeholder="Message"
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              disabled={Boolean(chat.pending)}
-            />
-            <button
-              type="submit"
-              aria-label="Send message"
-              disabled={!draft.trim() || !chat.connected || Boolean(chat.pending)}
-            >
-              <img src="/assets/logo_icons/send_icon.svg" alt="" />
-            </button>
-          </form>
-        </>
-      )}
+      <ConversationHistory chat={chat} userId={userId} end={end} />
+      <ConversationComposer
+        room={room}
+        userId={userId}
+        chat={chat}
+        draft={draft}
+        setDraft={setDraft}
+        submit={submit}
+      />
     </section>
+  )
+}
+
+function ConversationHistory({ chat, userId, end }) {
+  return (
+    <div className="chat-history" aria-label="Messages">
+      {chat.more && (
+        <button disabled={chat.loading} onClick={chat.loadMore}>
+          Load older messages
+        </button>
+      )}
+      {chat.loading && <LoadingSkeleton label="Loading messages…" />}
+      {chat.error && (
+        <p role="alert">
+          Unable to load messages. <button onClick={chat.loadMore}>Retry</button>
+        </p>
+      )}
+      {!chat.loading && !chat.error && !chat.messages.length && (
+        <p className="chat-empty">Start your conversation.</p>
+      )}
+      {chat.messages.map((message) => (
+        <article
+          className={`chat-message ${message.userId === userId ? 'chat-mine' : ''}`}
+          key={itemId(message)}
+        >
+          <p>{typeof message.message === 'string' ? message.message : 'Unsupported message'}</p>
+          <time>{formatTime(message.createdAt)}</time>
+        </article>
+      ))}
+      {chat.pending && (
+        <article className="chat-message chat-mine">
+          <p>{chat.pending.text}</p>
+          <small>{chat.uncertain ? 'Delivery unconfirmed' : 'Sending…'}</small>
+        </article>
+      )}
+      <div ref={end} />
+    </div>
+  )
+}
+
+function ConversationComposer({ room, userId, chat, draft, setDraft, submit }) {
+  return room.blockedBy ? (
+    <div className="chat-blocked">
+      <strong>
+        {room.blockedBy === userId
+          ? 'You Blocked this User'
+          : `${userName(room.user)} Blocked You`}
+      </strong>
+      <p>
+        {room.blockedBy === userId
+          ? 'You cannot chat with this user. Unblock them from settings to resume.'
+          : 'You cannot chat with this user.'}
+      </p>
+    </div>
+  ) : (
+    <>
+      {!chat.connected && (
+        <div className="chat-notice" role="status">
+          Chat is offline. <button onClick={chat.reconnect}>Reconnect</button>
+          <button onClick={chat.refresh}>Refresh messages</button>
+        </div>
+      )}
+      {chat.uncertain && (
+        <div className="chat-notice" role="alert">
+          Delivery could not be confirmed. Check messages before sending again; resending may
+          duplicate your message.
+          <button disabled={chat.loading} onClick={chat.refresh}>
+            Check delivery
+          </button>
+          <button onClick={() => setDraft(chat.restoreDraft())}>Restore draft</button>
+        </div>
+      )}
+      <form className="chat-composer" onSubmit={submit}>
+        <input
+          aria-label="Message"
+          placeholder="Message"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          disabled={Boolean(chat.pending)}
+        />
+        <button
+          type="submit"
+          aria-label="Send message"
+          disabled={!draft.trim() || !chat.connected || Boolean(chat.pending)}
+        >
+          <img src="/assets/logo_icons/send_icon.svg" alt="" />
+        </button>
+      </form>
+    </>
   )
 }
 

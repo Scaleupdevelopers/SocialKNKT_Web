@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from '../../components/common/RequestState'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getCities, getCountries, getStates } from '../../action/action'
@@ -57,12 +58,7 @@ export function Location() {
   }, [])
 
   useEffect(() => {
-    return loadOptions(
-      getCountries(),
-      setCountries,
-      'countries',
-      setGeographyStatus,
-    )
+    return loadOptions(getCountries(), setCountries, 'countries', setGeographyStatus)
   }, [geographyRetries.countries])
 
   useEffect(() => {
@@ -212,6 +208,7 @@ export function Location() {
             <div className="location-grid">
               <OptionDropdown
                 label="Country"
+                loading={geographyStatus.countries === 'loading'}
                 value={location.countryId}
                 options={countries.map((item) => ({ label: item.name, value: item.id }))}
                 hasError={fieldErrors.country}
@@ -232,6 +229,7 @@ export function Location() {
               />
               <OptionDropdown
                 label="State"
+                loading={geographyStatus.states === 'loading'}
                 value={location.stateId}
                 options={states.map((item) => ({ label: item.name, value: item.id }))}
                 hasError={fieldErrors.state}
@@ -249,6 +247,7 @@ export function Location() {
               />
               <OptionDropdown
                 label="City"
+                loading={geographyStatus.cities === 'loading'}
                 value={location.cityId}
                 options={cities.map((item) => ({ label: item.name, value: item.id }))}
                 hasError={fieldErrors.city}
@@ -455,7 +454,7 @@ function YearDropdown({ label, value, onChange, disabled = false }) {
   )
 }
 
-function OptionDropdown({ label, value, options, onChange, hasError = false }) {
+function OptionDropdown({ label, value, options, onChange, hasError = false, loading }) {
   const dropdownRef = useRef(null)
   const [isOpen, setIsOpen] = useState(false)
 
@@ -475,6 +474,7 @@ function OptionDropdown({ label, value, options, onChange, hasError = false }) {
       <span>{label}</span>
       <button
         className="location-year-trigger"
+        disabled={loading}
         type="button"
         onClick={() => setIsOpen((open) => !open)}
       >
@@ -484,7 +484,10 @@ function OptionDropdown({ label, value, options, onChange, hasError = false }) {
         </span>
         <span className="location-year-arrow" aria-hidden="true" />
       </button>
-      {isOpen && (
+      {loading && (
+        <LoadingSkeleton label={`Loading ${label.toLowerCase()}…`} variant="field" count={1} />
+      )}
+      {isOpen && !loading && (
         <div className="location-year-menu" role="listbox">
           {options.map((option) => (
             <button
@@ -526,9 +529,6 @@ function loadOptions(request, setOptions, label, setStatus) {
 
 function GeographyFeedback({ status, onRetry }) {
   return Object.entries(status).map(([field, state]) => {
-    if (state === 'loading') {
-      return <p key={field} role="status">Loading {field}…</p>
-    }
     if (state !== 'failed') return null
     return (
       <p key={field} role="alert">

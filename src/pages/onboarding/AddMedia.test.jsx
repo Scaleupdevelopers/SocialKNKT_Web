@@ -103,3 +103,36 @@ it('rejects unsupported files and keeps content upload unavailable until its map
   expect(uploadFile).not.toHaveBeenCalled()
   expect(screen.getByLabelText('Content photos').disabled).toBe(true)
 })
+
+it('uses a media shimmer for initial load and preserves the selected photo during refresh', () => {
+  const context = { profile: null, authToken: 'same-account', setProfile, isLoading: true }
+  useProfile.mockReturnValue(context)
+  const view = render(
+    <MemoryRouter>
+      <AddMedia />
+    </MemoryRouter>,
+  )
+  expect(screen.getByRole('status', { name: 'Loading profile…' })).toHaveClass(
+    'loading-skeleton-media',
+  )
+  useProfile.mockReturnValue({ ...context, profile, isLoading: false })
+  view.rerender(
+    <MemoryRouter>
+      <AddMedia />
+    </MemoryRouter>,
+  )
+  choose('Profile Picture', photo)
+  const input = screen.getByLabelText('Profile Picture')
+  const preview = screen.getByAltText('photo.png')
+  useProfile.mockReturnValue({ ...context, profile, isLoading: true })
+  view.rerender(
+    <MemoryRouter>
+      <AddMedia />
+    </MemoryRouter>,
+  )
+  expect(screen.getByLabelText('Profile Picture')).toBe(input)
+  expect(screen.getByAltText('photo.png')).toBe(preview)
+  expect(screen.getByRole('status', { name: 'Refreshing profile…' })).toHaveClass(
+    'loading-skeleton-field',
+  )
+})

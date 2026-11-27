@@ -24,7 +24,9 @@ vi.mock('../../action/action', () => ({
   deleteChat: vi.fn(),
 }))
 vi.mock('../../layouts/Header', () => ({ Header: () => <header>Header</header> }))
-vi.mock('../../context/ProfileContext', () => ({ useProfile: () => ({ profile: { id: 'me' } }) }))
+vi.mock('../../context/ProfileContext', () => ({
+  useProfile: () => ({ profile: { id: 'me' } }),
+}))
 vi.mock('socket.io-client', () => ({ io: vi.fn() }))
 let sockets
 beforeEach(() => {
@@ -49,7 +51,11 @@ beforeEach(() => {
   })
   api.getChatRooms.mockResolvedValue({
     data: [
-      { id: 'a', user: { id: 'other', fname: 'Alice', username: 'alice' }, lastMessage: 'Hello' },
+      {
+        id: 'a',
+        user: { id: 'other', fname: 'Alice', username: 'alice' },
+        lastMessage: 'Hello',
+      },
     ],
   })
   api.getChatMessages.mockResolvedValue({ data: [] })
@@ -64,6 +70,38 @@ afterEach(() => {
 })
 
 describe('chat flow', () => {
+  it('shows accessible row shimmers for rooms and message history', async () => {
+    let finishRooms
+    let finishHistory
+    api.getChatRooms.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishRooms = resolve
+        }),
+    )
+    api.getChatMessages.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishHistory = resolve
+        }),
+    )
+    render(<Chat />)
+    expect(screen.getByRole('status', { name: 'Loading…' })).toHaveClass(
+      'loading-skeleton-rows',
+    )
+    await waitFor(() => expect(finishRooms).toBeTypeOf('function'))
+    await act(async () =>
+      finishRooms({ data: [{ id: 'a', user: { id: 'other', fname: 'Alice' } }] }),
+    )
+    fireEvent.click(screen.getByRole('button', { name: /Alice/ }))
+    expect(screen.getByRole('status', { name: 'Loading messages…' })).toHaveClass(
+      'loading-skeleton-rows',
+    )
+    await act(async () => finishHistory({ data: [] }))
+    expect(screen.queryByRole('status', { name: 'Loading messages…' })).not.toBeInTheDocument()
+    expect(screen.getByText('Start your conversation.')).toBeVisible()
+  })
+
   it('renders rooms, opens history and sends only once over the mobile socket contract', async () => {
     render(<Chat />)
     fireEvent.click(await screen.findByRole('button', { name: /Alice/ }))
@@ -100,7 +138,9 @@ describe('chat flow', () => {
     expect(screen.queryByLabelText('Send message')).toBeNull()
   })
   it('opens an existing searched room without creating a duplicate', async () => {
-    api.searchChatUsers.mockResolvedValue({ data: [{ _id: 'other', fname: 'Alice', roomId: 'a' }] })
+    api.searchChatUsers.mockResolvedValue({
+      data: [{ _id: 'other', fname: 'Alice', roomId: 'a' }],
+    })
     render(<Chat />)
     fireEvent.click(screen.getByRole('button', { name: 'New message' }))
     fireEvent.click(await screen.findByRole('button', { name: /Alice/ }))
@@ -189,7 +229,12 @@ describe('conversation consistency', () => {
     await screen.findByText('Start your conversation.')
     api.getChatRooms.mockResolvedValue({
       data: [
-        { ...room, lastMessage: 'Updated preview', lastMessageTime: 1719495490679, readBy: 'me' },
+        {
+          ...room,
+          lastMessage: 'Updated preview',
+          lastMessageTime: 1719495490679,
+          readBy: 'me',
+        },
       ],
     })
     act(() =>
@@ -270,7 +315,9 @@ describe('conversation consistency', () => {
     )
     rerender({ room: 'b' })
     await waitFor(() => expect(result.current.messages).toHaveLength(1))
-    await act(async () => resolveOld({ data: [{ id: 'old', roomId: 'a', message: 'old room' }] }))
+    await act(async () =>
+      resolveOld({ data: [{ id: 'old', roomId: 'a', message: 'old room' }] }),
+    )
     expect(result.current.messages[0].id).toBe('new')
     expect(sockets[0].emit).toHaveBeenCalledWith('leave_room', { roomId: 'a' })
     unmount()

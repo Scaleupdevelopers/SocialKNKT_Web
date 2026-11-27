@@ -7,6 +7,7 @@ import { connectionsChanged } from '../../utils/helper'
 import { useProfile } from '../../context/ProfileContext'
 import { usePagedList } from '../../utils/usePagedList'
 import { ConnectionManager } from '../../components/modals/ConnectionManager'
+import { LoadingSkeleton } from '../../components/common/RequestState'
 import './Connections.css'
 
 const filters = [
@@ -22,7 +23,8 @@ function ConnectionRow({ connection, ownList, onManage }) {
   const [error, setError] = useState('')
   const busy = useRef(false)
   const { userId, personalConnection, professionalConnection } = connection
-  const name = [connection.fname, connection.lname].filter(Boolean).join(' ') || connection.username
+  const name =
+    [connection.fname, connection.lname].filter(Boolean).join(' ') || connection.username
   const addType = personalConnection ? 'professional' : 'personal'
   const hasBoth = personalConnection && professionalConnection
 
@@ -61,8 +63,8 @@ function ConnectionRow({ connection, ownList, onManage }) {
             <span>@{connection.username}</span>
           </div>
           <p>
-            {connection.jobTitle || 'SocialKNKT member'} · {connection.totalNoOfConnections ?? 0}{' '}
-            Connections
+            {connection.jobTitle || 'SocialKNKT member'} ·{' '}
+            {connection.totalNoOfConnections ?? 0} Connections
           </p>
           {connection.cityName && (
             <small className="connection-location">
@@ -130,7 +132,7 @@ function ConnectionList({ userId, ownList, query, filter }) {
             onManage={() => setSelected(connection)}
           />
         ))}
-        {list.loading && <p role="status">Loading connections…</p>}
+        {list.loading && <LoadingSkeleton label="Loading connections…" />}
         {list.error && (
           <div role="alert">
             <p>{list.error}</p>
@@ -231,7 +233,7 @@ export function Connections() {
             filter={filter}
           />
         ) : (
-          <p role="status">Loading profile…</p>
+          <LoadingSkeleton label="Loading profile…" />
         )}
       </main>
     </div>

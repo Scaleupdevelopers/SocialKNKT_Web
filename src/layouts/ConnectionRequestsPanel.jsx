@@ -4,7 +4,7 @@ import { answerConnection, getConnectionRequests } from '../action/action'
 import { connectionsChanged } from '../utils/helper'
 import { usePagedList } from '../utils/usePagedList'
 import { useProfile } from '../context/ProfileContext'
-import { RequestState } from '../components/common/RequestState'
+import { LoadingSkeleton, RequestState } from '../components/common/RequestState'
 
 function RequestRow({ request, onAnswered }) {
   const [expanded, setExpanded] = useState(false)
@@ -54,7 +54,12 @@ function RequestRow({ request, onAnswered }) {
               ['Professional', 1],
               ['Both', 3],
             ].map(([label, status]) => (
-              <button key={status} type="button" disabled={pending} onClick={() => answer(status)}>
+              <button
+                key={status}
+                type="button"
+                disabled={pending}
+                onClick={() => answer(status)}
+              >
                 {label}
               </button>
             ))}
@@ -97,6 +102,9 @@ export function ConnectionRequestsPanel({ onClose }) {
           />
         ))}
       </RequestState>
+      {list.loading && list.items.length > 0 && (
+        <LoadingSkeleton label="Loading more requests…" count={2} />
+      )}
       {list.hasMore && (
         <button className="panel-more" disabled={list.loading} onClick={list.loadMore}>
           Load more

@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from '../../components/common/RequestState'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
@@ -290,7 +291,8 @@ export function WorkExperience() {
               <label className="work-field">
                 <span>Country</span>
                 <DateDropdown
-                  label={locationDropdownLabel(isLoadingCountries, 'country')}
+                  label="Select country"
+                  loading={isLoadingCountries}
                   value={experience.countryId}
                   options={countries.map((country) => ({
                     label: country.name,
@@ -315,7 +317,8 @@ export function WorkExperience() {
               <label className="work-field">
                 <span>State</span>
                 <DateDropdown
-                  label={locationDropdownLabel(isLoadingStates, 'state')}
+                  label="Select state"
+                  loading={isLoadingStates}
                   value={experience.stateId}
                   options={states.map((state) => ({ label: state.name, value: state.id }))}
                   onChange={(value) => {
@@ -334,7 +337,8 @@ export function WorkExperience() {
               <label className="work-field">
                 <span>City</span>
                 <DateDropdown
-                  label={locationDropdownLabel(isLoadingCities, 'city')}
+                  label="Select city"
+                  loading={isLoadingCities}
                   value={experience.cityId}
                   options={cities.map((city) => ({ label: city.name, value: city.id }))}
                   onChange={(value) => {
@@ -554,7 +558,7 @@ function DateGroup({ label, prefix = 'start', day, month, year, onChange }) {
   )
 }
 
-function DateDropdown({ label, value, options, onChange }) {
+function DateDropdown({ label, value, options, onChange, loading = false }) {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef(null)
 
@@ -584,13 +588,21 @@ function DateDropdown({ label, value, options, onChange }) {
     <div ref={dropdownRef} className={`date-dropdown ${isOpen ? 'is-open' : ''}`}>
       <button
         className="date-dropdown-trigger"
+        disabled={loading}
         type="button"
         onClick={() => setIsOpen((open) => !open)}
       >
         {selectedOption?.label || label}
         <span className="date-dropdown-arrow" />
       </button>
-      {isOpen && (
+      {loading && (
+        <LoadingSkeleton
+          label={`Loading ${label.replace('Select ', '')}…`}
+          variant="field"
+          count={1}
+        />
+      )}
+      {isOpen && !loading && (
         <div className="date-dropdown-menu" role="listbox">
           {normalizedOptions.map((option) => (
             <button
@@ -646,20 +658,8 @@ function locationDraft(item) {
   }
 }
 
-function locationDropdownLabel(isLoading, field) {
-  const loadingLabels = {
-    country: 'Loading countries...',
-    state: 'Loading states...',
-    city: 'Loading cities...',
-  }
-  return isLoading ? loadingLabels[field] : `Select ${field}`
-}
-
 function GeographyFeedback({ status, onRetry }) {
   return Object.entries(status).map(([field, state]) => {
-    if (state === 'loading') {
-      return <p key={field} role="status">Loading {field}…</p>
-    }
     if (state !== 'failed') return null
     return (
       <p key={field} role="alert">

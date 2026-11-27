@@ -16,6 +16,7 @@ import { ReportPostModal } from '../../components/modals/ReportPostModal/ReportP
 import { useProfile } from '../../context/ProfileContext'
 
 import { Header } from '../../layouts/Header'
+import { LoadingSkeleton } from '../../components/common/RequestState'
 import './Flicks.css'
 import { CommentsModal } from '../../components/modals/CommentsModal/CommentsModal'
 
@@ -242,18 +243,35 @@ function FlickFeed({ saved }) {
               />
             )
           })}
-        {loadError && (
-          <p role="alert">
-            Unable to load flicks. <button onClick={() => loadPage(page)}>Retry</button>
-          </p>
-        )}
-        {!isLoading && hasMore && !loadError && (
-          <button disabled={loadingMore} onClick={() => loadPage(page)}>
-            {loadingMore ? 'Loading…' : 'Load more flicks'}
-          </button>
-        )}
+        <FlickFeedFeedback
+          isLoading={isLoading}
+          loadingMore={loadingMore}
+          loadError={loadError}
+          hasMore={hasMore}
+          onLoad={() => loadPage(page)}
+        />
       </section>
     </main>
+  )
+}
+
+function FlickFeedFeedback({ isLoading, loadingMore, loadError, hasMore, onLoad }) {
+  return (
+    <>
+      {loadError && (
+        <p role="alert">
+          Unable to load flicks. <button onClick={onLoad}>Retry</button>
+        </p>
+      )}
+      {!isLoading && loadingMore && (
+        <LoadingSkeleton label="Loading more flicks…" variant="media" count={1} />
+      )}
+      {!isLoading && hasMore && !loadError && (
+        <button disabled={loadingMore} onClick={onLoad}>
+          Load more flicks
+        </button>
+      )}
+    </>
   )
 }
 

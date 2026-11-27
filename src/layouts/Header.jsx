@@ -4,6 +4,7 @@ import { AskShareModal } from '../components/modals/AskShareModal/AskShareModal'
 import { AUTH_STORAGE_KEY } from '../utils/helper'
 import './Header.css'
 import { useProfile } from '../context/ProfileContext'
+import { LoadingSkeleton } from '../components/common/RequestState'
 import {
   createPost,
   uploadFile,
@@ -254,7 +255,7 @@ function HeaderAction({ label, icon, count, onClick }) {
 }
 
 function PostComposerModal({ onClose, onQuestionCreated }) {
-  const { profile } = useProfile()
+  const { profile, isLoading } = useProfile()
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false)
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
   const [profileType, setProfileType] = useState('Professional')
@@ -339,7 +340,11 @@ function PostComposerModal({ onClose, onQuestionCreated }) {
       <div className="post-modal-user">
         <img src={profile?.image || '/assets/logo_icons/profile_alt.avif'} alt="" />
         <div>
-          <h3>{profile?.fullName || 'Loading profile...'}</h3>
+          {isLoading ? (
+            <LoadingSkeleton label="Loading profile…" variant="field" count={1} />
+          ) : (
+            <h3>{profile?.fullName || 'You'}</h3>
+          )}
           <div className="post-profile-selector">
             <button type="button" onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}>
               <ProfileTypeIcon type={profileType} />

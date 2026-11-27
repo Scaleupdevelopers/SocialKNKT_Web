@@ -35,19 +35,31 @@ const send = (text) => {
 async function offsetCollection(kind, size) {
   let items = Array.from({ length: size }, (_, i) => comment(`item-${i + 1}`))
   const read = kind === 'comments' ? api.getComments : api.getCommentReplies
-  const snapshot = (page) => ({ data: items.slice(page * 10, page * 10 + 10), totalCount: items.length })
+  const snapshot = (page) => ({
+    data: items.slice(page * 10, page * 10 + 10),
+    totalCount: items.length,
+  })
   read.mockImplementation(async (_id, page) => snapshot(page))
   api.deleteComment.mockImplementation(async (_post, id) => {
     items = items.filter((item) => item.id !== id)
     return { status: true }
   })
   if (kind === 'replies') {
-    api.getComments.mockResolvedValue({ data: [comment('parent', { commentReplies: size })], totalCount: 1 })
+    api.getComments.mockResolvedValue({
+      data: [comment('parent', { commentReplies: size })],
+      totalCount: 1,
+    })
   }
   render(<CommentsModal post={post} />)
-  if (kind === 'replies') fireEvent.click(await screen.findByRole('button', { name: /View .* Replies/ }))
+  if (kind === 'replies')
+    fireEvent.click(await screen.findByRole('button', { name: /View .* Replies/ }))
   await screen.findByText('item-1')
-  return { read, snapshot, options: kind === 'comments' ? 'Comment options' : 'Reply options', more: `Load more ${kind}` }
+  return {
+    read,
+    snapshot,
+    options: kind === 'comments' ? 'Comment options' : 'Reply options',
+    more: `Load more ${kind}`,
+  }
 }
 
 function deleteFirst(options) {
@@ -64,6 +76,64 @@ beforeEach(() => {
 })
 
 describe('comment mutations', () => {
+  it('keeps comments visible beside a single next-page shimmer and disables load more', async () => {
+    let finish
+    api.getComments
+      .mockResolvedValueOnce({
+        data: Array.from({ length: 10 }, (_, index) => comment(`c${index}`)),
+        totalCount: 11,
+      })
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finish = resolve
+          }),
+      )
+    render(<CommentsModal post={post} />)
+    expect(screen.getByLabelText('Loading comments')).toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    fireEvent.click(await screen.findByRole('button', { name: 'Load more comments' }))
+    expect(screen.getByText('c0')).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Load more comments' })).toBeDisabled()
+    expect(screen.getByRole('status', { name: 'Loading more comments...' })).toHaveClass(
+      'loading-skeleton-rows',
+    )
+    await act(async () => finish({ data: [comment('last')], totalCount: 11 }))
+    expect(screen.getByText('last')).toBeVisible()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+
+  it('shows reply shimmers without hiding existing replies during pagination', async () => {
+    let finish
+    api.getComments.mockResolvedValue({
+      data: [comment('parent', { commentReplies: 11 })],
+      totalCount: 1,
+    })
+    api.getCommentReplies.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve
+        }),
+    )
+    render(<CommentsModal post={post} />)
+    fireEvent.click(await screen.findByRole('button', { name: /View 11 Replies/ }))
+    expect(screen.getByRole('status', { name: 'Loading replies…' })).toHaveClass(
+      'loading-skeleton-rows',
+    )
+    await act(async () =>
+      finish({
+        data: Array.from({ length: 10 }, (_, index) => comment(`r${index}`)),
+        totalCount: 11,
+      }),
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Load more replies' }))
+    expect(screen.getByText('r0')).toBeVisible()
+    expect(screen.getAllByRole('status', { name: 'Loading replies…' })).toHaveLength(1)
+    await act(async () => finish({ data: [comment('last reply')], totalCount: 11 }))
+    expect(screen.getByText('last reply')).toBeVisible()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+
   it('locks each comment like until it settles and rolls back with a sanitized error', async () => {
     let fail
     api.getComments.mockResolvedValue({ data: [comment('mine')], totalCount: 1 })
@@ -156,33 +226,50 @@ describe('comment mutations', () => {
 })
 
 describe('comment and reply reads', () => {
-  it.each(['comments', 'replies'])('refetches %s offsets after deletion so the original eleventh item is not skipped', async (kind) => {
-    const collection = await offsetCollection(kind, 11)
-    deleteFirst(collection.options)
-    await screen.findByText('item-11')
-    expect(screen.queryByText('item-1')).not.toBeInTheDocument()
-    expect(collection.read.mock.calls.map((call) => call[1])).toEqual([0, 0])
-    expect(screen.queryByRole('button', { name: collection.more })).not.toBeInTheDocument()
-  })
-  it.each(['comments', 'replies'])('invalidates pending %s reads on delete and preserves the reset cursor', async (kind) => {
-    const collection = await offsetCollection(kind, 21)
-    let finish
-    const stale = collection.snapshot(1)
-    collection.read.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve }))
-    fireEvent.click(screen.getByRole('button', { name: collection.more }))
-    deleteFirst(collection.options)
-    await waitFor(() => expect(collection.read.mock.calls.map((call) => call[1])).toEqual([0, 1, 0]))
-    await screen.findByText('item-11')
-    await act(async () => finish(stale))
-    fireEvent.click(screen.getByRole('button', { name: collection.more }))
-    await screen.findByText('item-21')
-    expect(collection.read.mock.calls.map((call) => call[1])).toEqual([0, 1, 0, 1])
-    expect(screen.queryByText('item-1')).not.toBeInTheDocument()
-  })
+  it.each(['comments', 'replies'])(
+    'refetches %s offsets after deletion so the original eleventh item is not skipped',
+    async (kind) => {
+      const collection = await offsetCollection(kind, 11)
+      deleteFirst(collection.options)
+      await screen.findByText('item-11')
+      expect(screen.queryByText('item-1')).not.toBeInTheDocument()
+      expect(collection.read.mock.calls.map((call) => call[1])).toEqual([0, 0])
+      expect(screen.queryByRole('button', { name: collection.more })).not.toBeInTheDocument()
+    },
+  )
+  it.each(['comments', 'replies'])(
+    'invalidates pending %s reads on delete and preserves the reset cursor',
+    async (kind) => {
+      const collection = await offsetCollection(kind, 21)
+      let finish
+      const stale = collection.snapshot(1)
+      collection.read.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finish = resolve
+          }),
+      )
+      fireEvent.click(screen.getByRole('button', { name: collection.more }))
+      deleteFirst(collection.options)
+      await waitFor(() =>
+        expect(collection.read.mock.calls.map((call) => call[1])).toEqual([0, 1, 0]),
+      )
+      await screen.findByText('item-11')
+      await act(async () => finish(stale))
+      fireEvent.click(screen.getByRole('button', { name: collection.more }))
+      await screen.findByText('item-21')
+      expect(collection.read.mock.calls.map((call) => call[1])).toEqual([0, 1, 0, 1])
+      expect(screen.queryByText('item-1')).not.toBeInTheDocument()
+    },
+  )
   it('blocks submission during a pending first-page retry and retains the subsequently saved comment', async () => {
     let finish
-    api.getComments.mockRejectedValueOnce(new Error('offline'))
-      .mockImplementationOnce(() => new Promise((resolve) => { finish = resolve }))
+    api.getComments.mockRejectedValueOnce(new Error('offline')).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve
+        }),
+    )
     api.commentPost.mockResolvedValue({ data: { id: 'new', comment: 'Kept comment' } })
     render(<CommentsModal post={post} />)
     await screen.findByRole('button', { name: 'Retry comments' })

@@ -1,9 +1,15 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { EditProfileContent } from './EditProfileContent'
+import { LocationFields } from './LocationFields'
 import { useProfile } from '../../../context/ProfileContext'
-import { completeProfile, updateProfile, uploadFile } from '../../../action/action'
+import {
+  completeProfile,
+  updateProfile,
+  uploadFile,
+  getCountries,
+} from '../../../action/action'
 
 vi.mock('../../../context/ProfileContext', () => ({
   useProfile: vi.fn(),
@@ -78,6 +84,9 @@ it('keeps the same draft mounted through background refresh, failure and retry',
   view.rerender(<EditProfileContent />)
   expect(screen.getByLabelText('First Name')).toBe(input)
   expect(input.value).toBe('Unsaved name')
+  expect(screen.getByRole('status', { name: 'Refreshing profile…' })).toHaveClass(
+    'loading-skeleton-field',
+  )
 
   useProfile.mockReturnValue({ ...context, error: new Error('Refresh failed') })
   view.rerender(<EditProfileContent />)
@@ -259,4 +268,26 @@ it('expands Add, keeps siblings, and Cancel removes the new draft', () => {
   fireEvent.click(screen.getByText('Cancel'))
   expect(screen.queryByText('Draft college')).toBeNull()
   expect(screen.getByText('Saved college')).toBeTruthy()
+})
+
+it('keeps a saved location selected while its native dropdown loads beside a shimmer', async () => {
+  let resolveCountries
+  getCountries.mockReturnValueOnce(
+    new Promise((resolve) => {
+      resolveCountries = resolve
+    }),
+  )
+  const value = { countryId: 'ca', countryName: 'Canada' }
+  render(<LocationFields value={value} onChange={vi.fn()} />)
+  const country = screen.getByRole('combobox', { name: 'Country' })
+  expect(country).toBeDisabled()
+  expect(country).toHaveValue('ca')
+  expect(screen.getByRole('option', { name: 'Select country' })).toBeInTheDocument()
+  expect(screen.getByRole('status', { name: 'Loading country…' })).toHaveClass(
+    'loading-skeleton-field',
+  )
+  await act(async () => resolveCountries({ data: [{ id: 'ca', name: 'Canada' }] }))
+  expect(country).toBeEnabled()
+  expect(country).toHaveValue('ca')
+  expect(screen.queryByRole('status', { name: 'Loading country…' })).not.toBeInTheDocument()
 })

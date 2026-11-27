@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from '../../components/common/RequestState'
 import { useNavigate } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { getContactDetails } from '../../action/action'
@@ -49,7 +50,11 @@ export function ContactUs() {
       </header>
 
       <section className="contact-card" aria-labelledby="contact-title">
-        <img className="contact-icon" src="/assets/logo_icons/create_password_icon.png" alt="" />
+        <img
+          className="contact-icon"
+          src="/assets/logo_icons/create_password_icon.png"
+          alt=""
+        />
         <h1 id="contact-title">Contact Us</h1>
         <p>We’re here to help. Send us your query.</p>
         {error && (
@@ -60,13 +65,17 @@ export function ContactUs() {
             </button>
           </p>
         )}
-        {!contact && !error && <p role="status">Loading contact details…</p>}
+        {!contact && !error && (
+          <LoadingSkeleton label="Loading contact details…" variant="rows" count={3} />
+        )}
         {contact && (
           <p className="contact-details">
             {contact.text || 'Support contact details are currently unavailable.'}
           </p>
         )}
-        {contact?.email && <p>Opens your email app. Send the message there to contact support.</p>}
+        {contact?.email && (
+          <p>Opens your email app. Send the message there to contact support.</p>
+        )}
 
         <form className="contact-form" onSubmit={submit}>
           <label className="sr-only" htmlFor="contact-name">

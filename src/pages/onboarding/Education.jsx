@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from '../../components/common/RequestState'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getCities, getCountries, getStates } from '../../action/action'
@@ -59,12 +60,7 @@ export function Education() {
   }, [])
 
   useEffect(() => {
-    return loadOptions(
-      getCountries(),
-      setCountries,
-      'countries',
-      setGeographyStatus,
-    )
+    return loadOptions(getCountries(), setCountries, 'countries', setGeographyStatus)
   }, [geographyRetries.countries])
 
   useEffect(() => {
@@ -223,6 +219,7 @@ export function Education() {
               />
               <OptionDropdown
                 label="Country"
+                loading={geographyStatus.countries === 'loading'}
                 value={education.countryId}
                 options={countries.map((item) => ({ label: item.name, value: item.id }))}
                 onChange={(value) => {
@@ -242,6 +239,7 @@ export function Education() {
               />
               <OptionDropdown
                 label="State"
+                loading={geographyStatus.states === 'loading'}
                 value={education.stateId}
                 options={states.map((item) => ({ label: item.name, value: item.id }))}
                 onChange={(value) => {
@@ -258,6 +256,7 @@ export function Education() {
               />
               <OptionDropdown
                 label="City"
+                loading={geographyStatus.cities === 'loading'}
                 value={education.cityId}
                 options={cities.map((item) => ({ label: item.name, value: item.id }))}
                 onChange={(value) => {
@@ -491,8 +490,21 @@ function YearDropdown({ label, value, onChange, disabled = false, options = educ
   )
 }
 
-function OptionDropdown({ label, value, options, onChange }) {
-  return <YearDropdown label={label} value={value} options={options} onChange={onChange} />
+function OptionDropdown({ label, value, options, onChange, loading }) {
+  return (
+    <div>
+      <YearDropdown
+        label={label}
+        value={value}
+        options={options}
+        onChange={onChange}
+        disabled={loading}
+      />
+      {loading && (
+        <LoadingSkeleton label={`Loading ${label.toLowerCase()}…`} variant="field" count={1} />
+      )}
+    </div>
+  )
 }
 
 // Each effect owns its request; obsolete responses must not change options or feedback.
@@ -528,9 +540,6 @@ function locationDraft(item) {
 
 function GeographyFeedback({ status, onRetry }) {
   return Object.entries(status).map(([field, state]) => {
-    if (state === 'loading') {
-      return <p key={field} role="status">Loading {field}…</p>
-    }
     if (state !== 'failed') return null
     return (
       <p key={field} role="alert">

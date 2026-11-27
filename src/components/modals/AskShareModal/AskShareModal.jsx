@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'react-toastify'
 import { ModalShell } from '../ModalShell'
+import { LoadingSkeleton } from '../../common/RequestState'
 import { createThread, getThreadLocations, getTopics } from '../../../action/action'
 import { useProfile } from '../../../context/ProfileContext'
 import './AskShareModal.css'
@@ -205,7 +206,7 @@ function QuestionTopics({ selected, onChange, disabled }) {
       </button>
       {open && (
         <div className="ask-category-menu" role="group" aria-label="Choose up to 5 categories">
-          {loading && <p role="status">Loading categories…</p>}
+          {loading && <LoadingSkeleton label="Loading categories…" variant="field" />}
           {failed && (
             <p role="alert">
               Unable to load categories.{' '}

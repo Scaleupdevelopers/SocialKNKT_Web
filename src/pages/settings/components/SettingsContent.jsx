@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from '../../../components/common/RequestState'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
@@ -171,7 +172,7 @@ function BlockList() {
     <section className="privacy-settings block-list-section">
       <h3>Block List</h3>
       {isLoading ? (
-        <p className="block-list-status">Loading blocked users...</p>
+        <LoadingSkeleton label="Loading blocked users…" variant="rows" count={3} />
       ) : loadError ? (
         <div role="alert">
           <p className="block-list-status">Unable to load block list. Please try again.</p>

@@ -18,6 +18,7 @@ import '../home/Home.css'
 import '../settings/Settings.css'
 import './Profile.css'
 import { usePagedList } from '../../utils/usePagedList'
+import { LoadingSkeleton } from '../../components/common/RequestState'
 
 const PROFILE_PAGE_SIZE = 10
 
@@ -166,7 +167,9 @@ function ProfileView({ context, viewedUserId, isOwnProfile }) {
             </button>
           </div>
         )}
-        {loading && !displayed && <p role="status">Loading profile…</p>}
+        {loading && !displayed && (
+          <LoadingSkeleton label="Loading profile…" variant="card" count={1} />
+        )}
         <div className="profile-tabs">
           {['all', 'media', 'posts'].map((tab) => (
             <button
@@ -226,10 +229,17 @@ function ProfileTabContent({ activeTab, profile, isOwnProfile, viewedUserId }) {
   )
 }
 
-function ListFeedback({ list, label }) {
+function ListFeedback({ list, label, variant = 'rows' }) {
   return (
     <>
-      {list.loading && <p role="status">Loading {label}…</p>}
+      {list.loading && !list.items.length && (
+        <span className="loading-skeleton-label" role="status">
+          Loading {label}…
+        </span>
+      )}
+      {list.loading && list.items.length > 0 && (
+        <LoadingSkeleton label={`Loading ${label}…`} variant={variant} count={1} />
+      )}
       {list.error && (
         <div role="alert">
           Unable to load {label}.{' '}
@@ -287,7 +297,7 @@ function ProfilePostList({ profile, isOwnProfile, viewedUserId, postType }) {
           onDeleted={list.reload}
         />
       ))}
-      <ListFeedback list={list} label="posts" />
+      <ListFeedback list={list} label="posts" variant="card" />
       <div ref={end} className="feed-end-marker" aria-hidden="true" />
     </>
   )
@@ -449,11 +459,11 @@ function MediaContent({ isOwnProfile, viewedUserId }) {
     <section className="profile-media-content" aria-label="Profile media">
       <FeedMediaSection feed={feed} onPreview={setPreviewImage} />
 
-      <ListFeedback list={feed} label="feed media" />
+      <ListFeedback list={feed} label="feed media" variant="media" />
 
       <FlickMediaSection flicks={flicks} onPreview={setPreviewFlick} />
 
-      <ListFeedback list={flicks} label="flicks" />
+      <ListFeedback list={flicks} label="flicks" variant="media" />
 
       {mediaCollectionsEmpty(feed, flicks) && (
         <div className="profile-media-empty">

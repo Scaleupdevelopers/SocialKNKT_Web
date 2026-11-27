@@ -5,6 +5,7 @@ import { PostCard } from '../home/components/PostCard'
 import { ConnectionManager } from '../../components/modals/ConnectionManager'
 import { searchContent, SEARCH_PAGE_SIZE } from '../../action/action'
 import { entityId, mergeResults } from '../../utils/helper'
+import { LoadingSkeleton } from '../../components/common/RequestState'
 import '../home/Home.css'
 import './Search.css'
 
@@ -158,6 +159,26 @@ function SearchResults({ kind, query, preview, onSeeAll, onMedia }) {
           />
         ))}
       </div>
+      <SearchMediaPreview preview={preview} kind={kind} items={items} onMedia={onMedia} />
+      <SearchFeedback
+        loading={loading}
+        error={error}
+        kind={kind}
+        count={items.length}
+        onRetry={() => load(page)}
+      />
+      {!preview && hasMore && !error && (
+        <button disabled={loading} onClick={() => load(page)}>
+          Load more
+        </button>
+      )}
+    </section>
+  )
+}
+
+function SearchMediaPreview({ preview, kind, items, onMedia }) {
+  return (
+    <>
       {preview && kind === 'posts' && items.length > 0 && (
         <section className="search-results">
           <div className="search-heading">
@@ -171,21 +192,28 @@ function SearchResults({ kind, query, preview, onSeeAll, onMedia }) {
           </div>
         </section>
       )}
-      {loading && <p role="status">Loading results…</p>}
+    </>
+  )
+}
+
+function SearchFeedback({ loading, error, kind, count, onRetry }) {
+  return (
+    <>
+      {loading && (
+        <LoadingSkeleton
+          label="Loading results…"
+          variant={kind === 'media' ? 'media' : 'rows'}
+        />
+      )}
       {error && (
         <div role="alert">
-          Unable to load results. <button onClick={() => load(page)}>Retry</button>
+          Unable to load results. <button onClick={onRetry}>Retry</button>
         </div>
       )}
-      {!loading && !error && !items.length && (
+      {!loading && !error && !count && (
         <p role="status">No {categories[kind].toLowerCase()} found.</p>
       )}
-      {!preview && hasMore && !error && (
-        <button disabled={loading} onClick={() => load(page)}>
-          Load more
-        </button>
-      )}
-    </section>
+    </>
   )
 }
 

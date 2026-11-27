@@ -11,6 +11,7 @@ import { deleteComment, reportComment } from '../../../action/action'
 import { toast } from 'react-toastify'
 import { useProfile } from '../../../context/ProfileContext'
 import { readAuth } from '../../../utils/helper'
+import { LoadingSkeleton } from '../../common/RequestState'
 
 export function CommentsModal(props) {
   const defaults = {
@@ -180,7 +181,12 @@ function CommentsContent({
     const isCurrent = () => mounted.current && replyRequests.current.get(commentId) === request
     setReplyPages((current) => ({
       ...current,
-      [commentId]: { ...current[commentId], ...replyResetState(reset), loading: true, error: false },
+      [commentId]: {
+        ...current[commentId],
+        ...replyResetState(reset),
+        loading: true,
+        error: false,
+      },
     }))
     try {
       const response = await repliesAction(commentId, nextPage)
@@ -229,7 +235,9 @@ function CommentsContent({
     Boolean(currentUserId && item.userId && String(item.userId) === String(currentUserId))
 
   const refreshAfterDelete = (deletedId) => {
-    const parent = comments.find((item) => item.replies?.some((reply) => getId(reply) === deletedId))
+    const parent = comments.find((item) =>
+      item.replies?.some((reply) => getId(reply) === deletedId),
+    )
     setComments((current) => removeCommentTree(current, deletedId))
     if (parent) {
       replyRequests.current.delete(getId(parent))
@@ -489,9 +497,7 @@ function CommentListBody({ list }) {
       {list.comments.map((item) => (
         <CommentRow key={getId(item)} item={item} list={list} />
       ))}
-      {list.isLoadingMoreComments && (
-        <div className="comments-loading-more">Loading more comments...</div>
-      )}
+      {list.isLoadingMoreComments && <LoadingSkeleton label="Loading more comments..." />}
       {list.hasMoreComments && !list.commentsError && (
         <button
           className="comments-load-more"
@@ -671,7 +677,7 @@ function CommentComposer({
 
 function ReplyPagination({ state, onLoad }) {
   if (!state) return null
-  if (state.loading) return <p role="status">Loading replies…</p>
+  if (state.loading) return <LoadingSkeleton label="Loading replies…" />
   if (state.error)
     return (
       <div className="comments-request-error" role="alert">
@@ -704,9 +710,9 @@ function replyResetState(reset) {
 }
 
 function clearReplies(items, commentId) {
-  return items.map((item) => getId(item) === commentId
-    ? { ...item, replies: [], repliesLoaded: false }
-    : item)
+  return items.map((item) =>
+    getId(item) === commentId ? { ...item, replies: [], repliesLoaded: false } : item,
+  )
 }
 
 function getId(item) {

@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { getNotifications } from '../action/action'
 import { usePagedList } from '../utils/usePagedList'
-import { RequestState } from '../components/common/RequestState'
+import { LoadingSkeleton, RequestState } from '../components/common/RequestState'
 import { readAuth } from '../utils/helper'
 
 export function notificationTarget(item) {
@@ -78,6 +78,9 @@ export function NotificationsPanel({ onClose }) {
           })}
         </div>
       </RequestState>
+      {list.loading && list.items.length > 0 && (
+        <LoadingSkeleton label="Loading more notifications…" count={2} />
+      )}
       {list.hasMore && (
         <button className="panel-more" disabled={list.loading} onClick={list.loadMore}>
           Load more
