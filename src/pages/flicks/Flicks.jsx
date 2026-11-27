@@ -190,8 +190,13 @@ function FlickFeed({ saved }) {
 
   useEffect(() => {
     active.current = true
-    loadPage(0)
+    let cancelled = false
+    // Skip the discarded StrictMode setup without disabling its lifecycle checks.
+    queueMicrotask(() => {
+      if (!cancelled) loadPage(0)
+    })
     return () => {
+      cancelled = true
       active.current = false
       generation.current++
       busy.current = false

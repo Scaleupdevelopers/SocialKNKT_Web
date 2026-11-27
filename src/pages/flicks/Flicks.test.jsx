@@ -1,3 +1,4 @@
+import { StrictMode } from 'react'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, useNavigate } from 'react-router-dom'
 import { beforeEach, expect, it, vi } from 'vitest'
@@ -97,13 +98,18 @@ it('batches visible flicks and does not count repeated visibility', async () => 
       disconnect() {}
     },
   )
-  getFlicks.mockResolvedValue({ data: [{ id: 'flick-1', description: 'Visible flick' }] })
+  getFlicks.mockResolvedValue({
+    data: [
+      { id: 'flick-1', description: 'Visible flick', media: 'https://example.test/flick.mp4' },
+    ],
+  })
   render(
     <MemoryRouter>
       <Flicks />
     </MemoryRouter>,
   )
   await screen.findByText('Visible flick')
+  await waitFor(() => expect(intersect).toBeTypeOf('function'))
   const target = {
     dataset: { postId: 'flick-1' },
     play: vi.fn().mockResolvedValue(),
@@ -283,11 +289,15 @@ it.each([false, true])(
     expect(screen.getByRole('status', { name: 'Loading more flicks…' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Load more/i })).not.toBeInTheDocument()
     await act(async () =>
-      finish({ data: [first[0], { id: 'last', description: 'Last flick', mediaType: 'flicks' }] }),
+      finish({
+        data: [first[0], { id: 'last', description: 'Last flick', mediaType: 'flicks' }],
+      }),
     )
     expect(screen.getAllByText('First 0')).toHaveLength(1)
     expect(screen.getByText('Last flick')).toBeInTheDocument()
-    expect(screen.queryByRole('status', { name: 'Loading more flicks…' })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('status', { name: 'Loading more flicks…' }),
+    ).not.toBeInTheDocument()
   },
 )
 
@@ -327,4 +337,17 @@ it('resets pagination when switching to saved flicks and ignores pending feed re
   await act(async () => finish({ data: [{ id: 'old', description: 'Stale feed result' }] }))
   expect(screen.queryByText('Stale feed result')).not.toBeInTheDocument()
   expect(getSavedPosts).toHaveBeenCalledExactlyOnceWith(0, 10)
+})
+
+it('reads the initial flick page once during StrictMode effect replay', async () => {
+  getFlicks.mockResolvedValue({ data: [{ id: 'strict-flick', description: 'Strict flick' }] })
+  render(
+    <StrictMode>
+      <MemoryRouter>
+        <Flicks />
+      </MemoryRouter>
+    </StrictMode>,
+  )
+  await screen.findByText('Strict flick')
+  expect(getFlicks).toHaveBeenCalledTimes(1)
 })

@@ -54,8 +54,13 @@ export function usePagedList(loadPage, pageSize = 10, getId = entityId) {
   )
   const reload = useCallback(() => load(0, true), [load])
   useEffect(() => {
-    reload()
+    let cancelled = false
+    // StrictMode replays mount effects; only the surviving setup starts the read.
+    queueMicrotask(() => {
+      if (!cancelled) reload()
+    })
     return () => {
+      cancelled = true
       version.current++
       busy.current = false
     }

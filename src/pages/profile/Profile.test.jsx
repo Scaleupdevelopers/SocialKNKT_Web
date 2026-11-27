@@ -1,3 +1,4 @@
+import { StrictMode } from 'react'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, useNavigate } from 'react-router-dom'
 import { beforeEach, expect, it, vi } from 'vitest'
@@ -360,3 +361,21 @@ it.each([
     expect(region.querySelectorAll('.profile-media-cell, video')).toHaveLength(11)
   },
 )
+
+it('reads profile lists once during StrictMode effect replay', async () => {
+  render(
+    <StrictMode>
+      <MemoryRouter>
+        <Profile />
+      </MemoryRouter>
+    </StrictMode>,
+  )
+  await waitFor(() => expect(api.getMyAllPosts).toHaveBeenCalledTimes(1))
+  fireEvent.click(screen.getByRole('button', { name: 'Media', exact: true }))
+  await waitFor(() => expect(api.getAllMyFeed).toHaveBeenCalledTimes(1))
+  await waitFor(() => expect(api.getAllMyFlicks).toHaveBeenCalledTimes(1))
+  await act(async () => {})
+  expect(api.getMyAllPosts).toHaveBeenCalledTimes(1)
+  expect(api.getAllMyFeed).toHaveBeenCalledTimes(1)
+  expect(api.getAllMyFlicks).toHaveBeenCalledTimes(1)
+})
