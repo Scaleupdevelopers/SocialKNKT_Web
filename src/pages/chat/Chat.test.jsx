@@ -10,7 +10,7 @@ import {
 } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Chat } from './Chat'
-import { useConversation } from './useConversation'
+import { CHAT_MESSAGE_LIMIT, useConversation } from './useConversation'
 import { useChatList } from './useChatList'
 import { mergeMessages } from './chatModel'
 import * as api from '../../action/action'
@@ -564,4 +564,150 @@ it('keeps matching existing conversations searchable without duplicate connectio
   expect(screen.getAllByRole('button', { name: /Alice/ })).toHaveLength(1)
   fireEvent.click(screen.getByRole('button', { name: /Alice/ }))
   expect(api.createChatRoom).not.toHaveBeenCalled()
+})
+
+describe('pending message confirmation', () => {
+  it.each(['history', 'socket'])(
+    'excludes IDs observed through %s before sending',
+    async (source) => {
+      vi.useFakeTimers()
+      const old = {
+        id: 'old',
+        roomId: 'a',
+        userId: 'me',
+        message: 'hello',
+        createdAt: Date.now(),
+      }
+      if (source === 'history') api.getChatMessages.mockResolvedValue({ data: [old] })
+      const { result } = renderHook(() => useConversation('a', 'me', false))
+      await act(async () => {})
+      if (source === 'socket') act(() => sockets[0].handlers.message(old))
+      act(() => expect(result.current.send('hello')).toBe(true))
+      api.getChatMessages.mockResolvedValue({ data: [old] })
+      await act(async () => result.current.refresh())
+      expect(result.current.pending?.text).toBe('hello')
+      act(() => vi.advanceTimersByTime(12000))
+      expect(result.current.uncertain).toBe(true)
+
+      const confirmed = { ...old, id: 'new', createdAt: Date.now() }
+      api.getChatMessages.mockResolvedValue({ data: [old, confirmed] })
+      await act(async () => result.current.refresh())
+      expect(result.current.pending).toBeNull()
+      expect(result.current.uncertain).toBe(false)
+      const { id, ...socketMessage } = confirmed
+      act(() => sockets[0].handlers.message({ ...socketMessage, _id: id }))
+      expect(result.current.messages).toHaveLength(2)
+      expect(
+        result.current.messages.filter((message) => (message.id || message._id) === 'new'),
+      ).toHaveLength(1)
+    },
+  )
+
+  it('rejects more than 1200 trimmed characters and accepts the trimmed boundary', async () => {
+    const { result } = renderHook(() => useConversation('a', 'me', false))
+    await act(async () => {})
+    expect(CHAT_MESSAGE_LIMIT).toBe(1200)
+    act(() => expect(result.current.send('x'.repeat(CHAT_MESSAGE_LIMIT + 1))).toBe(false))
+    expect(result.current.pending).toBeNull()
+    expect(sockets[0].emit.mock.calls.filter(([event]) => event === 'message')).toHaveLength(0)
+    act(() => expect(result.current.send(`  ${'x'.repeat(1200)}  `)).toBe(true))
+    expect(sockets[0].emit).toHaveBeenCalledWith('message', {
+      roomId: 'a',
+      message: 'x'.repeat(1200),
+      access_token: 'test-only',
+    })
+  })
+
+  it('cancels the uncertainty timeout when emit synchronously echoes the message', async () => {
+    vi.useFakeTimers()
+    const { result } = renderHook(() => useConversation('a', 'me', false))
+    await act(async () => {})
+    sockets[0].emit.mockImplementation((event, payload) => {
+      if (event !== 'message') return
+      sockets[0].handlers.message({
+        _id: 'echo',
+        roomId: 'a',
+        userId: 'me',
+        message: payload.message,
+        createdAt: Date.now(),
+      })
+    })
+    act(() => expect(result.current.send('hello')).toBe(true))
+    expect(result.current.pending).toBeNull()
+    act(() => vi.advanceTimersByTime(12000))
+    expect(result.current.uncertain).toBe(false)
+    expect(result.current.messages).toHaveLength(1)
+  })
+})
+
+describe('room list focus refresh', () => {
+  it('cancels the scheduled initial read when focus starts it early', async () => {
+    vi.useFakeTimers()
+    let finish
+    const fetchRooms = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve
+        }),
+    )
+    renderHook(() => useChatList(fetchRooms, 'rooms', false))
+    act(() => window.dispatchEvent(new Event('focus')))
+    expect(fetchRooms).toHaveBeenCalledTimes(1)
+    await act(async () => vi.advanceTimersByTime(300))
+    expect(fetchRooms).toHaveBeenCalledTimes(1)
+    await act(async () => finish({ data: [] }))
+  })
+
+  it('coalesces visible events, ignores hidden events and removes listeners on cleanup', async () => {
+    vi.useFakeTimers()
+    const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
+    let finish
+    const fetchRooms = vi.fn().mockResolvedValue({ data: [{ id: 'a' }] })
+    const { result, unmount } = renderHook(() => useChatList(fetchRooms, 'rooms', false))
+    try {
+      await act(async () => vi.advanceTimersByTime(250))
+      expect(fetchRooms).toHaveBeenCalledTimes(1)
+      fetchRooms.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finish = resolve
+          }),
+      )
+      act(() => {
+        window.dispatchEvent(new Event('focus'))
+        document.dispatchEvent(new Event('visibilitychange'))
+      })
+      expect(fetchRooms).toHaveBeenCalledTimes(2)
+      await act(async () => finish({ data: [{ id: 'updated' }] }))
+      expect(result.current.items).toEqual([{ id: 'updated' }])
+      visibility.mockReturnValue('hidden')
+      act(() => {
+        window.dispatchEvent(new Event('focus'))
+        document.dispatchEvent(new Event('visibilitychange'))
+      })
+      expect(fetchRooms).toHaveBeenCalledTimes(2)
+      unmount()
+      visibility.mockReturnValue('visible')
+      act(() => {
+        window.dispatchEvent(new Event('focus'))
+        document.dispatchEvent(new Event('visibilitychange'))
+      })
+      expect(fetchRooms).toHaveBeenCalledTimes(2)
+    } finally {
+      visibility.mockRestore()
+    }
+  })
+
+  it('does not refresh paginated search on focus or visibility changes', async () => {
+    vi.useFakeTimers()
+    const fetchSearch = vi.fn().mockResolvedValue({ data: [{ id: 'match' }] })
+    renderHook(() => useChatList(fetchSearch, 'query', true))
+    await act(async () => vi.advanceTimersByTime(250))
+    expect(fetchSearch).toHaveBeenCalledTimes(1)
+    act(() => {
+      window.dispatchEvent(new Event('focus'))
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    expect(fetchSearch).toHaveBeenCalledTimes(1)
+  })
 })

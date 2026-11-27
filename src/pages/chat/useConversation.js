@@ -2,7 +2,20 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { io } from 'socket.io-client'
 import { getChatMessages } from '../../action/action'
 import { readAuth } from '../../utils/helper'
-import { mergeMessages } from './chatModel'
+import { itemId, mergeMessages } from './chatModel'
+
+export const CHAT_MESSAGE_LIMIT = 1200
+
+function confirmsSend(message, sent, userId) {
+  const id = itemId(message)
+  return Boolean(
+    id &&
+      !sent.observedIds.has(id) &&
+      message.userId === userId &&
+      message.message === sent.text &&
+      Number(message.createdAt) >= sent.startedAt,
+  )
+}
 
 export function useConversation(roomId, userId, blocked, onRoomsChanged) {
   const [messages, setMessages] = useState([])
@@ -18,6 +31,7 @@ export function useConversation(roomId, userId, blocked, onRoomsChanged) {
   const busy = useRef(false)
   const refreshQueued = useRef(false)
   const pendingRef = useRef(null)
+  const observedIds = useRef(new Set())
   const timer = useRef(null)
   const roomsTimer = useRef(null)
   const roomsChanged = useRef(onRoomsChanged)
@@ -34,11 +48,9 @@ export function useConversation(roomId, userId, blocked, onRoomsChanged) {
   const reconcile = useCallback(
     (incoming) => {
       const sent = pendingRef.current
+      incoming.forEach((message) => observedIds.current.add(itemId(message)))
       if (!sent) return
-      const found = incoming.some(
-        (m) =>
-          m.userId === userId && m.message === sent.text && Number(m.createdAt) >= sent.startedAt,
-      )
+      const found = incoming.some((message) => confirmsSend(message, sent, userId))
       if (found) {
         clearTimeout(timer.current)
         pendingRef.current = null
@@ -95,6 +107,7 @@ export function useConversation(roomId, userId, blocked, onRoomsChanged) {
     busy.current = false
     refreshQueued.current = false
     pendingRef.current = null
+    observedIds.current = new Set()
     setPending(null)
     setUncertain(false)
     setMessages([])
@@ -151,17 +164,23 @@ export function useConversation(roomId, userId, blocked, onRoomsChanged) {
   }, [roomId, userId, load, reconcile, notifyRooms])
 
   function send(text) {
-    if (!text.trim() || blocked || pendingRef.current || !channel.current?.connected) return false
-    const value = { text: text.trim(), startedAt: Date.now() - 1000 }
+    const trimmed = text.trim()
+    if (!trimmed || trimmed.length > CHAT_MESSAGE_LIMIT) return false
+    if (blocked || pendingRef.current || !channel.current?.connected) return false
+    const value = {
+      text: trimmed,
+      startedAt: Date.now() - 1000,
+      observedIds: new Set(observedIds.current),
+    }
     pendingRef.current = value
     setPending(value)
     setUncertain(false)
+    timer.current = setTimeout(() => setUncertain(true), 12000)
     channel.current.emit('message', {
       roomId,
       message: value.text,
       access_token: readAuth()?.token,
     })
-    timer.current = setTimeout(() => setUncertain(true), 12000)
     return true
   }
   function restoreDraft() {

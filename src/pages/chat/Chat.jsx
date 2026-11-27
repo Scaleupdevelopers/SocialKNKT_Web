@@ -5,7 +5,7 @@ import { useProfile } from '../../context/ProfileContext'
 import { createChatRoom, deleteChat, getChatRooms, searchChatUsers } from '../../action/action'
 import { formatTime, itemId, userName } from './chatModel'
 import { useChatList } from './useChatList'
-import { useConversation } from './useConversation'
+import { CHAT_MESSAGE_LIMIT, useConversation } from './useConversation'
 import './Chat.css'
 
 function Avatar({ user }) {
@@ -406,6 +406,7 @@ function ConversationComposer({ room, userId, chat, draft, setDraft, submit }) {
                   type="button"
                   key={emoji}
                   aria-label={emoji}
+                  disabled={draft.length + emoji.length > CHAT_MESSAGE_LIMIT}
                   onClick={() => {
                     setDraft(draft + emoji)
                     setEmojiOpen(false)
@@ -422,6 +423,7 @@ function ConversationComposer({ room, userId, chat, draft, setDraft, submit }) {
           ref={inputRef}
           aria-label="Message"
           placeholder="Message"
+          maxLength={CHAT_MESSAGE_LIMIT}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           disabled={Boolean(chat.pending)}

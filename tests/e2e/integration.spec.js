@@ -220,6 +220,12 @@ test('chat history and offline recovery render', async ({ page }, info) => {
   await page.getByRole('button', { name: 'Choose emoji' }).click()
   await page.getByRole('button', { name: '😊', exact: true }).click()
   await expect(page.getByLabel('Message', { exact: true })).toHaveValue('😊')
+  await expect(page.getByLabel('Message', { exact: true })).toHaveAttribute('maxlength', '1200')
+  await page.getByLabel('Message', { exact: true }).fill('a'.repeat(1200))
+  await page.getByRole('button', { name: 'Choose emoji' }).click()
+  await expect(page.getByRole('button', { name: '😊', exact: true })).toBeDisabled()
+  await page.getByRole('button', { name: 'Choose emoji' }).click()
+  await page.getByLabel('Message', { exact: true }).fill('😊')
   const sizes = {
     'chat-search.svg': 32.1409,
     'chat-more.svg': 32.1409,

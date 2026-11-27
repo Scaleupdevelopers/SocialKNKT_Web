@@ -7,6 +7,7 @@ export function useChatList(fetchPage, key, paginated = true) {
   const generation = useRef(0)
   const page = useRef(-1)
   const busy = useRef(false)
+  const initialTimer = useRef(null)
   const loader = useRef(fetchPage)
   useEffect(() => {
     loader.current = fetchPage
@@ -30,7 +31,8 @@ export function useChatList(fetchPage, key, paginated = true) {
           more: paginated && items.length >= 20,
         }))
       } catch {
-        if (version === generation.current) setState((s) => ({ ...s, loading: false, error: true }))
+        if (version === generation.current)
+          setState((s) => ({ ...s, loading: false, error: true }))
       } finally {
         if (version === generation.current) busy.current = false
       }
@@ -40,12 +42,26 @@ export function useChatList(fetchPage, key, paginated = true) {
   useEffect(() => {
     page.current = -1
     setState({ items: [], loading: true, error: false, more: false })
-    const timer = setTimeout(() => load(true), 250)
+    initialTimer.current = setTimeout(() => load(true), 250)
     return () => {
-      clearTimeout(timer)
+      clearTimeout(initialTimer.current)
       generation.current++
       busy.current = false
     }
   }, [key, load]) // The latest callback is installed by the preceding effect.
+  useEffect(() => {
+    if (paginated) return
+    const refreshVisibleRooms = () => {
+      if (document.visibilityState !== 'visible' || busy.current) return
+      clearTimeout(initialTimer.current)
+      load(true)
+    }
+    window.addEventListener('focus', refreshVisibleRooms)
+    document.addEventListener('visibilitychange', refreshVisibleRooms)
+    return () => {
+      window.removeEventListener('focus', refreshVisibleRooms)
+      document.removeEventListener('visibilitychange', refreshVisibleRooms)
+    }
+  }, [paginated, key, load])
   return { ...state, refresh: () => load(true), loadMore: () => load(page.current < 0) }
 }
