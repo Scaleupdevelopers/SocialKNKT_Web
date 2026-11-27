@@ -33,7 +33,7 @@ function RequestRow({ request, onAnswered }) {
       <img src={request.image || '/assets/logo_icons/profile_alt.avif'} alt="" />
       <div className="connection-request-content">
         <p>{name} sent a connection request</p>
-        <div>
+        <div className="connection-request-actions">
           <button
             className="accept-button"
             disabled={pending}

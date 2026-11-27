@@ -24,11 +24,35 @@ test('connections persist requests, filter correctly and stay responsive', async
   ).toBeTruthy()
   await page.screenshot({ path: info.outputPath('connections-after.png'), fullPage: true })
 })
-test('connection requests accept and reset the panel', async ({ page }) => {
+test('connection requests accept and reset the panel', async ({ page }, info) => {
   const { calls } = await mockApi(page)
   await page.goto('/connections')
   await page.getByLabel('Connections', { exact: true }).click()
   await page.getByRole('button', { name: 'Accept', exact: true }).click()
+  await page.screenshot({ path: info.outputPath('connection-menu.png'), fullPage: true })
+  const menu = page.locator('.connection-type-menu')
+  const avatar = await page.locator('.connection-request > img').boundingBox()
+  const content = await page.locator('.connection-request-content').boundingBox()
+  expect(Math.abs(avatar.y - content.y)).toBeLessThan(1)
+  const buttons = menu.getByRole('button')
+  const boxes = await buttons.evaluateAll((elements) => elements.map((element) => {
+    const box = element.getBoundingClientRect()
+    return { top: box.top, bottom: box.bottom, left: box.left, right: box.right,
+      fits: element.scrollWidth <= element.clientWidth }
+  }))
+  expect(boxes).toHaveLength(3)
+  for (let index = 0; index < boxes.length; index++) {
+    expect(boxes[index].fits).toBe(true)
+    await expect(buttons.nth(index)).toBeInViewport()
+    if (index) expect(boxes[index].top).toBeGreaterThanOrEqual(boxes[index - 1].bottom)
+  }
+  const footer = await page.getByRole('button', { name: 'View connections', exact: true }).boundingBox()
+  expect(footer.y).toBeGreaterThanOrEqual(boxes[2].bottom)
+  await page.getByRole('button', { name: 'Accept', exact: true }).focus()
+  await page.keyboard.press('Tab')
+  await expect(page.getByRole('button', { name: 'Decline', exact: true })).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(buttons.nth(0)).toBeFocused()
   await page.getByRole('button', { name: 'Both', exact: true }).click()
   await expect(page.getByText('No pending requests.')).toBeVisible()
   expect(

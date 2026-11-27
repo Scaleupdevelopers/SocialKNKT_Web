@@ -331,24 +331,28 @@
 }
 
 .connection-request-content {
-  position: relative;
   flex: 1;
-  transform: translateY(6px);
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
-.connection-request-content > div {
+.connection-request {
+  align-items: flex-start;
+}
+
+.connection-request-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   margin-top: 5px;
 }
 
 .connection-type-menu {
-  position: absolute;
-  top: 52px;
-  left: 0;
-  z-index: 25;
-  width: 205px;
+  display: flex;
+  flex-direction: column;
+  width: min(205px, 100%);
+  margin-top: 8px;
   overflow: hidden;
   border-radius: 4px;
   background: #151515;
@@ -376,6 +380,11 @@
 
 .connection-type-menu button:hover {
   background: #292929;
+}
+
+.connection-type-menu button:focus-visible {
+  outline: 2px solid #f715a8;
+  outline-offset: -3px;
 }
 
 .close-request-button {
