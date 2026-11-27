@@ -1,4 +1,6 @@
 .flicks-page {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
   height: 100vh;
   overflow: hidden;
   background: #1a1a1a;
@@ -6,7 +8,8 @@
 }
 
 .flicks-feed {
-  height: calc(100vh - 90px);
+  grid-row: 3;
+  height: 100%;
   width: min(720px, calc(100% - 48px));
   margin: 0 auto;
   overflow-y: auto;
@@ -21,6 +24,13 @@
 
 .flicks-feed::-webkit-scrollbar {
   display: none;
+}
+
+.flicks-feed > .loading-skeleton {
+  flex: 0 0 auto;
+  width: min(620px, 100%);
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
 }
 
 .flick-feed-card {

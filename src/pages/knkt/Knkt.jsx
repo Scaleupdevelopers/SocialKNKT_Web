@@ -23,6 +23,7 @@ import {
 import { CommentsModal } from '../../components/modals/CommentsModal/CommentsModal'
 import { ReportPostModal } from '../../components/modals/ReportPostModal/ReportPostModal'
 import { useProfile } from '../../context/ProfileContext'
+import { mergeResults } from '../../utils/helper'
 import './Knkt.css'
 
 const threadLabels = {
@@ -214,7 +215,7 @@ export function Knkt() {
       .then((response) => {
         if (!isActive || threadRequestIdRef.current !== requestId) return
         const threads = selectedThreadId !== null ? [response.data] : response.data || []
-        setThreadData(threads)
+        setThreadData(mergeResults([], threads))
         setHasMoreThreads(selectedThreadId === null && threads.length >= 10)
       })
       .catch(() => {
@@ -232,15 +233,14 @@ export function Knkt() {
   }, [selectedTopicId, selectedThreadId, threadFilter, threadRetry])
 
   useEffect(() => {
+    const canLoadMore =
+      selectedThreadId === null &&
+      !threadsLoading &&
+      !isLoadingMoreThreads &&
+      hasMoreThreads &&
+      !threadError
     const loadMoreThreads = async () => {
-      if (
-        selectedThreadId !== null ||
-        threadsLoading ||
-        isLoadingMoreThreads ||
-        !hasMoreThreads ||
-        threadError
-      )
-        return
+      if (!canLoadMore) return
       setIsLoadingMoreThreads(true)
       const requestId = threadRequestIdRef.current
       try {
@@ -248,7 +248,7 @@ export function Knkt() {
         const response = await getThreads(nextPage, threadFilter, 10, selectedTopicId)
         if (threadRequestIdRef.current !== requestId) return
         const nextThreads = response.data || []
-        setThreadData((currentThreads) => [...currentThreads, ...nextThreads])
+        setThreadData((currentThreads) => mergeResults(currentThreads, nextThreads))
         setThreadPage(nextPage)
         setHasMoreThreads(nextThreads.length >= 10)
       } catch {
