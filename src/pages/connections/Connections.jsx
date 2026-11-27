@@ -98,9 +98,7 @@ function useConnectionRequests() {
       connectionsChanged()
     } catch (error) {
       if (!active.current) return
-      toast.error(error?.message || 'Unable to send request. Please try again.', {
-        position: 'bottom-center',
-      })
+      toast.error(error?.message || 'Unable to send request. Please try again.')
       locked.current.delete(userId)
       setItems((current) => ({
         ...current,

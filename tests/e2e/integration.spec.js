@@ -434,6 +434,7 @@ test('duplicate connection request shows backend toast without inline error', as
   const button = page.getByRole('button', { name: 'Add Professional' })
   await button.click()
   await expect(page.getByRole('alert')).toHaveText('Request already exists')
+  await expect(page.locator('.Toastify__toast-container--top-center')).toBeVisible()
   await expect(page.locator('.connection-row [role="alert"]')).toHaveCount(0)
   await expect(button).toBeEnabled()
   await expect(page.getByRole('button', { name: 'Request sent' })).toHaveCount(0)

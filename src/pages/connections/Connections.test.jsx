@@ -121,7 +121,6 @@ describe('Connections integration', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Add Professional' }))
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
       message || 'Unable to send request. Please try again.',
-      { position: 'bottom-center' },
     ))
     expect(document.querySelector('.connection-row [role="alert"]')).toBeNull()
     expect(screen.getByText('Sample Member')).toBeVisible()
