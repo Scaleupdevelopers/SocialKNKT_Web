@@ -28,6 +28,10 @@ export async function mockApi(page) {
     fname: 'Sample',
     lname: 'Member',
     username: 'sample',
+    jobTitle: 'Product Designer',
+    totalNoOfConnections: 24,
+    cityName: 'Indore',
+    countryName: 'India',
     personalConnection: true,
   }
   await page.addInitScript(

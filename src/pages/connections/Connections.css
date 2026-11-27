@@ -179,6 +179,7 @@
 }
 .connection-name-line {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   gap: 12px;
 }
@@ -197,6 +198,7 @@
 .connection-info p {
   margin: 7px 0 5px;
   font-size: 13px;
+  overflow-wrap: anywhere;
 }
 .connection-info p b {
   margin: 0 8px;
@@ -309,9 +311,17 @@
   }
   .connection-profile-trigger {
     gap: 10px;
+    flex-basis: 100%;
+    align-items: flex-start;
   }
   .connection-info {
-    min-width: calc(100% - 70px);
+    min-width: 0;
+  }
+  .connection-row-actions {
+    width: 100%;
+    max-width: none;
+    flex-direction: row;
+    align-items: center;
   }
   .connection-add {
     margin-left: 62px;

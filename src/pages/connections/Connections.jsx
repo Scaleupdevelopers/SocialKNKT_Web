@@ -60,18 +60,9 @@ function ConnectionRow({ connection, ownList, onManage }) {
         <div className="connection-info">
           <div className="connection-name-line">
             <strong>{name}</strong>
-            <span>@{connection.username}</span>
+            {connection.username && <span>@{connection.username}</span>}
           </div>
-          <p>
-            {connection.jobTitle || 'SocialKNKT member'} ·{' '}
-            {connection.totalNoOfConnections ?? 0} Connections
-          </p>
-          {connection.cityName && (
-            <small className="connection-location">
-              <img src="/assets/logo_icons/location.svg" alt="" />
-              {connection.cityName}
-            </small>
-          )}
+          <ConnectionDetails connection={connection} />
         </div>
       </button>
       {ownList && (
@@ -102,6 +93,26 @@ function ConnectionRow({ connection, ownList, onManage }) {
         </div>
       )}
     </article>
+  )
+}
+
+function ConnectionDetails({ connection }) {
+  const count = connection.totalNoOfConnections
+  const details = [
+    connection.jobTitle,
+    Number.isFinite(count) ? `${count} Connections` : null,
+  ].filter(Boolean)
+  const location = [connection.cityName, connection.countryName].filter(Boolean).join(', ')
+  return (
+    <>
+      {details.length > 0 && <p>{details.join(' • ')}</p>}
+      {location && (
+        <small className="connection-location">
+          <img src="/assets/logo_icons/location.svg" alt="" />
+          {location}
+        </small>
+      )}
+    </>
   )
 }
 

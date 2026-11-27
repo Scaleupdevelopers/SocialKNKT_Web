@@ -128,3 +128,35 @@ describe('Connections integration', () => {
     ).not.toBeInTheDocument()
   })
 })
+
+it('renders actual designation, count and full location from the API', async () => {
+  getProfileConnections.mockResolvedValue({ data: [{ ...connection,
+    jobTitle: 'Product Designer', totalNoOfConnections: 24,
+    cityName: 'Indore', countryName: 'India', image: 'https://example.test/avatar.png',
+  }] })
+  mount()
+  await screen.findByText('Product Designer • 24 Connections')
+  expect(screen.getByText('@sample')).toBeVisible()
+  expect(screen.getByText('Indore, India')).toBeVisible()
+  expect(document.querySelector('.connection-avatar')).toHaveAttribute('src', 'https://example.test/avatar.png')
+  expect(screen.queryByText(/SocialKNKT member/)).toBeNull()
+})
+
+it('does not invent missing designation, count, username or location', async () => {
+  getProfileConnections.mockResolvedValue({ data: [{ ...connection, username: null }] })
+  mount()
+  await screen.findByText('Sample Member')
+  expect(document.querySelector('.connection-info p')).toBeNull()
+  expect(document.querySelector('.connection-location')).toBeNull()
+  expect(document.querySelector('.connection-name-line span')).toBeNull()
+})
+
+it('preserves a real zero connection count without a dangling separator', async () => {
+  getProfileConnections.mockResolvedValue({ data: [{ ...connection,
+    totalNoOfConnections: 0, countryName: 'India',
+  }] })
+  mount()
+  await screen.findByText('0 Connections')
+  expect(screen.getByText('India')).toBeVisible()
+  expect(document.querySelector('.connection-info p')).toHaveTextContent(/^0 Connections$/)
+})

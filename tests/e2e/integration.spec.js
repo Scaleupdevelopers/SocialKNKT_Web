@@ -6,6 +6,11 @@ test('connections persist requests, filter correctly and stay responsive', async
   const { calls } = await mockApi(page)
   await page.goto('/connections')
   await expect(page.getByText('Sample Member', { exact: true })).toBeVisible()
+  await expect(page.getByText('Product Designer • 24 Connections', { exact: true })).toBeVisible()
+  await expect(page.getByText('Indore, India', { exact: true })).toBeVisible()
+  const detailsBox = await page.locator('.connection-info').boundingBox()
+  expect(detailsBox.width).toBeGreaterThan(200)
+  await expect(page.getByText('SocialKNKT member', { exact: false })).toHaveCount(0)
   await page.getByLabel('Filter connections').click()
   await page.getByRole('button', { name: 'Professional', exact: true }).click()
   await expect

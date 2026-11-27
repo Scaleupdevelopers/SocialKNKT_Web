@@ -230,3 +230,11 @@ Contract limitation: mobile's audience views allow accepted personal/professiona
 Validation: 23 profile tests passed, covering all three tabs, string/numeric privacy, accepted/pending connections, owner access and stale public response after a private-profile refresh. Two synthetic Chrome desktop/mobile tests passed with zero other-profile content requests and a nonempty lock asset. Build/lint passed with existing warnings; independent review cleared. Before evidence is the user's supplied screenshot showing the retry error; after captures are private under `outputs/private-profile-evidence`. Live private-connection unlocking and mobile runtime were not tested.
 
 All-tab follow-up from `b604e31`: the private-account icon/copy is vertically centered alongside the bio column, with a 320px minimum content area. Mobile ordering remains unchanged; standalone Media/Posts styling is unaffected. Both desktop/mobile Chrome checks pass with geometry assertions for centering and minimum height. Independent review cleared; private before/after captures are under `outputs/private-profile-centering`.
+
+## Connection card API details (2026-11-27)
+
+From `98fcb59`, removed invented SocialKNKT member designation and zero-count fallback. Cards retain image/name/username, followed by actual `jobTitle` and numeric `totalNoOfConnections`, then city and country. Missing fields are omitted; a real zero count remains visible. Backend `api/controllers/user/profile/connections/get.js` supplies these fields, with current/first work and place records; no new profile requests or API changes are needed. The name/username row wraps at narrow widths.
+
+Eight Connections unit checks pass (including populated, missing and zero-count details), along with both desktop/mobile Chrome connection-flow cases, build, lint and independent review. Existing warnings remain. Synthetic captures are in `outputs/connection-card-details`; no live connection was changed.
+
+Visual review also found mobile action buttons squeezing card details. At ≤700px, the profile/details now occupy a full row with actions below; a browser geometry assertion prevents recurrence. Final desktop/mobile captures and independent review confirm the corrected layout.
