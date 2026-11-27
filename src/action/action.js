@@ -87,11 +87,20 @@ export const getAllMyFlicks = async (page = 0, limit = 10) => {
 }
 
 export const getOtherUserFlicks = async (userId, page = 0, limit = 10) => {
-  return postRequest('user/flick/get-all-other-user-flick', { userId, page, limit, postType: 1 })
+  return postRequest('user/flick/get-all-other-user-flick', {
+    userId,
+    page,
+    limit,
+    postType: 1,
+  })
 }
 
 export const getMyAllPosts = async (page = 0, limit = 10, postType) => {
-  return getRequest('user/post/get-my-all-post', { page, limit, ...(postType ? { postType } : {}) })
+  return getRequest('user/post/get-my-all-post', {
+    page,
+    limit,
+    ...(postType ? { postType } : {}),
+  })
 }
 
 export const getOtherUserPosts = async (userId, page = 0, limit = 10, postType) => {
@@ -193,6 +202,10 @@ export const getOtherUserProfile = async (userId) => {
 
 export const blockUser = async (blockedUserId, blockStatus) => {
   return postRequest('user/block', { blockedUserId, blockStatus })
+}
+
+export const reportUser = async (userId, description) => {
+  return postRequest('user/chat/report', { userId, description })
 }
 
 export const getBlockedUsers = async () => {
@@ -364,6 +377,10 @@ export const getSavedPosts = (page = 0, limit = 10) => {
 
 export const recordPostShare = (postId) => {
   return putRequest('user/post/share', { postId, shareStatus: true })
+}
+
+export const recordPostViews = (postIds) => {
+  return putRequest('user/post/view', { postIds: [...new Set(postIds)], viewStatus: true })
 }
 
 //------------------|| NOTIFICATIONS ||------------------//

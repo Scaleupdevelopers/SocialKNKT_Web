@@ -34,9 +34,9 @@ describe('profile replacement payloads', () => {
     })
   })
   it('uses model education year keys', () => {
-    expect(buildPayload('education', createDraft(profile, 'education'), profile).education).toEqual(
-      profile.educations,
-    )
+    expect(
+      buildPayload('education', createDraft(profile, 'education'), profile).education,
+    ).toEqual(profile.educations)
   })
   it('does not persist normalized fallback image when changing resume', () => {
     expect(
@@ -45,18 +45,28 @@ describe('profile replacement payloads', () => {
         { ...createDraft(profile, 'media'), resume: 'https://example.org/cv.pdf' },
         profile,
       ),
-    ).toEqual({ bio: profile.bio, website: profile.website, resume: 'https://example.org/cv.pdf' })
+    ).toEqual({
+      bio: profile.bio,
+      website: profile.website,
+      resume: 'https://example.org/cv.pdf',
+    })
   })
   it('supports explicitly removing resume and media arrays', () => {
     const source = { ...profile, resume: 'cv.pdf', headshot: ['photo.png'] }
     expect(
-      buildPayload('media', { ...createDraft(source, 'media'), resume: '', headshot: [] }, source),
+      buildPayload(
+        'media',
+        { ...createDraft(source, 'media'), resume: '', headshot: [] },
+        source,
+      ),
     ).toMatchObject({ resume: '', headshot: [] })
   })
-  it('rejects unsupported clears and reversed dates', () => {
-    expect(validateDraft('pronunciation', { phonetic_spelling: '' }, profile)).toContain(
-      'does not support',
-    )
+  it('allows clearing pronunciation without replacing unrelated fields', () => {
+    const draft = { phonetic_spelling: '', record_name: '' }
+    expect(validateDraft('pronunciation', draft, profile)).toBe('')
+    expect(buildPayload('pronunciation', draft, profile)).toEqual(draft)
+  })
+  it('rejects unsupported basic clears and reversed dates', () => {
     expect(
       validateDraft(
         'work',

@@ -3,6 +3,35 @@ import config from './config'
 const serverPath = config.API_URL
 export const AUTH_STORAGE_KEY = 'socialknkt_auth'
 
+// Unverified signup credentials stay in memory, never in URL/history or storage.
+let pendingSignupSession = null
+let signupVersion = 0
+export const getPendingSignupVersion = () => signupVersion
+
+export function rememberSignup(user, fallbackEmail = '') {
+  signupVersion++
+  pendingSignupSession = user?.token
+    ? {
+        token: user.token,
+        user: {
+          id: user.id,
+          username: user.username,
+          phone: user.phone,
+          email: (user.email?.trim() || fallbackEmail).trim().toLowerCase(),
+          image: user.image,
+          bannerImage: user.banner_image,
+        },
+      }
+    : null
+}
+
+export function consumeSignup(email) {
+  const session = pendingSignupSession
+  pendingSignupSession = null
+  signupVersion++
+  return session?.user.email === email ? session : null
+}
+
 export function readAuth() {
   try {
     return JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) || 'null')

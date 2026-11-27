@@ -36,24 +36,60 @@ export function Education() {
   const [countries, setCountries] = useState([])
   const [states, setStates] = useState([])
   const [cities, setCities] = useState([])
+  const [geographyStatus, setGeographyStatus] = useState({})
+  const [geographyRetries, setGeographyRetries] = useState({
+    countries: 0,
+    states: 0,
+    cities: 0,
+  })
+
+  const retryGeography = (field) => {
+    setGeographyStatus((current) => ({ ...current, [field]: 'loading' }))
+    setGeographyRetries((current) => ({ ...current, [field]: current[field] + 1 }))
+  }
+
+  const savePending = useRef(false)
+  const mounted = useRef(false)
 
   useEffect(() => {
-    getCountries().then((response) => setCountries(response.data || [])).catch((error) => toast.error(error.message))
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
   }, [])
 
   useEffect(() => {
-    if (!education.countryId) return
-    getStates({ countryId: education.countryId })
-      .then((response) => setStates(response.data || []))
-      .catch((error) => toast.error(error.message))
-  }, [education.countryId])
+    return loadOptions(
+      getCountries(),
+      setCountries,
+      'countries',
+      setGeographyStatus,
+    )
+  }, [geographyRetries.countries])
 
   useEffect(() => {
+    setStates([])
+    setGeographyStatus((current) => ({ ...current, states: 'idle' }))
+    if (!education.countryId) return
+    return loadOptions(
+      getStates({ countryId: education.countryId }),
+      setStates,
+      'states',
+      setGeographyStatus,
+    )
+  }, [education.countryId, geographyRetries.states])
+
+  useEffect(() => {
+    setCities([])
+    setGeographyStatus((current) => ({ ...current, cities: 'idle' }))
     if (!education.countryId || !education.stateId) return
-    getCities({ countryId: education.countryId, stateId: education.stateId })
-      .then((response) => setCities(response.data || []))
-      .catch((error) => toast.error(error.message))
-  }, [education.countryId, education.stateId])
+    return loadOptions(
+      getCities({ countryId: education.countryId, stateId: education.stateId }),
+      setCities,
+      'cities',
+      setGeographyStatus,
+    )
+  }, [education.countryId, education.stateId, geographyRetries.cities])
 
   const updateEducation = (field, value) => {
     setEducation((current) => ({ ...current, [field]: value }))
@@ -80,8 +116,8 @@ export function Education() {
     const nextEducation = {
       school: education.school,
       degree: education.degree,
-      startDate: education.startYear ? `${education.startYear}-01-01` : '',
-      endDate: education.currentlyStudying || !education.endYear ? '' : `${education.endYear}-01-01`,
+      startYear: String(education.startYear),
+      endYear: education.currentlyStudying ? '' : String(education.endYear),
       countryId: education.countryId,
       countryName: education.country,
       stateId: education.stateId,
@@ -91,29 +127,46 @@ export function Education() {
       currentlyStudying: education.currentlyStudying,
     }
 
-    setEducations((current) => editingIndex === null
-      ? [...current, nextEducation]
-      : current.map((item, index) => index === editingIndex ? nextEducation : item))
-    setEducation({ ...education, school: '', degree: '', startYear: '', endYear: '', currentlyStudying: false })
+    setEducations((current) =>
+      editingIndex === null
+        ? [...current, nextEducation]
+        : current.map((item, index) => (index === editingIndex ? nextEducation : item)),
+    )
+    setEducation({
+      ...education,
+      school: '',
+      degree: '',
+      startYear: '',
+      endYear: '',
+      currentlyStudying: false,
+    })
     setEditingIndex(null)
     setShowPreview(true)
   }
 
   const saveEducations = async () => {
+    if (savePending.current) return
+    savePending.current = true
     setIsSaving(true)
 
     try {
-      const educationPayload = educations.map(({ countryName, stateName, cityName, ...item }) => item)
-      const response = await completeProfile({ education: educationPayload, stepCount: 2 })
-
-      if (response.status === true) {
-        toast.success(response.message || 'Education saved successfully.')
-        navigate('/location')
-      }
-    } catch (error) {
-      toast.error(error.message || 'Unable to save education.')
+      const entries = educations.map((entry) => {
+        const item = { ...entry }
+        delete item.countryName
+        delete item.stateName
+        delete item.cityName
+        return item
+      })
+      const response = await completeProfile({ education: entries, stepCount: 2 })
+      if (!mounted.current) return
+      if (response.status !== true) throw new Error('Save failed')
+      toast.success('Education saved successfully.')
+      navigate('/location')
+    } catch {
+      if (mounted.current) toast.error('Unable to save education. Please try again.')
     } finally {
-      setIsSaving(false)
+      savePending.current = false
+      if (mounted.current) setIsSaving(false)
     }
   }
 
@@ -121,14 +174,9 @@ export function Education() {
     setEducation({
       school: item.school || '',
       degree: item.degree || '',
-      country: item.countryName || '',
-      countryId: item.countryId || '',
-      state: item.stateName || '',
-      stateId: item.stateId || '',
-      city: item.cityName || '',
-      cityId: item.cityId || '',
-      startYear: item.startDate ? item.startDate.slice(0, 4) : '',
-      endYear: item.endDate ? item.endDate.slice(0, 4) : '',
+      ...locationDraft(item),
+      startYear: item.startYear || '',
+      endYear: item.endYear || '',
       currentlyStudying: Boolean(item.currentlyStudying),
     })
     setEditingIndex(index)
@@ -145,15 +193,19 @@ export function Education() {
       </header>
 
       <section className="education-card" aria-labelledby="education-title">
-        <div className="education-progress"><span /></div>
+        <div className="education-progress">
+          <span />
+        </div>
         <h1 id="education-title">Add Your Education</h1>
         <p className="education-description">
-          Show where you’ve studied and grown.<br />
+          Show where you’ve studied and grown.
+          <br />
           Add schools, colleges, or courses that shaped your journey.
         </p>
 
         {!showPreview ? (
           <form className="education-form" noValidate onSubmit={handleSubmit}>
+            <GeographyFeedback status={geographyStatus} onRetry={retryGeography} />
             <div className="education-grid">
               <EducationField
                 label="School / Institution Name"
@@ -169,9 +221,54 @@ export function Education() {
                 hasError={fieldErrors.degree}
                 onChange={(value) => updateEducation('degree', value)}
               />
-              <OptionDropdown label="Country" value={education.countryId} options={countries.map((item) => ({ label: item.name, value: item.id }))} onChange={(value) => { const item = countries.find((country) => country.id === value); setEducation((current) => ({ ...current, country: item?.name || '', countryId: value, state: '', stateId: '', city: '', cityId: '' })); setStates([]); setCities([]) }} />
-              <OptionDropdown label="State" value={education.stateId} options={states.map((item) => ({ label: item.name, value: item.id }))} onChange={(value) => { const item = states.find((state) => state.id === value); setEducation((current) => ({ ...current, state: item?.name || '', stateId: value, city: '', cityId: '' })); setCities([]) }} />
-              <OptionDropdown label="City" value={education.cityId} options={cities.map((item) => ({ label: item.name, value: item.id }))} onChange={(value) => { const item = cities.find((city) => city.id === value); setEducation((current) => ({ ...current, city: item?.name || '', cityId: value })) }} />
+              <OptionDropdown
+                label="Country"
+                value={education.countryId}
+                options={countries.map((item) => ({ label: item.name, value: item.id }))}
+                onChange={(value) => {
+                  const item = countries.find((country) => country.id === value)
+                  setEducation((current) => ({
+                    ...current,
+                    country: item?.name || '',
+                    countryId: value,
+                    state: '',
+                    stateId: '',
+                    city: '',
+                    cityId: '',
+                  }))
+                  setStates([])
+                  setCities([])
+                }}
+              />
+              <OptionDropdown
+                label="State"
+                value={education.stateId}
+                options={states.map((item) => ({ label: item.name, value: item.id }))}
+                onChange={(value) => {
+                  const item = states.find((state) => state.id === value)
+                  setEducation((current) => ({
+                    ...current,
+                    state: item?.name || '',
+                    stateId: value,
+                    city: '',
+                    cityId: '',
+                  }))
+                  setCities([])
+                }}
+              />
+              <OptionDropdown
+                label="City"
+                value={education.cityId}
+                options={cities.map((item) => ({ label: item.name, value: item.id }))}
+                onChange={(value) => {
+                  const item = cities.find((city) => city.id === value)
+                  setEducation((current) => ({
+                    ...current,
+                    city: item?.name || '',
+                    cityId: value,
+                  }))
+                }}
+              />
               <YearDropdown
                 label="Start Year"
                 value={education.startYear}
@@ -198,35 +295,79 @@ export function Education() {
             <button className="education-primary-button" type="submit" disabled={isSaving}>
               {isSaving ? 'Saving...' : 'Save Education'}
             </button>
-            <button className="education-skip-button" type="button" onClick={() => navigate('/location')}>
+            <button
+              className="education-skip-button"
+              type="button"
+              onClick={() => navigate('/location')}
+            >
               Skip for now
             </button>
           </form>
         ) : (
           <div className="saved-education">
-            <div className="saved-education-heading"><span>Education</span></div>
+            <div className="saved-education-heading">
+              <span>Education</span>
+            </div>
             {educations.map((item, index) => (
               <div className="saved-education-card" key={`${item.school}-${index}`}>
                 <div className="saved-education-content">
                   <strong>{item.school}</strong>
                   <span>{item.degree}</span>
-                  <span>{[item.cityName, item.stateName, item.countryName].filter(Boolean).join(', ') || 'Location not added'}</span>
-                  <span>{item.startDate || 'Start year'} — {item.currentlyStudying ? 'Present' : item.endDate || 'End year'}</span>
+                  <span>
+                    {[item.cityName, item.stateName, item.countryName]
+                      .filter(Boolean)
+                      .join(', ') || 'Location not added'}
+                  </span>
+                  <span>
+                    {item.startYear || 'Start year'} —{' '}
+                    {item.currentlyStudying ? 'Present' : item.endYear || 'End year'}
+                  </span>
                 </div>
                 <span className="education-actions">
-                  <button type="button" aria-label="Edit education" onClick={() => editEducation(item, index)}>
+                  <button
+                    type="button"
+                    aria-label="Edit education"
+                    onClick={() => editEducation(item, index)}
+                  >
                     <img src="/assets/logo_icons/edit_icon.svg" alt="Edit" />
                   </button>
-                  <button type="button" aria-label="Delete education" onClick={() => { setDeleteIndex(index); setShowDeleteModal(true) }}>
+                  <button
+                    type="button"
+                    aria-label="Delete education"
+                    onClick={() => {
+                      setDeleteIndex(index)
+                      setShowDeleteModal(true)
+                    }}
+                  >
                     <img src="/assets/logo_icons/delete_icon.svg" alt="Delete" />
                   </button>
                 </span>
               </div>
             ))}
-            <button className="education-primary-button" type="button" onClick={() => { setEducation({ ...education, school: '', degree: '', startYear: '', endYear: '', currentlyStudying: false }); setEditingIndex(null); setShowPreview(false) }}>
+            <button
+              className="education-primary-button"
+              type="button"
+              onClick={() => {
+                setEducation({
+                  ...education,
+                  school: '',
+                  degree: '',
+                  startYear: '',
+                  endYear: '',
+                  currentlyStudying: false,
+                })
+                setEditingIndex(null)
+                setShowPreview(false)
+              }}
+            >
               Add New Education
             </button>
-            <button className="education-continue-button" type="button" onClick={saveEducations} disabled={isSaving}>
+            <button
+              className="education-continue-button"
+              type="button"
+              onClick={saveEducations}
+              disabled={isSaving}
+            >
               {isSaving ? 'Saving...' : 'Continue'}
             </button>
           </div>
@@ -235,11 +376,36 @@ export function Education() {
 
       {showDeleteModal && (
         <div className="education-modal-backdrop">
-          <div className="education-modal" role="dialog" aria-modal="true" aria-labelledby="delete-education-title">
-            <button className="education-modal-close" type="button" aria-label="Close" onClick={() => setShowDeleteModal(false)}>×</button>
+          <div
+            className="education-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-education-title"
+          >
+            <button
+              className="education-modal-close"
+              type="button"
+              aria-label="Close"
+              onClick={() => setShowDeleteModal(false)}
+            >
+              ×
+            </button>
             <h2 id="delete-education-title">Delete Education</h2>
-            <p>Are you sure you want to delete this education<br />entry?</p>
-            <button className="education-delete-button" type="button" onClick={() => { setEducations((current) => current.filter((_, index) => index !== deleteIndex)); setShowPreview(educations.length > 1); setShowDeleteModal(false); setDeleteIndex(null) }}>
+            <p>
+              Are you sure you want to delete this education
+              <br />
+              entry?
+            </p>
+            <button
+              className="education-delete-button"
+              type="button"
+              onClick={() => {
+                setEducations((current) => current.filter((_, index) => index !== deleteIndex))
+                setShowPreview(educations.length > 1)
+                setShowDeleteModal(false)
+                setDeleteIndex(null)
+              }}
+            >
               Delete Education
             </button>
           </div>
@@ -265,10 +431,12 @@ function EducationField({ label, placeholder, value, onChange, hasError = false 
 function YearDropdown({ label, value, onChange, disabled = false, options = educationYears }) {
   const dropdownRef = useRef(null)
   const [isOpen, setIsOpen] = useState(false)
-  const normalizedOptions = options.map((option) => (
-    typeof option === 'object' ? option : { label: option, value: option }
-  ))
-  const selectedOption = normalizedOptions.find((option) => String(option.value) === String(value))
+  const normalizedOptions = options.map((option) =>
+    typeof option === 'object' ? option : { label: option, value: option },
+  )
+  const selectedOption = normalizedOptions.find(
+    (option) => String(option.value) === String(value),
+  )
 
   useEffect(() => {
     const closeDropdown = (event) => {
@@ -292,7 +460,10 @@ function YearDropdown({ label, value, onChange, disabled = false, options = educ
         aria-expanded={isOpen}
         onClick={() => setIsOpen((open) => !open)}
       >
-        <span>{selectedOption?.label || (options === educationYears ? 'Year' : `Select ${label.toLowerCase()}`)}</span>
+        <span>
+          {selectedOption?.label ||
+            (options === educationYears ? 'Year' : `Select ${label.toLowerCase()}`)}
+        </span>
         <span className="education-year-arrow" aria-hidden="true" />
       </button>
 
@@ -300,18 +471,18 @@ function YearDropdown({ label, value, onChange, disabled = false, options = educ
         <div className="education-year-menu" role="listbox">
           {normalizedOptions.map((item) => {
             return (
-            <button
-              key={item.value}
-              type="button"
-              role="option"
-              aria-selected={String(item.value) === String(value)}
-              onClick={() => {
-                onChange(item.value)
-                setIsOpen(false)
-              }}
-            >
-              {item.label}
-            </button>
+              <button
+                key={item.value}
+                type="button"
+                role="option"
+                aria-selected={String(item.value) === String(value)}
+                onClick={() => {
+                  onChange(item.value)
+                  setIsOpen(false)
+                }}
+              >
+                {item.label}
+              </button>
             )
           })}
         </div>
@@ -322,4 +493,52 @@ function YearDropdown({ label, value, onChange, disabled = false, options = educ
 
 function OptionDropdown({ label, value, options, onChange }) {
   return <YearDropdown label={label} value={value} options={options} onChange={onChange} />
+}
+
+// Each effect owns its request; obsolete responses must not change options or feedback.
+function loadOptions(request, setOptions, label, setStatus) {
+  let active = true
+  setStatus((current) => ({ ...current, [label]: 'loading' }))
+  request
+    .then((response) => {
+      if (!active) return
+      setOptions(response.data || [])
+      setStatus((current) => ({ ...current, [label]: 'idle' }))
+    })
+    .catch(() => {
+      if (!active) return
+      setStatus((current) => ({ ...current, [label]: 'failed' }))
+      toast.error(`Unable to load ${label}. Please try again.`)
+    })
+  return () => {
+    active = false
+  }
+}
+
+function locationDraft(item) {
+  return {
+    country: item.countryName || '',
+    countryId: item.countryId || '',
+    state: item.stateName || '',
+    stateId: item.stateId || '',
+    city: item.cityName || '',
+    cityId: item.cityId || '',
+  }
+}
+
+function GeographyFeedback({ status, onRetry }) {
+  return Object.entries(status).map(([field, state]) => {
+    if (state === 'loading') {
+      return <p key={field} role="status">Loading {field}…</p>
+    }
+    if (state !== 'failed') return null
+    return (
+      <p key={field} role="alert">
+        Unable to load {field}.{' '}
+        <button type="button" onClick={() => onRetry(field)}>
+          Retry {field}
+        </button>
+      </p>
+    )
+  })
 }

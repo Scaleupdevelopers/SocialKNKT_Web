@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { EditProfileContent } from './EditProfileContent'
 import { useProfile } from '../../../context/ProfileContext'
-import { updateProfile, uploadFile } from '../../../action/action'
+import { completeProfile, updateProfile, uploadFile } from '../../../action/action'
 
 vi.mock('../../../context/ProfileContext', () => ({
   useProfile: vi.fn(),
@@ -12,6 +12,7 @@ vi.mock('../../../context/ProfileContext', () => ({
 vi.mock('../../../action/action', async (original) => ({
   ...(await original()),
   updateProfile: vi.fn(),
+  completeProfile: vi.fn(),
   uploadFile: vi.fn(),
   getCountries: vi.fn().mockResolvedValue({ data: [] }),
   getStates: vi.fn().mockResolvedValue({ data: [] }),
@@ -41,6 +42,29 @@ beforeEach(() => {
   })
 })
 afterEach(cleanup)
+
+it('saves and clears pronunciation through the mobile complete-profile contract', async () => {
+  const source = {
+    ...profile,
+    phonetic_spelling: 'Sam',
+    record_name: 'https://example.org/name.webm',
+  }
+  useProfile.mockReturnValue({ profile: source, setProfile })
+  completeProfile.mockResolvedValue({
+    status: true,
+    data: { ...source, phonetic_spelling: '' },
+  })
+  render(<EditProfileContent />)
+  fireEvent.click(screen.getByRole('button', { name: 'Name Pronunciation' }))
+  fireEvent.change(screen.getByLabelText(/Phonetic spelling/i), { target: { value: '' } })
+  fireEvent.click(screen.getByText('Save'))
+  await screen.findByText('Profile saved.')
+  expect(completeProfile).toHaveBeenCalledWith({
+    phonetic_spelling: '',
+    record_name: source.record_name,
+  })
+  expect(updateProfile).not.toHaveBeenCalled()
+})
 
 it('keeps the same draft mounted through background refresh, failure and retry', () => {
   const refreshProfile = vi.fn()
@@ -92,7 +116,11 @@ it('retains draft on failure and retries a save with normalized context update',
   expect(screen.getByRole('alert').textContent).not.toContain('private server details')
   fireEvent.click(screen.getByText('Save'))
   await screen.findByText('Profile saved.')
-  expect(updateProfile).toHaveBeenLastCalledWith({ bio: 'Original', website: '', fname: 'Alex' })
+  expect(updateProfile).toHaveBeenLastCalledWith({
+    bio: 'Original',
+    website: '',
+    fname: 'Alex',
+  })
   expect(setProfile).toHaveBeenCalledWith(
     expect.objectContaining({ fname: 'Alex', fullName: 'Alex Lee' }),
   )

@@ -4,10 +4,17 @@ import { toast } from 'react-toastify'
 import { changePassword } from '../../action/action'
 import './PasswordPages.css'
 
+function requiredPasswordErrors(password, confirmPassword) {
+  const errors = {}
+  if (!password.trim()) errors.password = 'Password is required'
+  if (!confirmPassword.trim()) errors.confirmPassword = 'Confirm Password is required'
+  return errors
+}
+
 function ResetPassword() {
   const navigate = useNavigate()
   const { state } = useLocation()
-  const email = state?.email || ''
+  const email = (state?.email || '').trim().toLowerCase()
   const resetToken = state?.verificationToken || ''
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -19,15 +26,7 @@ function ResetPassword() {
   const handleSubmit = async (event) => {
     event.preventDefault()
 
-    const nextErrors = {}
-
-    if (!password.trim()) {
-      nextErrors.password = 'Password is required'
-    }
-
-    if (!confirmPassword.trim()) {
-      nextErrors.confirmPassword = 'Confirm Password is required'
-    }
+    const nextErrors = requiredPasswordErrors(password, confirmPassword)
 
     if (Object.keys(nextErrors).length > 0) {
       setFieldErrors(nextErrors)
@@ -76,7 +75,11 @@ function ResetPassword() {
       </header>
 
       <section className="password-card">
-        <img className="password-page-icon" src="/assets/logo_icons/create_password_icon.png" alt="" />
+        <img
+          className="password-page-icon"
+          src="/assets/logo_icons/create_password_icon.png"
+          alt=""
+        />
         <h1>Create New Password</h1>
         <p>Go ahead and create a unique password</p>
 
@@ -92,7 +95,9 @@ function ResetPassword() {
             }}
             onToggle={() => setShowPassword((visible) => !visible)}
           />
-          {fieldErrors.password && <p className="password-field-error">{fieldErrors.password}</p>}
+          {fieldErrors.password && (
+            <p className="password-field-error">{fieldErrors.password}</p>
+          )}
           <PasswordInput
             id="confirm-password"
             placeholder="Confirm New Password"
@@ -104,7 +109,9 @@ function ResetPassword() {
             }}
             onToggle={() => setShowConfirmPassword((visible) => !visible)}
           />
-          {fieldErrors.confirmPassword && <p className="password-field-error">{fieldErrors.confirmPassword}</p>}
+          {fieldErrors.confirmPassword && (
+            <p className="password-field-error">{fieldErrors.confirmPassword}</p>
+          )}
           <button className="password-submit" type="submit" disabled={isSubmitting}>
             {isSubmitting ? 'Saving...' : 'Set Password'}
           </button>

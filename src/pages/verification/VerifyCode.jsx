@@ -4,10 +4,22 @@ import { toast } from 'react-toastify'
 import { resendOtp, verifyOtp } from '../../action/action'
 import './VerifyCode.css'
 
+function VerificationDescription({ description, email }) {
+  return (
+    description || (
+      <>
+        Enter OTP sent to <strong>{email || 'your email'}</strong> to reset
+        <br />
+        your password. Please check your inbox
+      </>
+    )
+  )
+}
+
 export function VerifyCode({ title = 'Verify Code', description }) {
   const { state } = useLocation()
   const navigate = useNavigate()
-  const email = state?.email || ''
+  const email = (state?.email || '').trim().toLowerCase()
   const [code, setCode] = useState(['', '', '', '', '', ''])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isResending, setIsResending] = useState(false)
@@ -121,31 +133,20 @@ export function VerifyCode({ title = 'Verify Code', description }) {
       </header>
 
       <section className="verify-card" aria-labelledby="verify-title">
-        <img
-          className="verify-icon"
-          src="/assets/logo_icons/verify_code_icon.png"
-          alt=""
-        />
+        <img className="verify-icon" src="/assets/logo_icons/verify_code_icon.png" alt="" />
         <h1 id="verify-title">{title}</h1>
         <p className="verify-description">
-          {description || (
-            <>
-              Enter OTP sent to <strong>{email || 'your email'}</strong> to reset
-              <br />
-              your password. Please check your inbox
-            </>
-          )}
+          <VerificationDescription description={description} email={email} />
         </p>
 
-        <form
-          onSubmit={handleSubmit}
-          noValidate
-        >
+        <form onSubmit={handleSubmit} noValidate>
           <div className="otp-fields">
             {code.map((value, index) => (
               <input
                 key={index}
-                ref={(element) => { inputRefs.current[index] = element }}
+                ref={(element) => {
+                  inputRefs.current[index] = element
+                }}
                 value={value}
                 inputMode="numeric"
                 maxLength={1}
@@ -161,9 +162,7 @@ export function VerifyCode({ title = 'Verify Code', description }) {
           </button>
         </form>
 
-        <p className="verify-timer">
-          00:{String(remainingSeconds).padStart(2, '0')}
-        </p>
+        <p className="verify-timer">00:{String(remainingSeconds).padStart(2, '0')}</p>
         <p className="resend-text">
           Didn’t get a code?{' '}
           <button

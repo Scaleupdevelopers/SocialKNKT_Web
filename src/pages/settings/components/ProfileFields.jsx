@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { collections, sections } from './profileDraft'
 import { LocationFields } from './LocationFields'
 import { MediaFields } from './MediaFields'
+import { PronunciationRecorder } from '../../onboarding/Pronunciation'
 const editIcon = '/assets/logo_icons/profile-edit-outline.svg'
 const deleteIcon = '/assets/logo_icons/profile-delete-outline.svg'
 
@@ -18,7 +19,7 @@ const labels = {
   employmentType: 'Employment Type',
   school: 'School / College',
   degree: 'Degree',
-  phonetic_spelling: 'Phonetic Spelling',
+  phonetic_spelling: 'Phonetic spelling',
 }
 const inputTypes = { dob: 'date', email: 'email', website: 'url', phone: 'tel' }
 export function Field({ name, value, onChange, type = 'text', required = false, ...rest }) {
@@ -243,17 +244,27 @@ function CollectionSummary({ section, item }) {
 }
 
 export function ProfileFields({ section, draft, onChange, onBusy, onError }) {
+  const latestDraft = useRef(draft)
+  useLayoutEffect(() => {
+    latestDraft.current = draft
+  }, [draft])
   if (section === 'basic') return <BasicFields draft={draft} onChange={onChange} />
   if (collections[section])
     return <CollectionFields section={section} draft={draft} onChange={onChange} />
   if (section === 'media')
     return <MediaFields draft={draft} onChange={onChange} onBusy={onBusy} onError={onError} />
   return (
-    <Field
-      name="phonetic_spelling"
-      required
-      value={draft.phonetic_spelling}
-      onChange={(value) => onChange({ phonetic_spelling: value })}
-    />
+    <>
+      <Field
+        name="phonetic_spelling"
+        value={draft.phonetic_spelling}
+        onChange={(value) => onChange({ ...draft, phonetic_spelling: value })}
+      />
+      <PronunciationRecorder
+        value={draft.record_name}
+        onChange={(value) => onChange({ ...latestDraft.current, record_name: value })}
+        onBusy={onBusy}
+      />
+    </>
   )
 }

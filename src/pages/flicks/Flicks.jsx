@@ -3,12 +3,13 @@ import { Link, useSearchParams } from 'react-router-dom'
 import {
   getSavedPosts,
   recordPostShare,
+  recordPostViews,
   deletePost,
   getFlicks,
   savePost,
   updatePostLike,
 } from '../../action/action'
-import { mergeResults, postLink, AUTH_STORAGE_KEY } from '../../utils/helper'
+import { mergeResults, postLink, readAuth } from '../../utils/helper'
 import { toast } from 'react-toastify'
 
 import { ReportPostModal } from '../../components/modals/ReportPostModal/ReportPostModal'
@@ -34,6 +35,8 @@ function FlickFeed({ saved }) {
   const wheelUnlockTimer = useRef(null)
   const active = useRef(false)
   const busy = useRef(false)
+  const generation = useRef(0)
+  const viewed = useRef(new Set())
   const [page, setPage] = useState(0)
   const [hasMore, setHasMore] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -41,30 +44,32 @@ function FlickFeed({ saved }) {
   const loadPage = useCallback(
     async (nextPage) => {
       if (busy.current) return
+      const requestGeneration = generation.current
+      const isCurrent = () => active.current && requestGeneration === generation.current
       busy.current = true
       setLoadingMore(true)
       setLoadError(false)
       try {
-        const response = await (saved ? getSavedPosts(nextPage, 10) : getFlicks(nextPage, 10))
-        if (!active.current) return
-        const rows = response.data || []
-        const next = saved ? rows.filter((item) => item.mediaType === 'flicks') : rows
+        const { rows, next } = await readFlickPage(saved, nextPage)
+        if (!isCurrent()) return
         setFlicks((current) => mergeResults(current, next))
         setSavedFlickIds(
           (current) =>
             new Set([
               ...current,
-              ...next.filter((item) => saved || item.isSaved).map((item) => item._id || item.id),
+              ...next
+                .filter((item) => saved || item.isSaved)
+                .map((item) => item._id || item.id),
             ]),
         )
         setPage(nextPage + 1)
         // Saved records can reference deleted posts; only an empty response ends pagination.
         setHasMore(saved ? rows.length > 0 : rows.length >= 10)
       } catch {
-        if (active.current) setLoadError(true)
+        if (isCurrent()) setLoadError(true)
       } finally {
-        busy.current = false
-        if (active.current) {
+        if (isCurrent()) {
+          busy.current = false
           setIsLoading(false)
           setLoadingMore(false)
         }
@@ -72,6 +77,19 @@ function FlickFeed({ saved }) {
     },
     [saved],
   )
+
+  const removeFlick = (flickId) => {
+    generation.current++
+    busy.current = false
+    setFlicks((current) =>
+      current.filter((item) => String(item._id || item.id) !== String(flickId)),
+    )
+    // Offset pages shift after deletion. Re-read from page zero on the next load.
+    setPage(0)
+    setHasMore(true)
+    setLoadingMore(false)
+    setLoadError(false)
+  }
 
   const handleFeedWheel = (event) => {
     const feed = feedRef.current
@@ -83,7 +101,8 @@ function FlickFeed({ saved }) {
     const direction = event.deltaY > 0 ? 1 : -1
     const pageHeight = feed.clientHeight
     const currentPage = Math.round(feed.scrollTop / pageHeight)
-    if (direction > 0 && currentPage >= flicks.length - 2 && hasMore && !loadError) loadPage(page)
+    if (direction > 0 && currentPage >= flicks.length - 2 && hasMore && !loadError)
+      loadPage(page)
     const nextPage = Math.max(0, Math.min(flicks.length - 1, currentPage + direction))
 
     if (nextPage === currentPage) {
@@ -107,7 +126,9 @@ function FlickFeed({ saved }) {
 
   const toggleSavedFlick = async (flickId) => {
     if (savingFlickIds.has(flickId) || savedFlickIds.has(flickId)) return
-    const flick = flicks.find((item, index) => (item._id || item.media || index) === flickId)
+    const flick = flicks.find(
+      (item, index) => (item._id || item.id || item.media || index) === flickId,
+    )
     const postId = flick?._id || flick?.id
     if (!postId) return
 
@@ -119,8 +140,8 @@ function FlickFeed({ saved }) {
         nextIds.add(flickId)
         return nextIds
       })
-    } catch (error) {
-      toast.error(error.message || 'Unable to save flick.')
+    } catch {
+      toast.error('Unable to save flick. Please try again.')
     } finally {
       setSavingFlickIds((currentIds) => {
         const nextIds = new Set(currentIds)
@@ -139,15 +160,26 @@ function FlickFeed({ saved }) {
 
     const observer = new IntersectionObserver(
       (entries) => {
+        const visibleIds = []
         entries.forEach((entry) => {
           const video = entry.target
 
           if (entry.isIntersecting) {
             video.play().catch(() => {})
+            const id = video.dataset.postId
+            if (id && !viewed.current.has(id)) {
+              viewed.current.add(id)
+              visibleIds.push(id)
+            }
           } else {
             video.pause()
           }
         })
+        if (visibleIds.length) {
+          recordPostViews(visibleIds).catch(() => {
+            visibleIds.forEach((id) => viewed.current.delete(id))
+          })
+        }
       },
       { threshold: 0.7 },
     )
@@ -162,6 +194,8 @@ function FlickFeed({ saved }) {
     loadPage(0)
     return () => {
       active.current = false
+      generation.current++
+      busy.current = false
     }
   }, [loadPage])
 
@@ -185,21 +219,12 @@ function FlickFeed({ saved }) {
             loadPage(page)
         }}
       >
-        {isLoading && (
-          <article className="flick-feed-card flick-feed-skeleton" aria-label="Loading flick">
-            <div className="flick-skeleton-details">
-              <span className="flick-skeleton-avatar" />
-              <span className="flick-skeleton-line flick-skeleton-name" />
-              <span className="flick-skeleton-line flick-skeleton-description" />
-            </div>
-          </article>
-        )}
-
-        {!isLoading && !loadError && flicks.length === 0 && (
-          <p className="flicks-status">
-            {saved ? 'No saved flicks on this page.' : 'No flicks available yet.'}
-          </p>
-        )}
+        <FlickFeedStart
+          isLoading={isLoading}
+          loadError={loadError}
+          count={flicks.length}
+          saved={saved}
+        />
 
         {!isLoading &&
           flicks.map((flick, index) => {
@@ -213,6 +238,7 @@ function FlickFeed({ saved }) {
                 isSaved={isSaved}
                 isSaving={savingFlickIds.has(flickId)}
                 onToggleSaved={() => toggleSavedFlick(flickId)}
+                onDeleted={() => removeFlick(flickId)}
               />
             )
           })}
@@ -231,7 +257,27 @@ function FlickFeed({ saved }) {
   )
 }
 
-function FlickCard({ flick, isSaved, isSaving, onToggleSaved }) {
+function FlickFeedStart({ isLoading, loadError, count, saved }) {
+  if (isLoading) {
+    return (
+      <article className="flick-feed-card flick-feed-skeleton" aria-label="Loading flick">
+        <div className="flick-skeleton-details">
+          <span className="flick-skeleton-avatar" />
+          <span className="flick-skeleton-line flick-skeleton-name" />
+          <span className="flick-skeleton-line flick-skeleton-description" />
+        </div>
+      </article>
+    )
+  }
+  if (loadError || count > 0) return null
+  return (
+    <p className="flicks-status">
+      {saved ? 'No saved flicks on this page.' : 'No flicks available yet.'}
+    </p>
+  )
+}
+
+function FlickCard({ flick, isSaved, isSaving, onToggleSaved, onDeleted }) {
   const { profile } = useProfile()
   const videoRef = useRef(null)
   const [isPlaying, setIsPlaying] = useState(true)
@@ -242,33 +288,18 @@ function FlickCard({ flick, isSaved, isSaving, onToggleSaved }) {
   const [isReportOpen, setIsReportOpen] = useState(false)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
-  const authData = JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) || 'null')
-  const currentUserId =
-    profile?._id ||
-    profile?.id ||
-    profile?.userId ||
-    authData?.user?._id ||
-    authData?.user?.id ||
-    authData?.data?._id ||
-    authData?.data?.id
-  const flickOwnerId =
-    flick.userId ||
-    flick.user?._id ||
-    flick.user?.id ||
-    flick.ownerId ||
-    flick.owner?._id ||
-    flick.owner?.id ||
-    flick.createdBy?._id ||
-    flick.createdBy?.id
-  const isOwnFlick = Boolean(
-    currentUserId && flickOwnerId && String(flickOwnerId) === String(currentUserId),
-  )
-  const [isLiked, setIsLiked] = useState(Boolean(flick.isLiked ?? flick.liked ?? flick.likeStatus))
-  const [likeCount, setLikeCount] = useState(Number(flick.likeCount ?? flick.likes ?? 0))
+  const initial = initialFlickState(flick)
+  const [commentCount, setCommentCount] = useState(initial.commentCount)
+  const deleting = useRef(false)
+  const liking = useRef(false)
+  const isOwnFlick = ownsFlick(profile, flick)
+  const [isLiked, setIsLiked] = useState(initial.isLiked)
+  const [likeCount, setLikeCount] = useState(initial.likeCount)
 
   const handleLike = async () => {
     const postId = flick._id || flick.id
-    if (!postId) return
+    if (!postId || liking.current) return
+    liking.current = true
 
     const previousLikeStatus = isLiked
     const nextLikeStatus = !previousLikeStatus
@@ -277,11 +308,11 @@ function FlickCard({ flick, isSaved, isSaving, onToggleSaved }) {
     try {
       await updatePostLike(postId, nextLikeStatus)
     } catch {
-      setIsLiked((currentStatus) => {
-        if (currentStatus !== nextLikeStatus) return currentStatus
-        setLikeCount((count) => Math.max(0, count + (nextLikeStatus ? -1 : 1)))
-        return previousLikeStatus
-      })
+      setIsLiked(previousLikeStatus)
+      setLikeCount((count) => Math.max(0, count + (nextLikeStatus ? -1 : 1)))
+      toast.error('Unable to update like. Please try again.')
+    } finally {
+      liking.current = false
     }
   }
 
@@ -297,8 +328,8 @@ function FlickCard({ flick, isSaved, isSaving, onToggleSaved }) {
   }
 
   const shareUrl = postLink(flick._id || flick.id)
-  const shareText = `📢 Social Knkt Flick\n${flick.description || ''}\n${shareUrl}`
-  const shared = useRef(Boolean(flick.isShared || flick.isshared))
+  const shareText = flickShareText(flick, shareUrl)
+  const shared = useRef(initial.isShared)
   const recordShare = () => {
     if (shared.current) return
     shared.current = true
@@ -334,14 +365,18 @@ function FlickCard({ flick, isSaved, isSaving, onToggleSaved }) {
 
   const handleDelete = async () => {
     const postId = flick._id || flick.id
-    if (!postId || isDeleting) return
+    if (!postId || deleting.current) return
+    deleting.current = true
     setIsDeleting(true)
     try {
       await deletePost(postId)
       setIsDeleteOpen(false)
       setIsOptionsOpen(false)
-      window.location.reload()
+      onDeleted()
+    } catch {
+      toast.error('Unable to delete flick. Please try again.')
     } finally {
+      deleting.current = false
       setIsDeleting(false)
     }
   }
@@ -354,10 +389,109 @@ function FlickCard({ flick, isSaved, isSaving, onToggleSaved }) {
     setIsMuted(video.muted)
   }
 
+  const playback = { videoRef, isPlaying, isMuted, togglePlayback, toggleMute, setIsPlaying }
+  const actions = {
+    isLiked,
+    likeCount,
+    commentCount,
+    handleLike,
+    isSaved,
+    isSaving,
+    onToggleSaved,
+    isOptionsOpen,
+    isOwnFlick,
+    setIsOptionsOpen,
+    setIsCommentsOpen,
+    setIsShareOpen,
+    setIsDeleteOpen,
+    setIsReportOpen,
+  }
+  const dialogs = {
+    isShareOpen,
+    setIsShareOpen,
+    handleShare,
+    copyShareLink,
+    isReportOpen,
+    setIsReportOpen,
+    isDeleteOpen,
+    setIsDeleteOpen,
+    isDeleting,
+    handleDelete,
+    isCommentsOpen,
+    setIsCommentsOpen,
+    setCommentCount,
+  }
   return (
     <article className="flick-feed-card">
+      <FlickVideo flick={flick} {...playback} />
+      <FlickDetails flick={flick} />
+      <FlickActions {...actions} />
+      <FlickDialogs flick={flick} {...dialogs} />
+    </article>
+  )
+}
+
+async function readFlickPage(saved, page) {
+  const response = await (saved ? getSavedPosts(page, 10) : getFlicks(page, 10))
+  const rows = response.data || []
+  return { rows, next: saved ? rows.filter((item) => item.mediaType === 'flicks') : rows }
+}
+
+function entityId(entity) {
+  return entity?._id || entity?.id
+}
+
+function viewerId(profile, authData) {
+  return (
+    entityId(profile) || profile?.userId || entityId(authData?.user) || entityId(authData?.data)
+  )
+}
+
+function ownerId(flick) {
+  return (
+    flick.userId ||
+    entityId(flick.user) ||
+    flick.ownerId ||
+    entityId(flick.owner) ||
+    entityId(flick.createdBy)
+  )
+}
+
+function ownsFlick(profile, flick) {
+  const currentUserId = viewerId(profile, readAuth())
+  const flickOwnerId = ownerId(flick)
+  return Boolean(
+    currentUserId && flickOwnerId && String(flickOwnerId) === String(currentUserId),
+  )
+}
+
+function initialFlickState(flick) {
+  return {
+    commentCount: Number(flick.commentCount || 0),
+    isLiked: Boolean(flick.isLiked ?? flick.liked ?? flick.likeStatus),
+    likeCount: Number(flick.likeCount ?? flick.likes ?? 0),
+    isShared: Boolean(flick.isShared || flick.isshared),
+  }
+}
+
+function flickShareText(flick, shareUrl) {
+  return `📢 Social Knkt Flick\n${flick.description || ''}\n${shareUrl}`
+}
+
+function FlickVideo({
+  flick,
+  videoRef,
+  isPlaying,
+  isMuted,
+  togglePlayback,
+  toggleMute,
+  setIsPlaying,
+}) {
+  return (
+    <>
       <video
         ref={videoRef}
+        data-post-id={entityId(flick)}
         src={flick.media}
         poster={flick.thumbnail}
         autoPlay
@@ -368,7 +502,6 @@ function FlickCard({ flick, isSaved, isSaving, onToggleSaved }) {
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
       />
-
       <div className="flick-video-controls" aria-label="Video controls">
         <button
           type="button"
@@ -391,142 +524,211 @@ function FlickCard({ flick, isSaved, isSaving, onToggleSaved }) {
           <img src="/assets/logo_icons/sound_icon.svg" alt="" />
         </button>
       </div>
+    </>
+  )
+}
 
-      <div className="flick-feed-details">
-        <div className="flick-feed-user">
-          <img
-            src={flick.userImage || flick.image || '/assets/logo_icons/profile_avatar.png'}
-            alt=""
-          />
-          <strong>{flick.username || flick.userName || 'your.name'}</strong>
-        </div>
-        <p>{flick.description || ''}</p>
+function FlickDetails({ flick }) {
+  return (
+    <div className="flick-feed-details">
+      <div className="flick-feed-user">
+        <img
+          src={flick.userImage || flick.image || '/assets/logo_icons/profile_avatar.png'}
+          alt=""
+        />
+        <strong>{flick.username || flick.userName || 'your.name'}</strong>
       </div>
-      <div className="flick-feed-actions">
-        <button
-          type="button"
-          className={isLiked ? 'is-liked' : ''}
-          aria-label={isLiked ? 'Unlike' : 'Like'}
-          aria-pressed={isLiked}
-          onClick={handleLike}
-        >
-          <img
-            src={isLiked ? '/assets/logo_icons/heartLike.svg' : '/assets/logo_icons/like.svg'}
-            alt=""
-          />
-          <span>{likeCount}</span>
-        </button>
-        <button type="button" aria-label="Comments" onClick={() => setIsCommentsOpen(true)}>
-          <img src="/assets/logo_icons/comment.svg" alt="" />
-          <span>{flick.commentCount || 0}</span>
-        </button>
-        <button type="button" aria-label="Share flick" onClick={() => setIsShareOpen(true)}>
-          <img src="/assets/logo_icons/share_icon.svg" alt="" />
-        </button>
-        <button
-          type="button"
-          aria-label={isSaved ? 'Saved' : 'Save flick'}
-          onClick={onToggleSaved}
-          disabled={isSaving || isSaved}
-        >
-          <img
-            src={isSaved ? '/assets/logo_icons/saveIcon.svg' : '/assets/logo_icons/unsaved.svg'}
-            alt=""
-          />
-        </button>
-        <button type="button" aria-label="More" onClick={() => setIsOptionsOpen((value) => !value)}>
-          ⋮
-        </button>
-        {isOptionsOpen && (
-          <div className="flick-options-menu">
-            {isOwnFlick ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setIsOptionsOpen(false)
-                  setIsDeleteOpen(true)
-                }}
-              >
-                <img src="/assets/logo_icons/red_delete_icon.svg" alt="" />
-                Delete
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => {
-                  setIsOptionsOpen(false)
-                  setIsReportOpen(true)
-                }}
-              >
-                <img src="/assets/logo_icons/report.svg" alt="" />
-                Report
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-      {isShareOpen && (
-        <div
-          className="flick-share-backdrop"
-          role="presentation"
-          onClick={() => setIsShareOpen(false)}
-        >
-          <div
-            className="flick-share-modal"
-            role="dialog"
-            aria-modal="true"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <button
-              className="flick-share-close"
-              type="button"
-              aria-label="Close"
-              onClick={() => setIsShareOpen(false)}
-            >
-              ×
-            </button>
-            <h2>Share Flick</h2>
-            <button className="flick-share-action" type="button" onClick={handleShare}>
-              Share
-            </button>
-            <button className="flick-share-action" type="button" onClick={copyShareLink}>
-              Copy Link
-            </button>
-          </div>
-        </div>
+      <p>{flick.description || ''}</p>
+    </div>
+  )
+}
+
+function FlickActions(actions) {
+  return (
+    <div className="flick-feed-actions">
+      <FlickLikeButton
+        isLiked={actions.isLiked}
+        count={actions.likeCount}
+        onClick={actions.handleLike}
+      />
+      <button
+        type="button"
+        aria-label="Comments"
+        onClick={() => actions.setIsCommentsOpen(true)}
+      >
+        <img src="/assets/logo_icons/comment.svg" alt="" />
+        <span>{actions.commentCount}</span>
+      </button>
+      <button
+        type="button"
+        aria-label="Share flick"
+        onClick={() => actions.setIsShareOpen(true)}
+      >
+        <img src="/assets/logo_icons/share_icon.svg" alt="" />
+      </button>
+      <FlickSaveButton
+        isSaved={actions.isSaved}
+        isSaving={actions.isSaving}
+        onClick={actions.onToggleSaved}
+      />
+      <button
+        type="button"
+        aria-label="More"
+        onClick={() => actions.setIsOptionsOpen((value) => !value)}
+      >
+        ⋮
+      </button>
+      {actions.isOptionsOpen && <FlickOptions actions={actions} />}
+    </div>
+  )
+}
+
+function FlickLikeButton({ isLiked, count, onClick }) {
+  return (
+    <button
+      type="button"
+      className={isLiked ? 'is-liked' : ''}
+      aria-label={isLiked ? 'Unlike' : 'Like'}
+      aria-pressed={isLiked}
+      onClick={onClick}
+    >
+      <img
+        src={isLiked ? '/assets/logo_icons/heartLike.svg' : '/assets/logo_icons/like.svg'}
+        alt=""
+      />
+      <span>{count}</span>
+    </button>
+  )
+}
+
+function FlickSaveButton({ isSaved, isSaving, onClick }) {
+  return (
+    <button
+      type="button"
+      aria-label={isSaved ? 'Saved' : 'Save flick'}
+      onClick={onClick}
+      disabled={isSaving || isSaved}
+    >
+      <img
+        src={isSaved ? '/assets/logo_icons/saveIcon.svg' : '/assets/logo_icons/unsaved.svg'}
+        alt=""
+      />
+    </button>
+  )
+}
+
+function FlickOptions({ actions }) {
+  const open = () => {
+    actions.setIsOptionsOpen(false)
+    if (actions.isOwnFlick) actions.setIsDeleteOpen(true)
+    else actions.setIsReportOpen(true)
+  }
+  return (
+    <div className="flick-options-menu">
+      <button type="button" onClick={open}>
+        <img
+          src={
+            actions.isOwnFlick
+              ? '/assets/logo_icons/red_delete_icon.svg'
+              : '/assets/logo_icons/report.svg'
+          }
+          alt=""
+        />
+        {actions.isOwnFlick ? 'Delete' : 'Report'}
+      </button>
+    </div>
+  )
+}
+
+function FlickDialogs(dialogs) {
+  return (
+    <>
+      {dialogs.isShareOpen && (
+        <FlickShareDialog
+          onClose={() => dialogs.setIsShareOpen(false)}
+          onShare={dialogs.handleShare}
+          onCopy={dialogs.copyShareLink}
+        />
       )}
-      {isReportOpen && (
+      {dialogs.isReportOpen && (
         <ReportPostModal
-          postId={flick._id || flick.id}
-          onClose={() => setIsReportOpen(false)}
+          postId={entityId(dialogs.flick)}
+          onClose={() => dialogs.setIsReportOpen(false)}
           contentLabel="Flick"
         />
       )}
-      {isDeleteOpen && (
-        <div
-          className="flick-delete-backdrop"
-          role="presentation"
-          onClick={() => !isDeleting && setIsDeleteOpen(false)}
-        >
-          <div
-            className="flick-delete-modal"
-            role="dialog"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <h2>Delete Flick</h2>
-            <p>Are you sure you want to delete this flick?</p>
-            <div>
-              <button type="button" onClick={() => setIsDeleteOpen(false)} disabled={isDeleting}>
-                No
-              </button>
-              <button type="button" onClick={handleDelete} disabled={isDeleting}>
-                {isDeleting ? 'Deleting...' : 'Delete'}
-              </button>
-            </div>
-          </div>
-        </div>
+      {dialogs.isDeleteOpen && (
+        <FlickDeleteDialog
+          isDeleting={dialogs.isDeleting}
+          onClose={() => dialogs.setIsDeleteOpen(false)}
+          onDelete={dialogs.handleDelete}
+        />
       )}
-      {isCommentsOpen && <CommentsModal post={flick} onClose={() => setIsCommentsOpen(false)} />}
-    </article>
+      {dialogs.isCommentsOpen && (
+        <CommentsModal
+          post={dialogs.flick}
+          onClose={() => dialogs.setIsCommentsOpen(false)}
+          onCommentCountChange={(change) =>
+            dialogs.setCommentCount((count) => Math.max(0, count + change))
+          }
+        />
+      )}
+    </>
+  )
+}
+
+function FlickShareDialog({ onClose, onShare, onCopy }) {
+  return (
+    <div className="flick-share-backdrop" role="presentation" onClick={onClose}>
+      <div
+        className="flick-share-modal"
+        role="dialog"
+        aria-modal="true"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <button
+          className="flick-share-close"
+          type="button"
+          aria-label="Close"
+          onClick={onClose}
+        >
+          ×
+        </button>
+        <h2>Share Flick</h2>
+        <button className="flick-share-action" type="button" onClick={onShare}>
+          Share
+        </button>
+        <button className="flick-share-action" type="button" onClick={onCopy}>
+          Copy Link
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function FlickDeleteDialog({ isDeleting, onClose, onDelete }) {
+  return (
+    <div
+      className="flick-delete-backdrop"
+      role="presentation"
+      onClick={() => !isDeleting && onClose()}
+    >
+      <div
+        className="flick-delete-modal"
+        role="dialog"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <h2>Delete Flick</h2>
+        <p>Are you sure you want to delete this flick?</p>
+        <div>
+          <button type="button" onClick={onClose} disabled={isDeleting}>
+            No
+          </button>
+          <button type="button" onClick={onDelete} disabled={isDeleting}>
+            {isDeleting ? 'Deleting...' : 'Delete'}
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }

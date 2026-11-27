@@ -47,7 +47,10 @@ export async function mockApi(page) {
     calls.push({ path, method, body, query: Object.fromEntries(url.searchParams) })
     let data = []
     if (path === 'user/profile/get-my-profile') data = profile
-    else if (path === 'user/profile' && method === 'PUT') {
+    else if (
+      (path === 'user/profile' && method === 'PUT') ||
+      (path === 'user/complete-profile' && method === 'POST')
+    ) {
       profile = { ...profile, ...body }
       data = profile
     } else if (path === 'user/profile/get-other-user-profile')
@@ -58,6 +61,8 @@ export async function mockApi(page) {
         personalConnection: relationId,
         connectionId: relationId,
       }
+    else if (path === 'user/topics')
+      data = [{ id: '555555555555555555555555', topic: 'Technology' }]
     else if (path === 'user/profile/connections') data = [connection]
     else if (path === 'user/connection-request' && method === 'GET') data = requests
     else if (path === 'user/connection-request' && method === 'PUT') {
@@ -105,7 +110,8 @@ export async function mockApi(page) {
       ]
     else if (path === 'user/profile/admin')
       data = {
-        contactHTML: '<p>Email <a href="mailto:support@example.com">support@example.com</a></p>',
+        contactHTML:
+          '<p>Email <a href="mailto:support@example.com">support@example.com</a></p>',
       }
     await route.fulfill({ json: { status: true, data } })
   })

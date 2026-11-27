@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { normalizeProfile, useProfile } from '../../../context/ProfileContext'
-import { updateProfile } from '../../../action/action'
+import { completeProfile, updateProfile } from '../../../action/action'
 import { sections, collections, createDraft, buildPayload, validateDraft } from './profileDraft'
 import { ProfileFields } from './ProfileFields'
 import './ProfileEditor.css'
@@ -63,6 +63,7 @@ function SectionEditor({ section, profile, onSaved, onBusy }) {
   const [draft, setDraft] = useState(() => createDraft(profile, section))
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const disabled = saving || uploading
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [revision, setRevision] = useState(0)
@@ -82,7 +83,8 @@ function SectionEditor({ section, profile, onSaved, onBusy }) {
     setError('')
     setMessage('')
     try {
-      const response = await updateProfile(buildPayload(section, draft, profile))
+      const saveProfile = section === 'pronunciation' ? completeProfile : updateProfile
+      const response = await saveProfile(buildPayload(section, draft, profile))
       if (response.status !== true || !response.data) throw new Error('Update failed')
       const next = normalizeProfile(response.data)
       onSaved(next)
@@ -107,7 +109,7 @@ function SectionEditor({ section, profile, onSaved, onBusy }) {
     <section className="privacy-settings edit-profile-details">
       {!collections[section] && <h3>{sections.find(([key]) => key === section)[1]}</h3>}
       <form onSubmit={save}>
-        <fieldset className="profile-editor-fields" disabled={saving || uploading}>
+        <fieldset className="profile-editor-fields" disabled={disabled}>
           <ProfileFields
             key={revision}
             section={section}
@@ -125,14 +127,10 @@ function SectionEditor({ section, profile, onSaved, onBusy }) {
         {uploading && <p role="status">Uploading file…</p>}
         {(!collections[section] || changed) && (
           <div className="edit-profile-actions">
-            <button type="button" disabled={saving || uploading} onClick={cancel}>
+            <button type="button" disabled={disabled} onClick={cancel}>
               Cancel
             </button>
-            <button
-              className="community-gradient-button"
-              type="submit"
-              disabled={saving || uploading}
-            >
+            <button className="community-gradient-button" type="submit" disabled={disabled}>
               {saving ? 'Saving…' : 'Save'}
             </button>
           </div>

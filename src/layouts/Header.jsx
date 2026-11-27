@@ -4,11 +4,38 @@ import { AskShareModal } from '../components/modals/AskShareModal/AskShareModal'
 import { AUTH_STORAGE_KEY } from '../utils/helper'
 import './Header.css'
 import { useProfile } from '../context/ProfileContext'
-import { createPost, uploadFile, getConnectionCount, getNotificationCount } from '../action/action'
+import {
+  createPost,
+  uploadFile,
+  getConnectionCount,
+  getNotificationCount,
+} from '../action/action'
 import { createPdfThumbnail } from '../utils/pdfThumbnail'
 import { toast } from 'react-toastify'
 import { ConnectionRequestsPanel } from './ConnectionRequestsPanel'
 import { NotificationsPanel } from './NotificationsPanel'
+
+async function uploadComposerMedia(file, link) {
+  if (link.trim()) {
+    return { media: link.trim(), thumbnail: link.trim() }
+  }
+  if (!file) return {}
+
+  const media = await uploadFile(file)
+  const extension = file.name.split('.').pop().toLowerCase()
+  if (file.type !== 'application/pdf' && extension !== 'pdf') return { media }
+
+  const thumbnailBlob = await createPdfThumbnail(file)
+  const thumbnail = await uploadFile(thumbnailBlob, 'png', 'image/png')
+  return { media, thumbnail }
+}
+
+function composerMediaType(file, link, videoType) {
+  if (link.trim()) return 'link'
+  if (!file) return undefined
+  if (file.type.startsWith('video/')) return videoType
+  return file.type.startsWith('image/') ? 'image' : 'document'
+}
 
 const navigationItems = [
   {
@@ -35,11 +62,10 @@ const navigationItems = [
     label: 'Profile',
     path: '/profile',
     icon: '/assets/logo_icons/profile_icon.svg',
-  
   },
 ]
 
-export function Header() {
+export function Header({ onQuestionCreated }) {
   const { profile, isLoading } = useProfile()
   const navigate = useNavigate()
   const location = useLocation()
@@ -49,14 +75,21 @@ export function Header() {
   const counts = useHeaderCounts()
   const headerRef = useRef(null)
   useEffect(() => {
-    const close = event => {
-      if (event.key === 'Escape' || (event.type === 'pointerdown' && !headerRef.current?.contains(event.target))) {
-        setOpenPanel(null); setIsAccountMenuOpen(false)
+    const close = (event) => {
+      if (
+        event.key === 'Escape' ||
+        (event.type === 'pointerdown' && !headerRef.current?.contains(event.target))
+      ) {
+        setOpenPanel(null)
+        setIsAccountMenuOpen(false)
       }
     }
     document.addEventListener('keydown', close)
     document.addEventListener('pointerdown', close)
-    return () => { document.removeEventListener('keydown', close); document.removeEventListener('pointerdown', close) }
+    return () => {
+      document.removeEventListener('keydown', close)
+      document.removeEventListener('pointerdown', close)
+    }
   }, [])
 
   const logout = () => {
@@ -67,6 +100,46 @@ export function Header() {
 
   const isActive = (path) => {
     return location.pathname === path
+  }
+
+  function renderAccountMenu() {
+    return (
+      <div className="account-menu">
+        <div className="account-menu-profile">
+          <img src={profile?.image || '/assets/logo_icons/profile_alt.avif'} alt="" />
+          <div>
+            {isLoading ? (
+              <>
+                <span className="header-profile-skeleton header-profile-skeleton-name" />
+                <span className="header-profile-skeleton header-profile-skeleton-username" />
+              </>
+            ) : (
+              <>
+                <strong>{profile?.fullName}</strong>
+                <span>{profile?.displayUsername}</span>
+              </>
+            )}
+          </div>
+        </div>
+        <button
+          className="account-view-profile"
+          type="button"
+          onClick={() => navigate('/profile')}
+        >
+          View Profile
+        </button>
+        <a href="https://socialknkt.com/privacy" target="_blank" rel="noreferrer">
+          Privacy Policy
+        </a>
+        <a href="https://socialknkt.com/terms" target="_blank" rel="noreferrer">
+          Terms of Service
+        </a>
+        <button className="account-logout" type="button" onClick={logout}>
+          <img src="/assets/logo_icons/logoutIcon.svg" alt="" />
+          <span>Log out</span>
+        </button>
+      </div>
+    )
   }
 
   return (
@@ -104,7 +177,12 @@ export function Header() {
       </nav>
 
       <div className="header-actions">
-        <button className="header-search" type="button" aria-label="Search" onClick={() => navigate('/search')}>
+        <button
+          className="header-search"
+          type="button"
+          aria-label="Search"
+          onClick={() => navigate('/search')}
+        >
           <img src="/assets/logo_icons/search.svg" alt="" />
         </button>
 
@@ -128,51 +206,37 @@ export function Header() {
           onClick={() => setOpenPanel(openPanel === 'notifications' ? null : 'notifications')}
         />
 
-        <button className="header-account" type="button" aria-label="Open account menu" onClick={() => setIsAccountMenuOpen(!isAccountMenuOpen)}>
+        <button
+          className="header-account"
+          type="button"
+          aria-label="Open account menu"
+          onClick={() => setIsAccountMenuOpen(!isAccountMenuOpen)}
+        >
           <span className="header-account-avatar">
             <img src={profile?.image || '/assets/logo_icons/profile_alt.avif'} alt="" />
           </span>
-          <img className="header-account-chevron" src="/assets/logo_icons/dropdownHeader.svg" alt="" />
+          <img
+            className="header-account-chevron"
+            src="/assets/logo_icons/dropdownHeader.svg"
+            alt=""
+          />
         </button>
 
-        {isAccountMenuOpen && (
-          <div className="account-menu">
-            <div className="account-menu-profile">
-            <img src={profile?.image || '/assets/logo_icons/profile_alt.avif'} alt="" />
-              <div>
-                {isLoading ? (
-                  <>
-                    <span className="header-profile-skeleton header-profile-skeleton-name" />
-                    <span className="header-profile-skeleton header-profile-skeleton-username" />
-                  </>
-                ) : (
-                  <>
-                    <strong>{profile?.fullName}</strong>
-                    <span>{profile?.displayUsername}</span>
-                  </>
-                )}
-              </div>
-            </div>
-            <button className="account-view-profile" type="button" onClick={() => navigate('/profile')}>View Profile</button>
-            <a href="https://socialknkt.com/privacy" target="_blank" rel="noreferrer">Privacy Policy</a>
-            <a href="https://socialknkt.com/terms" target="_blank" rel="noreferrer">Terms of Service</a>
-            <button
-              className="account-logout"
-              type="button"
-              onClick={logout}
-            >
-              <img src="/assets/logo_icons/logoutIcon.svg" alt="" />
-              <span>Log out</span>
-            </button>
-          </div>
-        )}
+        {isAccountMenuOpen && renderAccountMenu()}
 
-        {openPanel === 'notifications' && <NotificationsPanel onClose={() => setOpenPanel(null)} />}
-        {openPanel === 'connections' && <ConnectionRequestsPanel onClose={() => setOpenPanel(null)} />}
+        {openPanel === 'notifications' && (
+          <NotificationsPanel onClose={() => setOpenPanel(null)} />
+        )}
+        {openPanel === 'connections' && (
+          <ConnectionRequestsPanel onClose={() => setOpenPanel(null)} />
+        )}
       </div>
 
       {isPostModalOpen && (
-        <PostComposerModal onClose={() => setIsPostModalOpen(false)} />
+        <PostComposerModal
+          onClose={() => setIsPostModalOpen(false)}
+          onQuestionCreated={onQuestionCreated}
+        />
       )}
     </header>
   )
@@ -189,7 +253,7 @@ function HeaderAction({ label, icon, count, onClick }) {
   )
 }
 
-function PostComposerModal({ onClose }) {
+function PostComposerModal({ onClose, onQuestionCreated }) {
   const { profile } = useProfile()
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false)
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
@@ -198,11 +262,13 @@ function PostComposerModal({ onClose }) {
   const [postText, setPostText] = useState('')
   const [isAskShareOpen, setIsAskShareOpen] = useState(false)
   const [selectedFile, setSelectedFile] = useState(null)
+  const [videoType, setVideoType] = useState('video')
   const [videoLink, setVideoLink] = useState('')
   const [isVideoLinkModalOpen, setIsVideoLinkModalOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const photoInputRef = useRef(null)
   const videoInputRef = useRef(null)
+  const flickInputRef = useRef(null)
   const documentInputRef = useRef(null)
   const modalRef = useRef(null)
 
@@ -218,7 +284,8 @@ function PostComposerModal({ onClose }) {
   const handleAddOption = (label) => {
     setIsAddMenuOpen(false)
     if (label === 'Add a photo') photoInputRef.current?.click()
-    if (label === 'Add a video' || label === 'Add flicks') videoInputRef.current?.click()
+    if (label === 'Add a video') videoInputRef.current?.click()
+    if (label === 'Add flicks') flickInputRef.current?.click()
     if (label === 'Add a document') documentInputRef.current?.click()
   }
 
@@ -230,21 +297,10 @@ function PostComposerModal({ onClose }) {
       const payload = {
         postType: profileType === 'Professional' ? 1 : profileType === 'Personal' ? 2 : 3,
         description: postText,
-        mediaType: link.trim() ? 'videolink' : selectedFile?.type?.startsWith('video/') ? 'video' : selectedFile?.type?.startsWith('image/') ? 'image' : selectedFile ? 'document' : undefined,
+        mediaType: composerMediaType(selectedFile, link, videoType),
       }
 
-      if (link.trim()) {
-        payload.media = link.trim()
-        payload.thumbnail = link.trim()
-      } else if (selectedFile) {
-        const ext = selectedFile.name.split('.').pop().toLowerCase()
-        payload.media = await uploadFile(selectedFile)
-        if (selectedFile.type === 'application/pdf' || ext === 'pdf') {
-          const thumbnailBlob = await createPdfThumbnail(selectedFile)
-          payload.thumbnail = await uploadFile(thumbnailBlob, 'png', 'image/png')
-        }
-      }
-
+      Object.assign(payload, await uploadComposerMedia(selectedFile, link))
       await createPost(payload)
       toast.success('Post created successfully.')
       window.location.reload()
@@ -278,6 +334,97 @@ function PostComposerModal({ onClose }) {
     return () => document.removeEventListener('mousedown', handleOutsideClick)
   }, [postText])
 
+  function renderComposerUser() {
+    return (
+      <div className="post-modal-user">
+        <img src={profile?.image || '/assets/logo_icons/profile_alt.avif'} alt="" />
+        <div>
+          <h3>{profile?.fullName || 'Loading profile...'}</h3>
+          <div className="post-profile-selector">
+            <button type="button" onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}>
+              <ProfileTypeIcon type={profileType} />
+              {profileType}
+              <img
+                className="post-modal-caret"
+                src="/assets/logo_icons/postadddropdown.svg"
+                alt=""
+              />
+            </button>
+
+            {isProfileMenuOpen && (
+              <div className="post-profile-menu">
+                {['Both', 'Personal', 'Professional'].map((type) => (
+                  <button
+                    type="button"
+                    key={type}
+                    onClick={() => {
+                      setProfileType(type)
+                      setIsProfileMenuOpen(false)
+                    }}
+                  >
+                    <ProfileTypeIcon type={type} />
+                    {type}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  function renderVideoLink() {
+    return (
+      <>
+        {isVideoLinkModalOpen && (
+          <div
+            className="header-video-link-backdrop"
+            role="presentation"
+            onClick={() => setIsVideoLinkModalOpen(false)}
+          >
+            <div
+              className="header-video-link-modal"
+              role="dialog"
+              aria-modal="true"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <button
+                className="header-video-link-close"
+                type="button"
+                onClick={() => setIsVideoLinkModalOpen(false)}
+                aria-label="Close"
+              >
+                ×
+              </button>
+              <h2>Add Video Link</h2>
+              <p>Paste a YouTube or video link to add it to your post.</p>
+              <input
+                autoFocus
+                value={videoLink}
+                onChange={(event) => setVideoLink(event.target.value)}
+                placeholder="Enter video link"
+              />
+              <div className="header-video-link-actions">
+                <button type="button" onClick={() => setIsVideoLinkModalOpen(false)}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSubmit(videoLink)}
+                  disabled={!videoLink.trim() || isSubmitting}
+                >
+                  {isSubmitting && <span className="post-submit-spinner" />}
+                  {isSubmitting ? 'Posting...' : 'Add Link'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    )
+  }
+
   return (
     <div className="post-modal-backdrop" role="presentation" onClick={onClose}>
       <section
@@ -295,41 +442,7 @@ function PostComposerModal({ onClose }) {
           </button>
         </div>
 
-        <div className="post-modal-user">
-          <img src={profile?.image || '/assets/logo_icons/profile_alt.avif'} alt="" />
-          <div>
-            <h3>{profile?.fullName || 'Loading profile...'}</h3>
-            <div className="post-profile-selector">
-              <button
-                type="button"
-                onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
-              >
-                <ProfileTypeIcon type={profileType} />
-                {profileType}
-                <img className="post-modal-caret" src="/assets/logo_icons/postadddropdown.svg" alt="" />
-              </button>
-
-              {isProfileMenuOpen && (
-                <div className="post-profile-menu">
-                  {['Both', 'Personal', 'Professional'].map((type) => (
-                    <button
-                      type="button"
-                      key={type}
-                      onClick={() => {
-                        setProfileType(type)
-                        setIsProfileMenuOpen(false)
-                      }}
-                    >
-                      <ProfileTypeIcon type={type} />
-                      {type}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
+        {renderComposerUser()}
         <div className="post-modal-editor">
           <textarea
             placeholder={isEditorFocused ? '' : 'What new with you?'}
@@ -341,9 +454,48 @@ function PostComposerModal({ onClose }) {
           {!isEditorFocused && <img src="/assets/logo_icons/editPost.svg" alt="" />}
         </div>
 
-        <input ref={photoInputRef} type="file" accept="image/*" hidden onChange={(event) => setSelectedFile(event.target.files?.[0] || null)} />
-        <input ref={videoInputRef} type="file" accept="video/*" hidden onChange={(event) => setSelectedFile(event.target.files?.[0] || null)} />
-        <input ref={documentInputRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv" hidden onChange={(event) => setSelectedFile(event.target.files?.[0] || null)} />
+        <input
+          ref={photoInputRef}
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={(event) => setSelectedFile(event.target.files?.[0] || null)}
+        />
+        <input
+          ref={videoInputRef}
+          aria-label="Choose video"
+          type="file"
+          accept="video/*"
+          hidden
+          onChange={(event) => {
+            const file = event.target.files?.[0]
+            if (!file) return
+            setSelectedFile(file)
+            setVideoType('video')
+            setVideoLink('')
+          }}
+        />
+        <input
+          ref={flickInputRef}
+          aria-label="Choose flick"
+          type="file"
+          accept="video/*"
+          hidden
+          onChange={(event) => {
+            const file = event.target.files?.[0]
+            if (!file) return
+            setSelectedFile(file)
+            setVideoType('flicks')
+            setVideoLink('')
+          }}
+        />
+        <input
+          ref={documentInputRef}
+          type="file"
+          accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv"
+          hidden
+          onChange={(event) => setSelectedFile(event.target.files?.[0] || null)}
+        />
 
         <div className="post-modal-actions">
           <div className="post-add-wrapper">
@@ -358,52 +510,62 @@ function PostComposerModal({ onClose }) {
 
             {isAddMenuOpen && (
               <div className="post-add-menu">
-                {addOptions.filter(([, label]) => label !== 'Add a document' || profileType !== 'Personal').map(([icon, label]) => (
-                  <button
-                    type="button"
-                    key={label}
-                    onClick={() => {
-                      if (label === 'Create KNKT(n) Thread') {
-                        setIsAddMenuOpen(false)
-                        setIsAskShareOpen(true)
-                      } else if (label === 'Add a photo' || label === 'Add a video' || label === 'Add flicks' || label === 'Add a document') {
-                        handleAddOption(label)
-                      } else if (label === 'Add Video Link') {
-                        setIsVideoLinkModalOpen(true)
-                        setIsAddMenuOpen(false)
-                      }
-                    }}
-                  >
-                    <img src={`/assets/logo_icons/${icon}`} alt="" />
-                    {label}
-                  </button>
-                ))}
+                {addOptions
+                  .filter(
+                    ([, label]) => label !== 'Add a document' || profileType !== 'Personal',
+                  )
+                  .map(([icon, label]) => (
+                    <button
+                      type="button"
+                      key={label}
+                      onClick={() => {
+                        if (label === 'Create KNKT(n) Thread') {
+                          setIsAddMenuOpen(false)
+                          setIsAskShareOpen(true)
+                        } else if (
+                          label === 'Add a photo' ||
+                          label === 'Add a video' ||
+                          label === 'Add flicks' ||
+                          label === 'Add a document'
+                        ) {
+                          handleAddOption(label)
+                        } else if (label === 'Add Video Link') {
+                          setIsVideoLinkModalOpen(true)
+                          setIsAddMenuOpen(false)
+                        }
+                      }}
+                    >
+                      <img src={`/assets/logo_icons/${icon}`} alt="" />
+                      {label}
+                    </button>
+                  ))}
               </div>
             )}
           </div>
 
-          <button className="post-modal-submit" type="button" onClick={() => handleSubmit()} disabled={isSubmitting} aria-busy={isSubmitting}>
+          <button
+            className="post-modal-submit"
+            type="button"
+            onClick={() => handleSubmit()}
+            disabled={isSubmitting}
+            aria-busy={isSubmitting}
+          >
             <img src="/assets/logo_icons/Send.svg" alt="" />
             {isSubmitting && <span className="post-submit-spinner" />}
             {isSubmitting ? 'Posting...' : 'Post'}
           </button>
         </div>
       </section>
-      {isAskShareOpen && <AskShareModal onClose={() => setIsAskShareOpen(false)} />}
-      {isVideoLinkModalOpen && (
-        <div className="header-video-link-backdrop" role="presentation" onClick={() => setIsVideoLinkModalOpen(false)}>
-          <div className="header-video-link-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
-            <button className="header-video-link-close" type="button" onClick={() => setIsVideoLinkModalOpen(false)} aria-label="Close">×</button>
-            <h2>Add Video Link</h2>
-            <p>Paste a YouTube or video link to add it to your post.</p>
-            <input autoFocus value={videoLink} onChange={(event) => setVideoLink(event.target.value)} placeholder="Enter video link" />
-            <div className="header-video-link-actions">
-              <button type="button" onClick={() => setIsVideoLinkModalOpen(false)}>Cancel</button>
-              <button type="button" onClick={() => handleSubmit(videoLink)} disabled={!videoLink.trim() || isSubmitting}>{isSubmitting && <span className="post-submit-spinner" />}{isSubmitting ? 'Posting...' : 'Add Link'}</button>
-            </div>
-          </div>
-        </div>
+      {isAskShareOpen && (
+        <AskShareModal
+          onClose={() => setIsAskShareOpen(false)}
+          onCreated={() => {
+            onQuestionCreated?.()
+            onClose()
+          }}
+        />
       )}
+      {renderVideoLink()}
     </div>
   )
 }
@@ -413,9 +575,10 @@ function ProfileTypeIcon({ type }) {
     return <img className="profile-type-icon" src="/assets/logo_icons/connection.svg" alt="" />
   }
 
-  const icon = type === 'Personal'
-    ? '/assets/logo_icons/connection.svg'
-    : '/assets/logo_icons/Professional.svg'
+  const icon =
+    type === 'Personal'
+      ? '/assets/logo_icons/connection.svg'
+      : '/assets/logo_icons/Professional.svg'
 
   return <img className="profile-type-icon" src={icon} alt="" />
 }

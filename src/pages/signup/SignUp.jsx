@@ -4,8 +4,78 @@ import { toast } from 'react-toastify'
 import PhoneInput from 'react-phone-number-input'
 import 'react-phone-number-input/style.css'
 import { checkUser, signUp } from '../../action/action'
-import { AUTH_STORAGE_KEY } from '../../utils/helper'
+import { AUTH_STORAGE_KEY, rememberSignup } from '../../utils/helper'
 import './SignUp.css'
+
+function initialSignupValues(profile = {}) {
+  const values = Object.fromEntries(
+    ['fname', 'lname', 'username', 'email', 'dob', 'phone'].map((field) => [
+      field,
+      profile[field] || '',
+    ]),
+  )
+  return { ...values, gender: profile.gender || 'male', password: '', confirmPassword: '' }
+}
+
+function signupRequiredFields(values, isSocialSignup, termsAccepted) {
+  const fields = ['fname', 'lname', 'username', 'dob', 'phone']
+  if (!isSocialSignup) fields.push('password', 'confirmPassword')
+  return {
+    ...Object.fromEntries(fields.map((field) => [field, !values[field]])),
+    email: !values.email.trim(),
+    terms: !termsAccepted,
+  }
+}
+
+function signupPayload(values, isSocialSignup, socialProfile) {
+  const { email, username, phone, fname, lname, dob, gender, password } = values
+  const data = {
+    email: email.trim().toLowerCase(),
+    username,
+    phone,
+    fname,
+    lname,
+    sso: isSocialSignup,
+    dob,
+    gender,
+    devicePlatform: '',
+  }
+  if (!isSocialSignup) return { ...data, password }
+  const { ssoAccount, deviceToken, devicePlatform, identityToken, image } = socialProfile
+  return { ...data, ssoAccount, deviceToken, devicePlatform, identityToken, image }
+}
+
+function finishSignup(response, isSocialSignup, email, navigate) {
+  const user = response.data
+  const hasVerifiedSocialSession =
+    isSocialSignup && user?.isEmailVerified === true && Boolean(user?.token)
+  if (hasVerifiedSocialSession) {
+    localStorage.setItem(
+      AUTH_STORAGE_KEY,
+      JSON.stringify({
+        token: user.token,
+        user: {
+          id: user.id,
+          username: user.username,
+          phone: user.phone,
+          email: user.email,
+          image: user.image,
+          bannerImage: user.banner_image,
+        },
+      }),
+    )
+    toast.success(response.message || 'Account created successfully.')
+    navigate('/work-experience')
+    return
+  }
+  rememberSignup(user, email)
+  toast.success(response.message || 'Account created successfully.')
+  navigate('/verify-account', { state: { email: signupEmail(user, email) } })
+}
+
+function signupEmail(user, fallback) {
+  return user?.email?.trim().toLowerCase() || fallback
+}
 
 export function SignUp() {
   const navigate = useNavigate()
@@ -18,17 +88,7 @@ export function SignUp() {
   const [isCheckingUser, setIsCheckingUser] = useState(false)
   const [fieldErrors, setFieldErrors] = useState({})
   const [termsAccepted, setTermsAccepted] = useState(false)
-  const [formValues, setFormValues] = useState({
-    fname: socialProfile?.fname || '',
-    lname: socialProfile?.lname || '',
-    username: socialProfile?.username || '',
-    email: socialProfile?.email || '',
-    dob: socialProfile?.dob || '',
-    phone: socialProfile?.phone || '',
-    gender: socialProfile?.gender || 'male',
-    password: '',
-    confirmPassword: '',
-  })
+  const [formValues, setFormValues] = useState(() => initialSignupValues(socialProfile || {}))
 
   const handleChange = (field, value) => {
     setFormValues((values) => ({
@@ -48,7 +108,7 @@ export function SignUp() {
     setIsCheckingUser(true)
 
     try {
-      const response = await checkUser({ username, email })
+      const response = await checkUser({ username, email: email.trim().toLowerCase() })
 
       if (response.status === true) {
         toast.success('Username is available.')
@@ -66,28 +126,8 @@ export function SignUp() {
   const handleSubmit = async (event) => {
     event.preventDefault()
 
-    const {
-      email,
-      password,
-      confirmPassword,
-      username,
-      phone,
-      fname,
-      lname,
-      dob,
-      gender,
-    } = formValues
-
-    const requiredFields = {
-      fname: !fname,
-      lname: !lname,
-      username: !username,
-      email: !email,
-      dob: !dob,
-      phone: !phone,
-      ...(isSocialSignup ? {} : { password: !password, confirmPassword: !confirmPassword }),
-      terms: !termsAccepted,
-    }
+    const { password, confirmPassword, phone } = formValues
+    const requiredFields = signupRequiredFields(formValues, isSocialSignup, termsAccepted)
 
     if (Object.values(requiredFields).some(Boolean)) {
       setFieldErrors(requiredFields)
@@ -104,27 +144,7 @@ export function SignUp() {
       return
     }
 
-    const signupData = {
-      email,
-      username,
-      phone,
-      fname,
-      lname,
-      sso: isSocialSignup,
-      dob,
-      gender,
-      devicePlatform: '',
-    }
-
-    if (!isSocialSignup) {
-      signupData.password = password
-    } else {
-      signupData.ssoAccount = socialProfile.ssoAccount
-      signupData.deviceToken = socialProfile.deviceToken
-      signupData.devicePlatform = socialProfile.devicePlatform
-      signupData.identityToken = socialProfile.identityToken
-      signupData.image = socialProfile.image
-    }
+    const signupData = signupPayload(formValues, isSocialSignup, socialProfile)
 
     setIsSubmitting(true)
 
@@ -132,32 +152,7 @@ export function SignUp() {
       const response = await signUp(signupData)
 
       if (response.status === true) {
-        const user = response.data
-        const hasVerifiedSocialSession = isSocialSignup
-          && response.data?.isEmailVerified === true
-          && Boolean(response.data?.token)
-
-        if (hasVerifiedSocialSession) {
-          localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({
-            token: user.token,
-            user: {
-              id: user.id,
-              username: user.username,
-              phone: user.phone,
-              email: user.email,
-              image: user.image,
-              bannerImage: user.banner_image,
-            },
-          }))
-          toast.success(response.message || 'Account created successfully.')
-          navigate('/work-experience')
-          return
-        }
-
-        toast.success(response.message || 'Account created successfully.')
-        navigate('/verify-account', {
-          state: { email: signupData.email },
-        })
+        finishSignup(response, isSocialSignup, signupData.email, navigate)
       }
     } catch (error) {
       toast.error(error.message || 'Unable to create account.')
@@ -174,7 +169,9 @@ export function SignUp() {
         </button>
         <p className="signup-login-prompt">
           Already have an account?{' '}
-          <button type="button" onClick={() => navigate('/')}>Login Now</button>
+          <button type="button" onClick={() => navigate('/')}>
+            Login Now
+          </button>
         </p>
       </header>
 
@@ -182,18 +179,57 @@ export function SignUp() {
         <h1 id="signup-title">Go ahead and sign up</h1>
         <p className="signup-subtitle">Please Enter Your Details</p>
 
-        <form
-          className="signup-form"
-          onSubmit={handleSubmit}
-          noValidate
-        >
+        <form className="signup-form" onSubmit={handleSubmit} noValidate>
           <div className="signup-grid">
-            <SignupField name="fname" label="First Name" placeholder="Enter your First Name" value={formValues.fname} onChange={handleChange} hasError={fieldErrors.fname} />
-            <SignupField name="lname" label="Last Name" placeholder="Enter your Last Name" value={formValues.lname} onChange={handleChange} hasError={fieldErrors.lname} />
-            <SignupField name="username" label="User Name" placeholder="Enter your User Name" value={formValues.username} onChange={handleChange} onBlur={handleUserCheck} hasError={fieldErrors.username} errorMessage={fieldErrors.username} />
-            <SignupField name="email" label="Email address" type="email" placeholder="Enter your email" value={formValues.email} onChange={handleChange} onBlur={handleUserCheck} hasError={fieldErrors.email} />
-            <SignupField name="dob" label="Birth date" type="date" placeholder="mm/dd/yyyy" value={formValues.dob} onChange={handleChange} hasError={fieldErrors.dob} />
-            <label className={`signup-field ${fieldErrors.phone ? 'has-error' : ''}`} htmlFor="signup-phone">
+            <SignupField
+              name="fname"
+              label="First Name"
+              placeholder="Enter your First Name"
+              value={formValues.fname}
+              onChange={handleChange}
+              hasError={fieldErrors.fname}
+            />
+            <SignupField
+              name="lname"
+              label="Last Name"
+              placeholder="Enter your Last Name"
+              value={formValues.lname}
+              onChange={handleChange}
+              hasError={fieldErrors.lname}
+            />
+            <SignupField
+              name="username"
+              label="User Name"
+              placeholder="Enter your User Name"
+              value={formValues.username}
+              onChange={handleChange}
+              onBlur={handleUserCheck}
+              hasError={fieldErrors.username}
+              errorMessage={fieldErrors.username}
+            />
+            <SignupField
+              name="email"
+              label="Email address"
+              type="email"
+              placeholder="Enter your email"
+              value={formValues.email}
+              onChange={handleChange}
+              onBlur={handleUserCheck}
+              hasError={fieldErrors.email}
+            />
+            <SignupField
+              name="dob"
+              label="Birth date"
+              type="date"
+              placeholder="mm/dd/yyyy"
+              value={formValues.dob}
+              onChange={handleChange}
+              hasError={fieldErrors.dob}
+            />
+            <label
+              className={`signup-field ${fieldErrors.phone ? 'has-error' : ''}`}
+              htmlFor="signup-phone"
+            >
               <span>Number</span>
               <PhoneInput
                 international
@@ -209,25 +245,43 @@ export function SignUp() {
           <fieldset className="gender-field">
             <legend>Gender</legend>
             <div className="gender-options">
-              {['Male', 'Female', 'Transgender', 'Gender Neutral', 'Non Binary', 'Other'].map((gender) => (
-                <label key={gender}>
-                  <input
-                    type="radio"
-                    name="gender"
-                    value={gender.toLowerCase()}
-                    checked={formValues.gender === gender.toLowerCase()}
-                    onChange={(event) => handleChange('gender', event.target.value)}
-                  />
-                  {gender}
-                </label>
-              ))}
+              {['Male', 'Female', 'Transgender', 'Gender Neutral', 'Non Binary', 'Other'].map(
+                (gender) => (
+                  <label key={gender}>
+                    <input
+                      type="radio"
+                      name="gender"
+                      value={gender.toLowerCase()}
+                      checked={formValues.gender === gender.toLowerCase()}
+                      onChange={(event) => handleChange('gender', event.target.value)}
+                    />
+                    {gender}
+                  </label>
+                ),
+              )}
             </div>
           </fieldset>
 
           {!isSocialSignup && (
             <div className="signup-grid">
-              <PasswordField name="password" label="Password" value={formValues.password} onChange={handleChange} hasError={fieldErrors.password} showPassword={showPassword} onToggle={() => setShowPassword((value) => !value)} />
-              <PasswordField name="confirmPassword" label="Confirm Password" value={formValues.confirmPassword} onChange={handleChange} hasError={fieldErrors.confirmPassword} showPassword={showConfirmPassword} onToggle={() => setShowConfirmPassword((value) => !value)} />
+              <PasswordField
+                name="password"
+                label="Password"
+                value={formValues.password}
+                onChange={handleChange}
+                hasError={fieldErrors.password}
+                showPassword={showPassword}
+                onToggle={() => setShowPassword((value) => !value)}
+              />
+              <PasswordField
+                name="confirmPassword"
+                label="Confirm Password"
+                value={formValues.confirmPassword}
+                onChange={handleChange}
+                hasError={fieldErrors.confirmPassword}
+                showPassword={showConfirmPassword}
+                onToggle={() => setShowConfirmPassword((value) => !value)}
+              />
             </div>
           )}
 
@@ -240,7 +294,12 @@ export function SignUp() {
                 setFieldErrors((errors) => ({ ...errors, terms: false }))
               }}
             />
-            <span>I accept the <strong>Terms and conditions.</strong></span>
+            <span>
+              I accept the{' '}
+              <a href="https://socialknkt.com/terms" target="_blank" rel="noopener noreferrer">
+                <strong>Terms and conditions.</strong>
+              </a>
+            </span>
           </label>
 
           <button className="signup-submit" type="submit" disabled={isSubmitting}>
@@ -252,7 +311,17 @@ export function SignUp() {
   )
 }
 
-function SignupField({ name, label, type = 'text', placeholder, value, onChange, onBlur, hasError, errorMessage }) {
+function SignupField({
+  name,
+  label,
+  type = 'text',
+  placeholder,
+  value,
+  onChange,
+  onBlur,
+  hasError,
+  errorMessage,
+}) {
   return (
     <label className={`signup-field ${hasError ? 'has-error' : ''}`}>
       <span>{label}</span>

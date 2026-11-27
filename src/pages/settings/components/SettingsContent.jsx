@@ -1,7 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
-import { blockUser, deleteAccount, getBlockedUsers, updateAccountStatus, updatePassword, updateProfessionalStatus } from '../../../action/action'
+import {
+  blockUser,
+  deleteAccount,
+  getBlockedUsers,
+  updateAccountStatus,
+  updatePassword,
+  updateProfessionalStatus,
+} from '../../../action/action'
 import { useProfile } from '../../../context/ProfileContext'
 
 export function SettingsContent() {
@@ -37,7 +44,9 @@ export function SettingsContent() {
                 setIsProfessionalUpdating(true)
                 try {
                   await updateProfessionalStatus(nextValue)
-                  setProfile((current) => current ? { ...current, isProfessional: nextValue } : current)
+                  setProfile((current) =>
+                    current ? { ...current, isProfessional: nextValue } : current,
+                  )
                 } catch (error) {
                   setIsProfessional(!nextValue)
                   toast.error(error.message || 'Unable to update professional status.')
@@ -48,32 +57,7 @@ export function SettingsContent() {
             />
           </div>
 
-          <button
-            className={activeSection === 'privacy' ? 'active' : ''}
-            type="button"
-            onClick={() => setActiveSection('privacy')}
-          >
-            Account Privacy
-            {activeSection === 'privacy' && <span>‹</span>}
-          </button>
-
-          <button
-            className={activeSection === 'block-list' ? 'active' : ''}
-            type="button"
-            onClick={() => setActiveSection('block-list')}
-          >
-            Block List
-            {activeSection === 'block-list' && <span>‹</span>}
-          </button>
-
-          <button
-            className={activeSection === 'password' ? 'active' : ''}
-            type="button"
-            onClick={() => setActiveSection('password')}
-          >
-            Change password
-            {activeSection === 'password' && <span>‹</span>}
-          </button>
+          <SettingsMenuSections activeSection={activeSection} onSelect={setActiveSection} />
 
           <button className="danger" type="button" onClick={() => setIsDeleteOpen(true)}>
             Delete Account
@@ -96,7 +80,7 @@ export function SettingsContent() {
                   try {
                     const profileType = nextValue ? 2 : 1
                     await updateAccountStatus(profileType)
-                    setProfile((current) => current ? { ...current, profileType } : current)
+                    setProfile((current) => (current ? { ...current, profileType } : current))
                   } catch (error) {
                     setIsPrivateAccount(!nextValue)
                     toast.error(error.message || 'Unable to update account privacy.')
@@ -114,29 +98,59 @@ export function SettingsContent() {
         )}
       </div>
 
-      {isDeleteOpen && <DeleteAccountModal onClose={() => setIsDeleteOpen(false)} onDeleted={() => navigate('/signin')} />}
+      {isDeleteOpen && (
+        <DeleteAccountModal
+          onClose={() => setIsDeleteOpen(false)}
+          onDeleted={() => navigate('/signin')}
+        />
+      )}
     </div>
   )
+}
+
+function SettingsMenuSections({ activeSection, onSelect }) {
+  return [
+    ['privacy', 'Account Privacy'],
+    ['block-list', 'Block List'],
+    ['password', 'Change password'],
+  ].map(([section, label]) => (
+    <button
+      key={section}
+      className={activeSection === section ? 'active' : ''}
+      type="button"
+      onClick={() => onSelect(section)}
+    >
+      {label}
+      {activeSection === section && <span>‹</span>}
+    </button>
+  ))
 }
 
 function BlockList() {
   const [blockedUsers, setBlockedUsers] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [unblockingId, setUnblockingId] = useState(null)
+  const [loadError, setLoadError] = useState(false)
+  const [retryCount, setRetryCount] = useState(0)
 
   useEffect(() => {
     let isMounted = true
     getBlockedUsers()
       .then((response) => {
-        if (isMounted) setBlockedUsers(response.data || [])
+        const users = Array.isArray(response.data) ? response.data : []
+        if (isMounted) setBlockedUsers(users.filter((user) => user && (user.id || user._id)))
       })
-      .catch((error) => toast.error(error.message || 'Unable to load block list.'))
+      .catch(() => {
+        if (isMounted) setLoadError(true)
+      })
       .finally(() => {
         if (isMounted) setIsLoading(false)
       })
 
-    return () => { isMounted = false }
-  }, [])
+    return () => {
+      isMounted = false
+    }
+  }, [retryCount])
 
   const handleUnblock = async (user) => {
     const userId = user.id || user._id
@@ -156,16 +170,47 @@ function BlockList() {
   return (
     <section className="privacy-settings block-list-section">
       <h3>Block List</h3>
-      {isLoading ? <p className="block-list-status">Loading blocked users...</p> : blockedUsers.length === 0 ? <p className="block-list-status">No blocked users.</p> : (
+      {isLoading ? (
+        <p className="block-list-status">Loading blocked users...</p>
+      ) : loadError ? (
+        <div role="alert">
+          <p className="block-list-status">Unable to load block list. Please try again.</p>
+          <button
+            className="community-gradient-button settings-password-submit"
+            type="button"
+            onClick={() => {
+              setIsLoading(true)
+              setLoadError(false)
+              setRetryCount((count) => count + 1)
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      ) : blockedUsers.length === 0 ? (
+        <p className="block-list-status">No blocked users.</p>
+      ) : (
         <div className="blocked-users-list">
           {blockedUsers.map((user) => {
             const userId = user.id || user._id
-            const name = `${user.fname || ''} ${user.lname || ''}`.trim() || user.username || 'Unknown user'
+            const name =
+              `${user.fname || ''} ${user.lname || ''}`.trim() ||
+              user.username ||
+              'Unknown user'
             return (
               <div className="blocked-user-row" key={userId}>
                 <img src={user.image || '/assets/logo_icons/profile_alt.avif'} alt="" />
-                <div className="blocked-user-details"><strong>{name}</strong><span>@{user.username || 'user'}</span></div>
-                <button type="button" onClick={() => handleUnblock(user)} disabled={unblockingId === userId}>{unblockingId === userId ? 'Unblocking...' : 'Unblock'}</button>
+                <div className="blocked-user-details">
+                  <strong>{name}</strong>
+                  <span>@{user.username || 'user'}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleUnblock(user)}
+                  disabled={unblockingId === userId}
+                >
+                  {unblockingId === userId ? 'Unblocking...' : 'Unblock'}
+                </button>
               </div>
             )
           })}
@@ -206,35 +251,66 @@ function DeleteAccountModal({ onClose, onDeleted }) {
         aria-labelledby="delete-account-title"
         onClick={(event) => event.stopPropagation()}
       >
-        <button className="delete-account-close" type="button" aria-label="Close delete account modal" onClick={onClose}>
+        <button
+          className="delete-account-close"
+          type="button"
+          aria-label="Close delete account modal"
+          onClick={onClose}
+        >
           ×
         </button>
         <h2 id="delete-account-title">Delete Account</h2>
         <p>Are you sure you want to delete your KNKT account?</p>
         <p>
-          Once you confirm, your account will be deactivated for 30 days. You can recover your account during this period. After 30 days, your account and associated data will be permanently deleted and cannot be recovered.
+          Once you confirm, your account and associated data will be permanently deleted
+          immediately. This action cannot be undone, and your account cannot be recovered.
         </p>
-        <button className="delete-account-button" type="button" disabled={isDeleting} onClick={async () => {
-          if (isDeleting) return
-          setIsDeleting(true)
-          try {
-            await deleteAccount()
-            localStorage.removeItem('socialknkt_auth')
-            toast.success('Account deleted successfully.')
-            onDeleted()
-          } catch (error) {
-            toast.error(error.message || 'Unable to delete account.')
-          } finally {
-            setIsDeleting(false)
-          }
-        }}>{isDeleting ? 'Deleting...' : 'Delete'}</button>
+        <button
+          className="delete-account-button"
+          type="button"
+          disabled={isDeleting}
+          onClick={async () => {
+            if (isDeleting) return
+            setIsDeleting(true)
+            try {
+              await deleteAccount()
+              localStorage.removeItem('socialknkt_auth')
+              toast.success('Account deleted successfully.')
+              onDeleted()
+            } catch (error) {
+              toast.error(error.message || 'Unable to delete account.')
+            } finally {
+              setIsDeleting(false)
+            }
+          }}
+        >
+          {isDeleting ? 'Deleting...' : 'Delete'}
+        </button>
       </section>
     </div>
   )
 }
 
+function passwordChangeErrors(values) {
+  const errors = {}
+  if (!values.oldPassword) errors.oldPassword = 'Old password is required.'
+  if (!values.newPassword) errors.newPassword = 'New password is required.'
+  if (!values.confirmPassword) errors.confirmPassword = 'Confirm password is required.'
+  if (
+    values.newPassword &&
+    values.confirmPassword &&
+    values.newPassword !== values.confirmPassword
+  )
+    errors.confirmPassword = 'Passwords do not match.'
+  return errors
+}
+
 function ChangePasswordForm() {
-  const [values, setValues] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' })
+  const [values, setValues] = useState({
+    oldPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  })
   const [errors, setErrors] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -245,11 +321,7 @@ function ChangePasswordForm() {
 
   const handleSubmit = async (event) => {
     event.preventDefault()
-    const nextErrors = {}
-    if (!values.oldPassword) nextErrors.oldPassword = 'Old password is required.'
-    if (!values.newPassword) nextErrors.newPassword = 'New password is required.'
-    if (!values.confirmPassword) nextErrors.confirmPassword = 'Confirm password is required.'
-    if (values.newPassword && values.confirmPassword && values.newPassword !== values.confirmPassword) nextErrors.confirmPassword = 'Passwords do not match.'
+    const nextErrors = passwordChangeErrors(values)
     if (Object.keys(nextErrors).length) {
       setErrors(nextErrors)
       return
@@ -272,10 +344,37 @@ function ChangePasswordForm() {
     <section className="privacy-settings change-password-section">
       <h3>Change Password</h3>
       <form onSubmit={handleSubmit} noValidate>
-        <PasswordField label="Old Password" placeholder="Enter Old Password" info="Your current password is required." value={values.oldPassword} error={errors.oldPassword} onChange={(value) => updateValue('oldPassword', value)} />
-        <PasswordField label="New Password" placeholder="Enter New Password" info="Use at least 8 characters with a number and symbol." value={values.newPassword} error={errors.newPassword} onChange={(value) => updateValue('newPassword', value)} />
-        <PasswordField label="Confirm Password" placeholder="Re-enter New Password" info="Enter the same new password again." value={values.confirmPassword} error={errors.confirmPassword} onChange={(value) => updateValue('confirmPassword', value)} />
-        <button className="community-gradient-button settings-password-submit" type="submit" disabled={isSubmitting}>{isSubmitting ? 'Updating...' : 'Change Password'}</button>
+        <PasswordField
+          label="Old Password"
+          placeholder="Enter Old Password"
+          info="Your current password is required."
+          value={values.oldPassword}
+          error={errors.oldPassword}
+          onChange={(value) => updateValue('oldPassword', value)}
+        />
+        <PasswordField
+          label="New Password"
+          placeholder="Enter New Password"
+          info="Use at least 8 characters with a number and symbol."
+          value={values.newPassword}
+          error={errors.newPassword}
+          onChange={(value) => updateValue('newPassword', value)}
+        />
+        <PasswordField
+          label="Confirm Password"
+          placeholder="Re-enter New Password"
+          info="Enter the same new password again."
+          value={values.confirmPassword}
+          error={errors.confirmPassword}
+          onChange={(value) => updateValue('confirmPassword', value)}
+        />
+        <button
+          className="community-gradient-button settings-password-submit"
+          type="submit"
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? 'Updating...' : 'Change Password'}
+        </button>
       </form>
     </section>
   )
@@ -289,12 +388,29 @@ function PasswordField({ label, placeholder, info, value, error, onChange }) {
     <label className="settings-password-field">
       <span className="settings-password-label">
         {label}
-        <button type="button" className="password-info-button" aria-label={`Show information about ${label}`} onClick={() => setIsInfoOpen(!isInfoOpen)}>i</button>
+        <button
+          type="button"
+          className="password-info-button"
+          aria-label={`Show information about ${label}`}
+          onClick={() => setIsInfoOpen(!isInfoOpen)}
+        >
+          i
+        </button>
         {isInfoOpen && <span className="password-info-popover">{info}</span>}
       </span>
       <span className="settings-password-input">
-        <input type={isVisible ? 'text' : 'password'} placeholder={placeholder} value={value} onChange={(event) => onChange(event.target.value)} aria-invalid={Boolean(error)} />
-        <button type="button" aria-label={`Toggle ${label} visibility`} onClick={() => setIsVisible(!isVisible)}>
+        <input
+          type={isVisible ? 'text' : 'password'}
+          placeholder={placeholder}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          aria-invalid={Boolean(error)}
+        />
+        <button
+          type="button"
+          aria-label={`Toggle ${label} visibility`}
+          onClick={() => setIsVisible(!isVisible)}
+        >
           <EyeIcon hidden={!isVisible} />
         </button>
       </span>

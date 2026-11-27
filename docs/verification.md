@@ -36,6 +36,33 @@ Browser coverage exercises connection filters and requests, profile persistence,
 
 Connections use the existing request endpoints, with personal/professional/both acceptance and authoritative request IDs. Edit profile reuses shared controls and preserves unrelated profile fields and collections. Search, notification links, saved flicks and shared links use existing API contracts and routes. Contact Us reads the existing admin contact details and opens an email draft; the user sends it from their mail app, and the web does not claim delivery.
 
-The inspected backend's feeds search with media=false returns threads. Posts search currently exposes supported photo/video results; text-post search requires a backend contract correction. Clearing existing phonetic pronunciation is unsupported by the backend, and recorded pronunciation has no verified update contract. Chat implements verified text-message events; audio/media chat is not implemented without a verified contract.
+The inspected backend's feeds search with media=false returns threads. Posts search currently exposes supported photo/video results; text-post search requires a backend contract correction. Pronunciation uses the mobile `user/complete-profile` endpoint for both `record_name` audio URLs and `phonetic_spelling`, including explicit clears. Editor saves omit `stepCount`; onboarding sends step 4. Chat implements verified text-message events; audio/media chat is not implemented without a verified contract.
+
+## Flow comparison, 27 November 2026
+
+The comparison uses Figma Final UI and the source revisions above. Source contracts and mocked browser checks do not establish that the deployed backend matches these revisions.
+
+| Flow | Findings and verification scope |
+| --- | --- |
+| Signup, OTP and passwords | Canonical email handling; signup token held in memory until successful verification. A refreshed verification page safely returns to sign-in after verification because no pending token is persisted. |
+| Onboarding details | Education year keys match the backend model; current-location selection preserves the chosen country; cascading location reads and submissions are guarded. |
+| Pronunciation and profile editing | Actual MediaRecorder audio uploads, playback, retry and cleanup; shared recorder in the existing editor. Save and Skip proceed to Add Media. |
+| Onboarding Add Media | Profile picture and banner save through existing signed uploads and profile actions, with partial-failure retry and preview cleanup. “Add Content” is explicitly unavailable pending the requested choice between profile headshots and feed posts; photos are not silently discarded or published. |
+| Own/other profiles | Backend summary fields, recorded-name playback, report-user contract, block ownership, list pagination and recovery. |
+| Home, Flicks and KNKT | Flick upload intent and mobile-compatible link media type; real question submission; resolvable thread links; visible post/flick view recording. |
+| Comments and replies | Authoritative IDs replace temporary IDs; reply pagination, retry and parent comment counts. Deletion must restart offset pagination and invalidate outstanding reads so the next record is not skipped. The same regression is covered for profile posts and flicks. |
+| Connections, search, notifications | Existing browser regression flows retained. Search limitations above remain backend-dependent. |
+| Settings | Permanent-deletion copy matches backend behavior; deleted blocked-user records are filtered and list errors support retry. |
+| Contact | Existing admin contact/email composition flow, as approved; no invented message-submit API. |
+| Chat | Existing history and text socket lifecycle coverage retained. Live two-user send/read/reconnect and media/audio parity remain unverified. |
+| KNKT Fund | Informational in both clients; no verified voting/donation API. Web copy says 10% while inspected mobile main says 20%; retain existing web copy pending product confirmation. |
+
+New writes and destructive actions are tested with intercepted APIs and synthetic accounts. Browser evidence is kept locally in ignored test output; no live reports, blocks, posts, account deletions or uploads are required for this suite. No backend/mobile files are changed and no GitHub push is part of this task.
+
+Before/after synthetic UI evidence compares `eecc21e` with this local change for onboarding pronunciation, pronunciation editor, user report, and Add Media at 1440×1024 and 390×844. The task's private local `work/flow-audit-evidence` directory retains these captures; current automated screenshots are regenerated under ignored `test-results/`. Real microphone hardware, identity-provider popups, signed storage persistence and deployed socket behavior are separate checks and remain unverified in this comparison.
+
+Changed functions were checked against a cyclomatic complexity maximum of 9 and split into local components/helpers where needed. Some untouched legacy functions still exceed that threshold; the normal lint command does not enforce a whole-repository complexity limit. Normal lint also retains existing warnings and the production build reports a large bundle; neither is a deployment-readiness claim.
+
+Final local verification for this comparison: `npm test` passed 213 tests in 26 files; `npm run test:e2e` passed 22 Chrome desktop/mobile tests; `npm run lint` passed with 37 warnings and no errors; `npm run build` passed with the large-bundle warning; `git diff --check` passed. These checks use the local source tree, synthetic API fixtures and the existing lockfile. No production rollout or live write verification is claimed.
 
 Before QA sign-off, use authorized test accounts in a matching API/socket environment to verify two-user request acceptance/removal, profile upload storage and persistence, socket send/read/reconnect, account switching across tabs, and opening the configured email client. These live checks are separate from mocked browser tests. Deployment and store release are outside this task.

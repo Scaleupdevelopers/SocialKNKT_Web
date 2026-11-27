@@ -22,11 +22,12 @@ export function ForgotPassword() {
     setIsSubmitting(true)
 
     try {
-      const response = await sendForgotPasswordOtp({ email })
+      const normalizedEmail = email.trim().toLowerCase()
+      const response = await sendForgotPasswordOtp({ email: normalizedEmail })
 
       if (response.status === true) {
         toast.success(response.message || 'OTP sent successfully.')
-        navigate('/verify-code', { state: { email } })
+        navigate('/verify-code', { state: { email: normalizedEmail } })
       }
     } catch (error) {
       toast.error(error.message || 'Unable to send OTP.')
@@ -44,11 +45,7 @@ export function ForgotPassword() {
       </header>
 
       <section className="forgot-card" aria-labelledby="forgot-title">
-        <img
-          className="forgot-icon"
-          src="/assets/logo_icons/forgot_password_icon.png"
-          alt=""
-        />
+        <img className="forgot-icon" src="/assets/logo_icons/forgot_password_icon.png" alt="" />
         <h1 id="forgot-title">Forgot password?</h1>
         <p className="forgot-description">
           Don’t worry! It happens. Please enter the email
@@ -56,12 +53,10 @@ export function ForgotPassword() {
           associated with your account.
         </p>
 
-        <form
-          className="forgot-form"
-          onSubmit={handleSubmit}
-          noValidate
-        >
-          <label className="sr-only" htmlFor="forgot-email">Email Id</label>
+        <form className="forgot-form" onSubmit={handleSubmit} noValidate>
+          <label className="sr-only" htmlFor="forgot-email">
+            Email Id
+          </label>
           <input
             id="forgot-email"
             type="email"

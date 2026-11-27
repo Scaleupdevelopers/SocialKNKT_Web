@@ -7,6 +7,89 @@ import { appleProvider, firebaseAuth, googleProvider } from '../../config/fireba
 import { getAdditionalUserInfo, signInWithPopup } from 'firebase/auth'
 import './SignIn.css'
 
+function isVerifiedSocialSession(response) {
+  return (
+    response.status === true &&
+    response.data?.isEmailVerified === true &&
+    Boolean(response.data?.token)
+  )
+}
+
+function storeSocialSession(user, email, image) {
+  localStorage.setItem(
+    AUTH_STORAGE_KEY,
+    JSON.stringify({
+      token: user.token,
+      user: {
+        id: user.id,
+        username: user.username || '',
+        phone: user.phone || '',
+        email: user.email || email,
+        image: user.image || image,
+        bannerImage: user.banner_image || '',
+      },
+    }),
+  )
+}
+
+function appleFirstName(user, profile, parts) {
+  return user.displayName?.split(' ')[0] || profile.firstName || parts[0] || ''
+}
+
+function appleLastName(user, profile, parts) {
+  return (
+    user.displayName?.split(' ').slice(1).join(' ') ||
+    profile.lastName ||
+    parts.slice(1).join(' ') ||
+    ''
+  )
+}
+
+function appleSignupProfile(result) {
+  const user = result.user
+  const profile = getAdditionalUserInfo(result)?.profile || {}
+  const parts = (user.displayName || profile.name || '').trim().split(/\s+/).filter(Boolean)
+  const email = (user.email || '').trim().toLowerCase()
+  return {
+    email,
+    fname: appleFirstName(user, profile, parts),
+    lname: appleLastName(user, profile, parts),
+    username: email.split('@')[0],
+    image: '',
+    ssoAccount: 'apple',
+    deviceToken: localStorage.getItem('deviceToken') || '',
+    devicePlatform: 'web',
+    identityToken: user.uid,
+  }
+}
+
+function googleSignupProfile(user) {
+  const [fname = '', ...lnameParts] = (user.displayName || '').split(' ')
+  return {
+    email: (user.email || '').trim().toLowerCase(),
+    fname,
+    lname: lnameParts.join(' '),
+    ssoAccount: 'google',
+    deviceToken: localStorage.getItem('deviceToken') || '',
+    devicePlatform: 'web',
+    identityToken: user.uid,
+  }
+}
+
+function googleSignupState(payload, user) {
+  return {
+    socialSignup: true,
+    socialProfile: {
+      ...payload,
+      phone: '',
+      gender: '',
+      dob: '',
+      image: user.photoURL || '',
+      username: user.email?.split('@')[0] || '',
+    },
+  }
+}
+
 export function SignIn() {
   const [showPassword, setShowPassword] = useState(false)
   const [password, setPassword] = useState('')
@@ -20,25 +103,9 @@ export function SignIn() {
     setIsAppleSubmitting(true)
     try {
       const result = await signInWithPopup(firebaseAuth, appleProvider)
-      const firebaseUser = result.user
-      const appleProfile = getAdditionalUserInfo(result)?.profile || {}
-      const displayNameParts = (firebaseUser.displayName || appleProfile.name || '').trim().split(/\s+/).filter(Boolean)
-      const email = firebaseUser.email || ''
-      const socialProfile = {
-        email,
-        fname: firebaseUser.displayName?.split(' ')[0] || appleProfile.firstName || displayNameParts[0] || '',
-        lname: firebaseUser.displayName?.split(' ').slice(1).join(' ') || appleProfile.lastName || displayNameParts.slice(1).join(' ') || '',
-        username: email.split('@')[0],
-        image: '',
-        ssoAccount: 'apple',
-        deviceToken: localStorage.getItem('deviceToken') || '',
-        devicePlatform: 'web',
-        identityToken: firebaseUser.uid,
-      }
+      const socialProfile = appleSignupProfile(result)
       const ssoResponse = await ssoCheck(socialProfile)
-      const isExistingVerifiedUser = ssoResponse.status === true
-        && ssoResponse.data?.isEmailVerified === true
-        && Boolean(ssoResponse.data?.token)
+      const isExistingVerifiedUser = isVerifiedSocialSession(ssoResponse)
 
       if (!isExistingVerifiedUser) {
         navigate('/sign-up', { state: { socialSignup: true, socialProfile } })
@@ -46,10 +113,7 @@ export function SignIn() {
       }
 
       const user = ssoResponse.data
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({
-        token: user.token,
-        user: { id: user.id, username: user.username || '', phone: user.phone || '', email: user.email || email, image: user.image || '', bannerImage: user.banner_image || '' },
-      }))
+      storeSocialSession(user, socialProfile.email, '')
       toast.success(ssoResponse.message || 'Apple login successful.')
       navigate('/home')
     } catch (error) {
@@ -65,58 +129,23 @@ export function SignIn() {
     try {
       const result = await signInWithPopup(firebaseAuth, googleProvider)
       const firebaseUser = result.user
-      const identityToken = firebaseUser.uid 
-      const [fname = '', ...lnameParts] = (firebaseUser.displayName || '').split(' ')
-
-      const ssoPayload = {
-        email: firebaseUser.email || '',
-        fname,
-        lname: lnameParts.join(' '),
-        ssoAccount: 'google',
-        deviceToken: localStorage.getItem('deviceToken') || '',
-        devicePlatform: 'web',
-        identityToken,
-      }
+      const ssoPayload = googleSignupProfile(firebaseUser)
 
       const ssoResponse = await ssoCheck(ssoPayload)
-      const isExistingVerifiedUser = ssoResponse.status === true
-        && ssoResponse.data?.isEmailVerified === true
-        && Boolean(ssoResponse.data?.token)
+      const isExistingVerifiedUser = isVerifiedSocialSession(ssoResponse)
       if (!isExistingVerifiedUser) {
         navigate('/sign-up', {
-          state: {
-            socialSignup: true,
-            socialProfile: {
-              ...ssoPayload,
-              phone: '',
-              gender: '',
-              dob: '',
-              image: firebaseUser.photoURL || '',
-              username: firebaseUser.email?.split('@')[0] || '',
-            },
-          },
+          state: googleSignupState(ssoPayload, firebaseUser),
         })
         return
       }
 
       const user = ssoResponse.data
-      const authData = {
-        token: user.token,
-        user: {
-          id: user.id,
-          username: user.username || '',
-          phone: user.phone || '',
-          email: user.email || firebaseUser.email || '',
-          image: user.image || firebaseUser.photoURL || '',
-          bannerImage: user.banner_image || '',
-        },
-      }
-
-      if (!authData.token) {
+      if (!user.token) {
         throw new Error('Google login response did not include an auth token.')
       }
 
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(authData))
+      storeSocialSession(user, firebaseUser.email || '', firebaseUser.photoURL || '')
       toast.success(ssoResponse.message || 'Google login successful.')
       navigate('/home')
     } catch (error) {
@@ -148,7 +177,7 @@ export function SignIn() {
     setIsSubmitting(true)
 
     try {
-      const response = await login({ email, password })
+      const response = await login({ email: email.trim().toLowerCase(), password })
 
       if (response.status === true) {
         toast.success(response.message || 'Login successful.')
@@ -195,12 +224,10 @@ export function SignIn() {
         <h1 id="signin-title">Glad to see you, Again!</h1>
         <p className="signin-subtitle">Please Enter Your Details</p>
 
-        <form
-          className="signin-form"
-          onSubmit={handleSubmit}
-          noValidate
-        >
-          <label className="sr-only" htmlFor="email">Email Id</label>
+        <form className="signin-form" onSubmit={handleSubmit} noValidate>
+          <label className="sr-only" htmlFor="email">
+            Email Id
+          </label>
           <input
             id="email"
             type="email"
@@ -215,7 +242,9 @@ export function SignIn() {
           />
           {fieldErrors.email && <p className="field-error">{fieldErrors.email}</p>}
 
-          <label className="sr-only" htmlFor="password">Password</label>
+          <label className="sr-only" htmlFor="password">
+            Password
+          </label>
           <div className="password-field">
             <input
               id="password"
@@ -244,7 +273,11 @@ export function SignIn() {
           </div>
           {fieldErrors.password && <p className="field-error">{fieldErrors.password}</p>}
 
-          <button className="forgot-link" type="button" onClick={() => navigate('/forgot-password')}>
+          <button
+            className="forgot-link"
+            type="button"
+            onClick={() => navigate('/forgot-password')}
+          >
             Forgot Password?
           </button>
           <button className="login-button" type="submit" disabled={isSubmitting}>
@@ -256,27 +289,49 @@ export function SignIn() {
           <span>Or continue with email</span>
         </div>
 
-        <div className="social-buttons">
-          <button className="social-button" type="button" disabled={isAppleSubmitting || isGoogleSubmitting || isSubmitting} onClick={handleAppleSignIn}>
-            <img
-              className="social-icon"
-              src="/assets/logo_icons/apple_icon.svg"
-              alt=""
-            />
-            {isAppleSubmitting ? 'Signing in...' : 'Sign in with Apple'}
-          </button>
-          <button
-            className="social-button"
-            type="button"
-            disabled={isGoogleSubmitting || isSubmitting}
-            onClick={handleGoogleSignIn}
-          >
-            <img className="social-icon google-social-icon" src="/assets/logo_icons/google_icon.png" alt="" />
-            {isGoogleSubmitting ? 'Signing in...' : 'Sign in with Google'}
-          </button>
-        </div>
+        <SocialSignInButtons
+          isAppleSubmitting={isAppleSubmitting}
+          isGoogleSubmitting={isGoogleSubmitting}
+          isSubmitting={isSubmitting}
+          handleAppleSignIn={handleAppleSignIn}
+          handleGoogleSignIn={handleGoogleSignIn}
+        />
       </section>
     </main>
   )
 }
 
+function SocialSignInButtons({
+  isAppleSubmitting,
+  isGoogleSubmitting,
+  isSubmitting,
+  handleAppleSignIn,
+  handleGoogleSignIn,
+}) {
+  return (
+    <div className="social-buttons">
+      <button
+        className="social-button"
+        type="button"
+        disabled={isAppleSubmitting || isGoogleSubmitting || isSubmitting}
+        onClick={handleAppleSignIn}
+      >
+        <img className="social-icon" src="/assets/logo_icons/apple_icon.svg" alt="" />
+        {isAppleSubmitting ? 'Signing in...' : 'Sign in with Apple'}
+      </button>
+      <button
+        className="social-button"
+        type="button"
+        disabled={isGoogleSubmitting || isSubmitting}
+        onClick={handleGoogleSignIn}
+      >
+        <img
+          className="social-icon google-social-icon"
+          src="/assets/logo_icons/google_icon.png"
+          alt=""
+        />
+        {isGoogleSubmitting ? 'Signing in...' : 'Sign in with Google'}
+      </button>
+    </div>
+  )
+}

@@ -7,12 +7,32 @@ import {
   getIncomingConnection,
   removeConnection,
   sendConnection,
+  recordPostViews,
+  reportUser,
 } from '../src/action/action'
 import { pendingConnection } from '../src/utils/helper'
 beforeEach(() => {
   vi.stubGlobal(
     'fetch',
     vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ status: true }) }),
+  )
+})
+it('uses the verified view and user-report contracts', async () => {
+  await recordPostViews(['post-a', 'post-a', 'post-b'])
+  expect(fetch).toHaveBeenLastCalledWith(
+    '/api/v1/user/post/view',
+    expect.objectContaining({
+      method: 'PUT',
+      body: JSON.stringify({ postIds: ['post-a', 'post-b'], viewStatus: true }),
+    }),
+  )
+  await reportUser('user-a', 'Reason')
+  expect(fetch).toHaveBeenLastCalledWith(
+    '/api/v1/user/chat/report',
+    expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ userId: 'user-a', description: 'Reason' }),
+    }),
   )
 })
 it('sends backend connection payloads through shared authenticated helper', async () => {
@@ -44,14 +64,17 @@ it('sends backend connection payloads through shared authenticated helper', asyn
   )
 })
 
-it.each(['_id', 'id'])('prioritizes an incoming %s over an accepted relationship', (idField) => {
-  expect(
-    pendingConnection(
-      { personalConnection: 'accepted', connectionId: 'accepted' },
-      { [idField]: 'incoming' },
-    ),
-  ).toEqual({ id: 'incoming', outgoing: false })
-})
+it.each(['_id', 'id'])(
+  'prioritizes an incoming %s over an accepted relationship',
+  (idField) => {
+    expect(
+      pendingConnection(
+        { personalConnection: 'accepted', connectionId: 'accepted' },
+        { [idField]: 'incoming' },
+      ),
+    ).toEqual({ id: 'incoming', outgoing: false })
+  },
+)
 
 it('distinguishes outgoing requests from either accepted relationship id', () => {
   const profile = { personalConnection: 'personal', professionalConnection: 'professional' }
@@ -106,7 +129,9 @@ it('keeps HTTP calls out of UI components and hooks', () => {
     if (!/\.(js|jsx)$/.test(name) || name.includes('.test.')) return false
     if (name === 'action/action.js' || name === 'utils/helper.js') return false
     const code = readFileSync(`${source}/${name}`, 'utf8')
-    return /\b(fetch|getRequest|postRequest|putRequest|deleteRequest|PatchRequest)\s*\(/.test(code)
+    return /\b(fetch|getRequest|postRequest|putRequest|deleteRequest|PatchRequest)\s*\(/.test(
+      code,
+    )
   })
   expect(violations).toEqual([])
 })

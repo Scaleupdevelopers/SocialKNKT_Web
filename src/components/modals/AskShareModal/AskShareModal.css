@@ -16,6 +16,88 @@
   position: relative;
 }
 
+.ask-share-modal {
+  width: min(672px, calc(100% - 32px));
+  box-sizing: border-box;
+  padding: 60px 48px;
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+}
+.ask-share-modal .community-modal-heading h2 {
+  font-size: 32px;
+}
+.ask-share-modal .community-modal-user {
+  margin-bottom: 16px;
+  font-size: 20px;
+}
+.ask-share-modal .community-modal-user img {
+  width: 62px;
+  height: 62px;
+}
+.ask-share-modal .community-modal-input {
+  min-height: 60px;
+  margin-top: 16px;
+  border-radius: 8px;
+  font-size: 16px;
+}
+.ask-share-modal .community-gradient-button {
+  height: 66px;
+  margin-top: 32px;
+  font-size: 20px;
+  border-radius: 48px;
+}
+.ask-share-modal :disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.ask-share-modal :focus-visible {
+  outline: 2px solid #ff19d5;
+  outline-offset: 3px;
+}
+.ask-location {
+  position: relative;
+}
+.ask-location > img {
+  position: absolute;
+  width: 21px;
+  height: 21px;
+  left: 24px;
+  top: 20px;
+}
+.ask-location input {
+  padding-left: 56px;
+}
+.ask-category-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 16px;
+  cursor: pointer;
+}
+.ask-category-option input {
+  accent-color: #ff19d5;
+}
+.ask-share-modal .ask-category-menu {
+  position: relative;
+  max-height: 220px;
+  overflow-y: auto;
+  margin-top: 4px;
+}
+.ask-category-trigger span {
+  overflow-wrap: anywhere;
+}
+.ask-category-menu p {
+  padding: 12px;
+}
+@media (max-width: 600px) {
+  .ask-share-modal {
+    padding: 24px;
+  }
+  .ask-share-modal .community-modal-heading h2 {
+    font-size: 23px;
+  }
+}
+
 .ask-category-trigger {
   display: flex;
   align-items: center;

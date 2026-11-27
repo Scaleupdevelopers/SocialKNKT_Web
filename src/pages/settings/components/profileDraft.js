@@ -44,14 +44,25 @@ export const basicFields = [
   'phone',
 ]
 const pick = (value, keys) =>
-  Object.fromEntries(keys.filter((key) => value[key] !== undefined).map((key) => [key, value[key]]))
+  Object.fromEntries(
+    keys.filter((key) => value[key] !== undefined).map((key) => [key, value[key]]),
+  )
 
 export function createDraft(profile, section) {
   const config = collections[section]
   if (config) return (profile[config.source] || []).map((item) => ({ ...item }))
   if (section === 'basic')
     return Object.fromEntries(basicFields.map((key) => [key, profile[key] || '']))
-  if (section === 'pronunciation') return { phonetic_spelling: profile.phonetic_spelling || '' }
+  if (section === 'pronunciation') {
+    return {
+      phonetic_spelling: profile.phonetic_spelling || '',
+      record_name: profile.record_name || '',
+    }
+  }
+  return createMediaDraft(profile)
+}
+
+function createMediaDraft(profile) {
   return {
     image: profile.image || '',
     resume: profile.resume || '',
@@ -61,6 +72,9 @@ export function createDraft(profile, section) {
 }
 
 export function buildPayload(section, draft, profile) {
+  if (section === 'pronunciation') {
+    return { phonetic_spelling: draft.phonetic_spelling, record_name: draft.record_name }
+  }
   // These scalars are explicitly assigned by the server even during section updates.
   const preserved = { bio: profile.bio || '', website: profile.website || '' }
   const config = collections[section]
@@ -95,8 +109,6 @@ export function buildPayload(section, draft, profile) {
 }
 
 export function validateDraft(section, draft, profile) {
-  if (section === 'pronunciation' && !draft.phonetic_spelling.trim())
-    return 'Enter phonetic spelling. The server does not support clearing this field.'
   if (section === 'basic') {
     const cannotClear = ['fname', 'lname', 'username', 'dob', 'email', 'phone', 'gender']
     if (cannotClear.some((key) => profile[key] && !draft[key]?.trim()))

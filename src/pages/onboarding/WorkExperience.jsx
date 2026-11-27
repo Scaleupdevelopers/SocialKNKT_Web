@@ -4,14 +4,40 @@ import { toast } from 'react-toastify'
 import { completeProfile, getCities, getCountries, getStates } from '../../action/action'
 import './WorkExperience.css'
 
-const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+const months = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+]
 const currentYear = new Date().getFullYear()
 const years = Array.from({ length: currentYear - 1951 + 1 }, (_, index) => currentYear - index)
 
 const emptyExperience = {
-  title: '', company: '', country: '', countryId: '', state: '', stateId: '', city: '', cityId: '', employmentType: '',
-  startDate: '', startMonth: '', startYear: '',
-  endDate: '', endMonth: '', endYear: '', isCurrent: false,
+  title: '',
+  company: '',
+  country: '',
+  countryId: '',
+  state: '',
+  stateId: '',
+  city: '',
+  cityId: '',
+  employmentType: '',
+  startDate: '',
+  startMonth: '',
+  startYear: '',
+  endDate: '',
+  endMonth: '',
+  endYear: '',
+  isCurrent: false,
 }
 
 const getDaysInMonth = (month, year = 2026) => {
@@ -19,9 +45,7 @@ const getDaysInMonth = (month, year = 2026) => {
     return 29
   }
 
-  return month
-    ? new Date(Number(year), Number(month), 0).getDate()
-    : 31
+  return month ? new Date(Number(year), Number(month), 0).getDate() : 31
 }
 
 const splitDate = (date) => {
@@ -51,73 +75,69 @@ export function WorkExperience() {
   const [countries, setCountries] = useState([])
   const [states, setStates] = useState([])
   const [cities, setCities] = useState([])
+  const [geographyStatus, setGeographyStatus] = useState({})
+  const [geographyRetries, setGeographyRetries] = useState({
+    countries: 0,
+    states: 0,
+    cities: 0,
+  })
+
+  const retryGeography = (field) => {
+    setGeographyStatus((current) => ({ ...current, [field]: 'loading' }))
+    setGeographyRetries((current) => ({ ...current, [field]: current[field] + 1 }))
+  }
+
   const [isLoadingCountries, setIsLoadingCountries] = useState(false)
   const [isLoadingStates, setIsLoadingStates] = useState(false)
   const [isLoadingCities, setIsLoadingCities] = useState(false)
 
+  const savePending = useRef(false)
+  const mounted = useRef(false)
+
   useEffect(() => {
-    const loadCountries = async () => {
-      setIsLoadingCountries(true)
-
-      try {
-        const response = await getCountries()
-        setCountries(response.data || [])
-      } catch (error) {
-        toast.error(error.message || 'Unable to load countries.')
-      } finally {
-        setIsLoadingCountries(false)
-      }
+    mounted.current = true
+    return () => {
+      mounted.current = false
     }
-
-    loadCountries()
   }, [])
 
   useEffect(() => {
-    if (!experience.countryId) {
-      return
-    }
-
-    const loadStates = async () => {
-      setIsLoadingStates(true)
-
-      try {
-        const response = await getStates({ countryId: experience.countryId })
-        setStates(response.data || [])
-      } catch (error) {
-        setStates([])
-        toast.error(error.message || 'Unable to load states.')
-      } finally {
-        setIsLoadingStates(false)
-      }
-    }
-
-    loadStates()
-  }, [experience.countryId])
+    return loadOptions(
+      getCountries(),
+      setCountries,
+      'countries',
+      setGeographyStatus,
+      setIsLoadingCountries,
+    )
+  }, [geographyRetries.countries])
 
   useEffect(() => {
-    if (!experience.countryId || !experience.stateId) {
-      return
-    }
+    setStates([])
+    setGeographyStatus((current) => ({ ...current, states: 'idle' }))
+    setIsLoadingStates(false)
+    if (!experience.countryId) return
+    return loadOptions(
+      getStates({ countryId: experience.countryId }),
+      setStates,
+      'states',
+      setGeographyStatus,
+      setIsLoadingStates,
+    )
+  }, [experience.countryId, geographyRetries.states])
 
-    const loadCities = async () => {
-      setIsLoadingCities(true)
-
-      try {
-        const response = await getCities({
-          countryId: experience.countryId,
-          stateId: experience.stateId,
-        })
-        setCities(response.data || [])
-      } catch (error) {
-        setCities([])
-        toast.error(error.message || 'Unable to load cities.')
-      } finally {
-        setIsLoadingCities(false)
-      }
-    }
-
-    loadCities()
-  }, [experience.countryId, experience.stateId])
+  useEffect(() => {
+    setCities([])
+    setGeographyStatus((current) => ({ ...current, cities: 'idle' }))
+    setIsLoadingCities(false)
+    if (!experience.countryId || !experience.stateId) return
+    return loadOptions(
+      getCities({ countryId: experience.countryId, stateId: experience.stateId }),
+      setCities,
+      'cities',
+      setGeographyStatus,
+      setIsLoadingCities,
+    )
+  }, [experience.countryId, experience.stateId, geographyRetries.cities])
 
   const updateExperience = (field, value) => {
     setExperience((current) => ({ ...current, [field]: value }))
@@ -164,9 +184,7 @@ export function WorkExperience() {
         return [...current, nextExperience]
       }
 
-      return current.map((item, index) => (
-        index === editingIndex ? nextExperience : item
-      ))
+      return current.map((item, index) => (index === editingIndex ? nextExperience : item))
     })
     setExperience(emptyExperience)
     setEditingIndex(null)
@@ -180,12 +198,7 @@ export function WorkExperience() {
     setExperience({
       title: item.jobTitle || '',
       company: item.companyName || '',
-      country: item.countryName || '',
-      countryId: item.countryId || '',
-      state: item.stateName || '',
-      stateId: item.stateId || '',
-      city: item.cityName || '',
-      cityId: item.cityId || '',
+      ...locationDraft(item),
       employmentType: item.employmentType || '',
       startDate: startDate.day,
       startMonth: startDate.month,
@@ -201,25 +214,32 @@ export function WorkExperience() {
   }
 
   const saveExperiences = async () => {
+    if (savePending.current) return
     if (!experiences.length) {
       toast.error('Please add at least one work experience.')
       return
     }
-
+    savePending.current = true
     setIsSaving(true)
 
     try {
-      const workExperience = experiences.map(({ countryName, stateName, cityName, ...item }) => item)
-      const response = await completeProfile({ workExperience, stepCount: 1 })
-
-      if (response.status === true) {
-        toast.success(response.message || 'Work experience saved successfully.')
-        navigate('/education')
-      }
-    } catch (error) {
-      toast.error(error.message || 'Unable to save work experience.')
+      const entries = experiences.map((entry) => {
+        const item = { ...entry }
+        delete item.countryName
+        delete item.stateName
+        delete item.cityName
+        return item
+      })
+      const response = await completeProfile({ workExperience: entries, stepCount: 1 })
+      if (!mounted.current) return
+      if (response.status !== true) throw new Error('Save failed')
+      toast.success('Work experience saved successfully.')
+      navigate('/education')
+    } catch {
+      if (mounted.current) toast.error('Unable to save work experience. Please try again.')
     } finally {
-      setIsSaving(false)
+      savePending.current = false
+      if (mounted.current) setIsSaving(false)
     }
   }
 
@@ -238,97 +258,140 @@ export function WorkExperience() {
       </header>
 
       <section className="work-card" aria-labelledby="work-title">
-        <div className="progress-track"><span /></div>
+        <div className="progress-track">
+          <span />
+        </div>
         <h1 id="work-title">Add your Work Experience</h1>
         <p className="work-description">
-          Show what you do and where you shine.<br />
-          Highlight your current role or past jobs to help others connect with your professional side.
+          Show what you do and where you shine.
+          <br />
+          Highlight your current role or past jobs to help others connect with your professional
+          side.
         </p>
 
-        {!showPreview && <form className="work-form" onSubmit={addExperience} noValidate>
-          <div className="work-grid">
-            <Field label="Job Title" value={experience.title} placeholder="Enter your Job Title" hasError={fieldErrors.title} onChange={(value) => updateExperience('title', value)} />
-            <Field label="Company Name" value={experience.company} placeholder="Enter your company name" hasError={fieldErrors.company} onChange={(value) => updateExperience('company', value)} />
-            <label className="work-field">
-              <span>Country</span>
-              <DateDropdown
-                label={isLoadingCountries ? 'Loading countries...' : 'Select country'}
-                value={experience.countryId}
-                options={countries.map((country) => ({ label: country.name, value: country.id }))}
-                onChange={(value) => {
-                  const selectedCountry = countries.find((country) => country.id === value)
-                  setExperience((current) => ({
-                    ...current,
-                    country: selectedCountry?.name || '',
-                    countryId: value,
-                    state: '',
-                    stateId: '',
-                    city: '',
-                    cityId: '',
-                  }))
-                  setStates([])
-                  setCities([])
-                }}
+        {!showPreview && (
+          <form className="work-form" onSubmit={addExperience} noValidate>
+            <GeographyFeedback status={geographyStatus} onRetry={retryGeography} />
+            <div className="work-grid">
+              <Field
+                label="Job Title"
+                value={experience.title}
+                placeholder="Enter your Job Title"
+                hasError={fieldErrors.title}
+                onChange={(value) => updateExperience('title', value)}
               />
-            </label>
-            <label className="work-field">
-              <span>State</span>
-              <DateDropdown
-                label={isLoadingStates ? 'Loading states...' : 'Select state'}
-                value={experience.stateId}
-                options={states.map((state) => ({ label: state.name, value: state.id }))}
-                onChange={(value) => {
-                  const selectedState = states.find((state) => state.id === value)
-                  setExperience((current) => ({
-                    ...current,
-                    state: selectedState?.name || '',
-                    stateId: value,
-                    city: '',
-                    cityId: '',
-                  }))
-                  setCities([])
-                }}
+              <Field
+                label="Company Name"
+                value={experience.company}
+                placeholder="Enter your company name"
+                hasError={fieldErrors.company}
+                onChange={(value) => updateExperience('company', value)}
               />
-            </label>
-            <label className="work-field">
-              <span>City</span>
-              <DateDropdown
-                label={isLoadingCities ? 'Loading cities...' : 'Select city'}
-                value={experience.cityId}
-                options={cities.map((city) => ({ label: city.name, value: city.id }))}
-                onChange={(value) => {
-                  const selectedCity = cities.find((city) => city.id === value)
-                  setExperience((current) => ({
-                    ...current,
-                    city: selectedCity?.name || '',
-                    cityId: value,
-                  }))
-                }}
-              />
-            </label>
-            <label className="work-field">
-              <span>Employment Type</span>
-              <DateDropdown
-                label="Select your Employment Type"
-                value={experience.employmentType}
-                options={['Full-time', 'Part-time', 'Flex/Hybrid', 'Seasonal']}
-                onChange={(value) => updateExperience('employmentType', value)}
-              />
-            </label>
-          </div>
+              <label className="work-field">
+                <span>Country</span>
+                <DateDropdown
+                  label={locationDropdownLabel(isLoadingCountries, 'country')}
+                  value={experience.countryId}
+                  options={countries.map((country) => ({
+                    label: country.name,
+                    value: country.id,
+                  }))}
+                  onChange={(value) => {
+                    const selectedCountry = countries.find((country) => country.id === value)
+                    setExperience((current) => ({
+                      ...current,
+                      country: selectedCountry?.name || '',
+                      countryId: value,
+                      state: '',
+                      stateId: '',
+                      city: '',
+                      cityId: '',
+                    }))
+                    setStates([])
+                    setCities([])
+                  }}
+                />
+              </label>
+              <label className="work-field">
+                <span>State</span>
+                <DateDropdown
+                  label={locationDropdownLabel(isLoadingStates, 'state')}
+                  value={experience.stateId}
+                  options={states.map((state) => ({ label: state.name, value: state.id }))}
+                  onChange={(value) => {
+                    const selectedState = states.find((state) => state.id === value)
+                    setExperience((current) => ({
+                      ...current,
+                      state: selectedState?.name || '',
+                      stateId: value,
+                      city: '',
+                      cityId: '',
+                    }))
+                    setCities([])
+                  }}
+                />
+              </label>
+              <label className="work-field">
+                <span>City</span>
+                <DateDropdown
+                  label={locationDropdownLabel(isLoadingCities, 'city')}
+                  value={experience.cityId}
+                  options={cities.map((city) => ({ label: city.name, value: city.id }))}
+                  onChange={(value) => {
+                    const selectedCity = cities.find((city) => city.id === value)
+                    setExperience((current) => ({
+                      ...current,
+                      city: selectedCity?.name || '',
+                      cityId: value,
+                    }))
+                  }}
+                />
+              </label>
+              <label className="work-field">
+                <span>Employment Type</span>
+                <DateDropdown
+                  label="Select your Employment Type"
+                  value={experience.employmentType}
+                  options={['Full-time', 'Part-time', 'Flex/Hybrid', 'Seasonal']}
+                  onChange={(value) => updateExperience('employmentType', value)}
+                />
+              </label>
+            </div>
 
-          <div className="date-grid">
-            <DateGroup label="Start Date" day={experience.startDate} month={experience.startMonth} year={experience.startYear} onChange={updateExperience} />
-            {!experience.isCurrent && <DateGroup label="End Date" prefix="end" day={experience.endDate} month={experience.endMonth} year={experience.endYear} onChange={updateExperience} />}
-          </div>
+            <div className="date-grid">
+              <DateGroup
+                label="Start Date"
+                day={experience.startDate}
+                month={experience.startMonth}
+                year={experience.startYear}
+                onChange={updateExperience}
+              />
+              {!experience.isCurrent && (
+                <DateGroup
+                  label="End Date"
+                  prefix="end"
+                  day={experience.endDate}
+                  month={experience.endMonth}
+                  year={experience.endYear}
+                  onChange={updateExperience}
+                />
+              )}
+            </div>
 
-          <label className="work-checkbox">
-            <input type="checkbox" checked={experience.isCurrent} onChange={(event) => updateExperience('isCurrent', event.target.checked)} />
-            I currently work here
-          </label>
+            <label className="work-checkbox">
+              <input
+                type="checkbox"
+                checked={experience.isCurrent}
+                onChange={(event) => updateExperience('isCurrent', event.target.checked)}
+              />
+              I currently work here
+            </label>
 
-          <button className="work-primary-button" type="submit">Add Work Experience</button>
-        </form>}
+            <button className="work-primary-button" type="submit">
+              Add Work Experience
+            </button>
+          </form>
+        )}
 
         {showPreview && experiences.length > 0 && (
           <div className="saved-work">
@@ -340,12 +403,23 @@ export function WorkExperience() {
                 <div className="saved-work-card-content">
                   <strong>{item.jobTitle}</strong>
                   <span>{item.companyName}</span>
-                  <span>{[item.cityName, item.stateName, item.countryName].filter(Boolean).join(', ') || 'Location not added'}</span>
+                  <span>
+                    {[item.cityName, item.stateName, item.countryName]
+                      .filter(Boolean)
+                      .join(', ') || 'Location not added'}
+                  </span>
                   <span>{item.employmentType || 'Employment type not added'}</span>
-                  <span>{item.startDate || 'Start date'} — {item.currentlyWorking ? 'Present' : item.endDate || 'End date'}</span>
+                  <span>
+                    {item.startDate || 'Start date'} —{' '}
+                    {item.currentlyWorking ? 'Present' : item.endDate || 'End date'}
+                  </span>
                 </div>
                 <div className="saved-work-actions">
-                  <button type="button" aria-label="Edit work experience" onClick={() => editExperience(item, index)}>
+                  <button
+                    type="button"
+                    aria-label="Edit work experience"
+                    onClick={() => editExperience(item, index)}
+                  >
                     <img src="/assets/logo_icons/edit_icon.svg" alt="Edit" />
                   </button>
                   <button
@@ -373,22 +447,49 @@ export function WorkExperience() {
             >
               Add New Work Experience
             </button>
-            <button className="continue-button" type="button" onClick={saveExperiences} disabled={isSaving}>
+            <button
+              className="continue-button"
+              type="button"
+              onClick={saveExperiences}
+              disabled={isSaving}
+            >
               {isSaving ? 'Saving...' : 'Continue'}
             </button>
           </div>
         )}
 
-        {!showPreview && <button className="skip-button" type="button" onClick={() => navigate('/education')}>Skip for now</button>}
+        {!showPreview && (
+          <button className="skip-button" type="button" onClick={() => navigate('/education')}>
+            Skip for now
+          </button>
+        )}
       </section>
 
       {showDeleteModal && (
         <div className="delete-modal-backdrop" role="presentation">
-          <div className="delete-modal" role="dialog" aria-modal="true" aria-labelledby="delete-title">
-            <button className="delete-modal-close" type="button" aria-label="Close" onClick={() => setShowDeleteModal(false)}>×</button>
+          <div
+            className="delete-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-title"
+          >
+            <button
+              className="delete-modal-close"
+              type="button"
+              aria-label="Close"
+              onClick={() => setShowDeleteModal(false)}
+            >
+              ×
+            </button>
             <h2 id="delete-title">Delete Experience</h2>
-            <p>This action will permanently remove this entry from<br />your profile.</p>
-            <button className="delete-confirm-button" type="button" onClick={removeExperience}>Delete Work Experience</button>
+            <p>
+              This action will permanently remove this entry from
+              <br />
+              your profile.
+            </p>
+            <button className="delete-confirm-button" type="button" onClick={removeExperience}>
+              Delete Work Experience
+            </button>
           </div>
         </div>
       )}
@@ -400,7 +501,12 @@ function Field({ label, value, placeholder, hasError, onChange }) {
   return (
     <label className={`work-field ${hasError ? 'has-error' : ''}`}>
       <span>{label}</span>
-      <input value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} required />
+      <input
+        value={value}
+        placeholder={placeholder}
+        onChange={(event) => onChange(event.target.value)}
+        required
+      />
     </label>
   )
 }
@@ -430,8 +536,18 @@ function DateGroup({ label, prefix = 'start', day, month, year, onChange }) {
     <fieldset className="date-group">
       <legend>{label}</legend>
       <div>
-        <DateDropdown label="Month" value={month} options={months.map((item, index) => ({ label: item, value: index + 1 }))} onChange={handleMonthChange} />
-        <DateDropdown label="Date" value={day} options={days} onChange={(value) => onChange(`${prefix}Date`, value)} />
+        <DateDropdown
+          label="Month"
+          value={month}
+          options={months.map((item, index) => ({ label: item, value: index + 1 }))}
+          onChange={handleMonthChange}
+        />
+        <DateDropdown
+          label="Date"
+          value={day}
+          options={days}
+          onChange={(value) => onChange(`${prefix}Date`, value)}
+        />
         <DateDropdown label="Year" value={year} options={years} onChange={handleYearChange} />
       </div>
     </fieldset>
@@ -456,15 +572,21 @@ function DateDropdown({ label, value, options, onChange }) {
     }
   }, [])
 
-  const normalizedOptions = options.map((option) => (
-    typeof option === 'object' ? option : { label: option, value: option }
-  ))
+  const normalizedOptions = options.map((option) =>
+    typeof option === 'object' ? option : { label: option, value: option },
+  )
 
-  const selectedOption = normalizedOptions.find((option) => String(option.value) === String(value))
+  const selectedOption = normalizedOptions.find(
+    (option) => String(option.value) === String(value),
+  )
 
   return (
     <div ref={dropdownRef} className={`date-dropdown ${isOpen ? 'is-open' : ''}`}>
-      <button className="date-dropdown-trigger" type="button" onClick={() => setIsOpen((open) => !open)}>
+      <button
+        className="date-dropdown-trigger"
+        type="button"
+        onClick={() => setIsOpen((open) => !open)}
+      >
         {selectedOption?.label || label}
         <span className="date-dropdown-arrow" />
       </button>
@@ -487,4 +609,65 @@ function DateDropdown({ label, value, options, onChange }) {
       )}
     </div>
   )
+}
+
+// Each effect owns its request; obsolete responses must not change options or feedback.
+function loadOptions(request, setOptions, label, setStatus, setLoading) {
+  let active = true
+  setStatus((current) => ({ ...current, [label]: 'loading' }))
+  setLoading(true)
+  request
+    .then((response) => {
+      if (!active) return
+      setOptions(response.data || [])
+      setStatus((current) => ({ ...current, [label]: 'idle' }))
+    })
+    .catch(() => {
+      if (!active) return
+      setStatus((current) => ({ ...current, [label]: 'failed' }))
+      toast.error(`Unable to load ${label}. Please try again.`)
+    })
+    .finally(() => {
+      if (active) setLoading(false)
+    })
+  return () => {
+    active = false
+  }
+}
+
+function locationDraft(item) {
+  return {
+    country: item.countryName || '',
+    countryId: item.countryId || '',
+    state: item.stateName || '',
+    stateId: item.stateId || '',
+    city: item.cityName || '',
+    cityId: item.cityId || '',
+  }
+}
+
+function locationDropdownLabel(isLoading, field) {
+  const loadingLabels = {
+    country: 'Loading countries...',
+    state: 'Loading states...',
+    city: 'Loading cities...',
+  }
+  return isLoading ? loadingLabels[field] : `Select ${field}`
+}
+
+function GeographyFeedback({ status, onRetry }) {
+  return Object.entries(status).map(([field, state]) => {
+    if (state === 'loading') {
+      return <p key={field} role="status">Loading {field}…</p>
+    }
+    if (state !== 'failed') return null
+    return (
+      <p key={field} role="alert">
+        Unable to load {field}.{' '}
+        <button type="button" onClick={() => onRetry(field)}>
+          Retry {field}
+        </button>
+      </p>
+    )
+  })
 }

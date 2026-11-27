@@ -3,7 +3,7 @@
   padding: 22px 5.5vw 32px;
   background: #1b1b1b;
   color: #f8f8f8;
-  font-family: "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: 'DM Sans', sans-serif;
 }
 .media-header button {
   width: 88px;
@@ -19,11 +19,11 @@
   object-fit: contain;
 }
 .media-card {
-  width: min(760px, 100%);
+  width: min(852px, 100%);
   margin: 34px auto 0;
 }
 .media-progress {
-  height: 5px;
+  height: 8px;
   margin-bottom: 24px;
   border-radius: 5px;
   background: #ddd;
@@ -45,7 +45,7 @@
   margin: 14px 0 28px;
   color: #adadad;
   text-align: center;
-  font-size: 16px;
+  font-size: 20px;
 }
 .media-form {
   display: grid;
@@ -61,14 +61,14 @@
 }
 .profile-media-grid {
   display: grid;
-  grid-template-columns: 1fr 2.5fr;
-  gap: 8px;
+  grid-template-columns: 120px 1fr;
+  gap: 16px;
   padding-top: 28px;
 }
 .upload-box {
   position: relative;
   display: flex;
-  min-height: 108px;
+  min-height: 120px;
   flex-direction: column;
   align-items: center;
   justify-content: center;
@@ -80,7 +80,33 @@
   overflow: visible;
 }
 .upload-box-small {
-  min-height: 108px;
+  min-height: 120px;
+}
+.media-preview {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+.media-form > .upload-box {
+  margin-top: 28px;
+}
+.media-content-status {
+  color: #adadad;
+  font-size: 14px;
+  margin: 0;
+}
+.upload-box:focus-within {
+  outline: 2px solid #ff3ca4;
+  outline-offset: 3px;
+}
+.upload-box:has(input:disabled) {
+  opacity: 0.55;
+  cursor: default;
+}
+.media-form button:disabled {
+  cursor: default;
+  opacity: 0.55;
 }
 .upload-box input {
   position: absolute;
@@ -119,21 +145,6 @@
   color: #999;
   font-size: 10px;
 }
-.media-previews {
-  display: flex;
-  width: 100%;
-  height: 100%;
-  gap: 6px;
-  padding: 6px;
-  overflow: auto;
-}
-.media-previews img {
-  width: 100%;
-  height: 100%;
-  min-width: 80px;
-  object-fit: cover;
-  border-radius: 3px;
-}
 .media-continue {
   height: 62px;
   margin-top: 8px;
@@ -157,16 +168,16 @@
 }
 @media (max-width: 640px) {
   .media-page {
-  padding: 20px;
-}
-.media-header button {
-  width: 68px;
-  height: 68px;
-}
-.media-card {
-  margin-top: 36px;
-}
-.profile-media-grid {
-  grid-template-columns: 1fr;
-}
+    padding: 20px;
+  }
+  .media-header button {
+    width: 68px;
+    height: 68px;
+  }
+  .media-card {
+    margin-top: 36px;
+  }
+  .profile-media-grid {
+    grid-template-columns: 120px minmax(0, 1fr);
+  }
 }

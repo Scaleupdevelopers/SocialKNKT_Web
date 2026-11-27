@@ -3,7 +3,13 @@
   padding: 22px 5.5vw 32px;
   background: #1b1b1b;
   color: #f8f8f8;
-  font-family: "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family:
+    'Inter',
+    'SF Pro Display',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
 }
 .pronunciation-header button {
   width: 88px;
@@ -152,36 +158,70 @@
 }
 @media (max-width: 640px) {
   .pronunciation-page {
+    padding: 20px;
+  }
+  .pronunciation-header button {
+    width: 68px;
+    height: 68px;
+  }
+  .pronunciation-card {
+    margin-top: 36px;
+  }
+  .pronunciation-card h1 {
+    font-size: 32px;
+  }
+  .pronunciation-description {
+    font-size: 16px;
+  }
+  .pronunciation-description br {
+    display: none;
+  }
+  .pronunciation-field {
+    font-size: 16px;
+  }
+  .pronunciation-field input {
+    height: 58px;
+    padding: 0 18px;
+  }
+  .record-box {
+    min-height: 170px;
+  }
+  .pronunciation-submit {
+    height: 62px;
+    font-size: 17px;
+  }
+}
+
+.pronunciation-recorder .record-box {
+  gap: 12px;
   padding: 20px;
+  min-height: 180px;
+  box-sizing: border-box;
 }
-.pronunciation-header button {
-  width: 68px;
-  height: 68px;
+.pronunciation-recorder .record-box button {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  color: inherit;
+  font: inherit;
 }
-.pronunciation-card {
-  margin-top: 36px;
+.pronunciation-recorder audio {
+  width: min(100%, 420px);
 }
-.pronunciation-card h1 {
-  font-size: 32px;
+.pronunciation-recorder p {
+  margin: 0;
+  line-height: 1.5;
 }
-.pronunciation-description {
-  font-size: 16px;
+.pronunciation-recorder [role='alert'] {
+  color: #ff9bac;
 }
-.pronunciation-description br {
-  display: none;
+.pronunciation-recorder button:focus-visible,
+.pronunciation-form button:focus-visible {
+  outline: 2px solid #f715a8;
+  outline-offset: 4px;
 }
-.pronunciation-field {
-  font-size: 16px;
-}
-.pronunciation-field input {
-  height: 58px;
-  padding: 0 18px;
-}
-.record-box {
-  min-height: 170px;
-}
-.pronunciation-submit {
-  height: 62px;
-  font-size: 17px;
-}
+.pronunciation-recorder button:disabled,
+.pronunciation-form button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
