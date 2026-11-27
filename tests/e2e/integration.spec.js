@@ -20,6 +20,13 @@ test('connections persist requests, filter correctly and stay responsive', async
     .toBeTruthy()
   await page.getByRole('button', { name: 'Add Professional' }).click()
   await expect(page.getByRole('button', { name: 'Request sent' })).toBeDisabled()
+  await page.getByLabel('Filter connections').click()
+  await page.getByRole('button', { name: 'Personal', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Request sent' })).toBeDisabled()
+  await page.getByLabel('Search connections').fill('Sample')
+  await expect(page.getByLabel('Filter connections')).toHaveCount(0)
+  await expect.poll(() => calls.some(c => c.path === 'user/profile/connections' && c.query.q === 'Sample' && !c.query.filter)).toBe(true)
+  await expect(page.getByRole('button', { name: 'Request sent' })).toBeDisabled()
   expect(
     calls.find((c) => c.path === 'user/connection-request' && c.method === 'POST').body,
   ).toEqual({ connectUserId: other, connectionType: 'professional' })

@@ -33,6 +33,7 @@ export async function mockApi(page) {
     cityName: 'Indore',
     countryName: 'India',
     personalConnection: true,
+    professionalConnection: false,
   }
   await page.addInitScript(
     ({ me }) =>

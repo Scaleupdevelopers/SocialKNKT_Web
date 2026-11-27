@@ -3,10 +3,11 @@ import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Connections } from './Connections'
 import { getProfileConnections, sendConnection } from '../../action/action'
+import { useProfile } from '../../context/ProfileContext'
 
 vi.mock('../../layouts/Header', () => ({ Header: () => null }))
 vi.mock('../../context/ProfileContext', () => ({
-  useProfile: () => ({ profile: { id: 'me' }, refreshProfile: vi.fn() }),
+  useProfile: vi.fn(),
 }))
 vi.mock('../../action/action', async (original) => ({
   ...(await original()),
@@ -25,6 +26,7 @@ const connection = {
   lname: 'Member',
   username: 'sample',
   personalConnection: true,
+  professionalConnection: false,
 }
 const mount = (url = '/connections') =>
   render(
@@ -35,6 +37,7 @@ const mount = (url = '/connections') =>
 let intersect
 beforeEach(() => {
   vi.clearAllMocks()
+  useProfile.mockReturnValue({ profile: { id: 'me' }, authToken: 'session-a', refreshProfile: vi.fn() })
   vi.stubGlobal(
     'IntersectionObserver',
     class {
@@ -159,4 +162,73 @@ it('preserves a real zero connection count without a dangling separator', async 
   await screen.findByText('0 Connections')
   expect(screen.getByText('India')).toBeVisible()
   expect(document.querySelector('.connection-info p')).toHaveTextContent(/^0 Connections$/)
+})
+
+it.each([
+  [true, false, 'Add Professional'],
+  [false, true, 'Add Personal'],
+  [false, false, 'Add Personal'],
+  [true, true, null],
+  [undefined, undefined, null],
+])('matches mobile CTA visibility for personal=%s professional=%s', async (personal, professional, label) => {
+  getProfileConnections.mockResolvedValue({ data: [{ ...connection,
+    personalConnection: personal, professionalConnection: professional,
+  }] })
+  mount()
+  await screen.findByText('Sample Member')
+  if (label) expect(screen.getByRole('button', { name: label })).toBeVisible()
+  else expect(screen.queryByRole('button', { name: /^Add / })).toBeNull()
+})
+
+it('sends the personal upgrade using the peer ID, not the relationship ID', async () => {
+  getProfileConnections.mockResolvedValue({ data: [{ ...connection,
+    personalConnection: false, professionalConnection: true,
+  }] })
+  mount()
+  fireEvent.click(await screen.findByRole('button', { name: 'Add Personal' }))
+  await screen.findByRole('button', { name: 'Request sent' })
+  expect(sendConnection).toHaveBeenCalledExactlyOnceWith('other', 'personal')
+})
+
+it('retains successful request state across filters and resets filtering for search', async () => {
+  mount()
+  fireEvent.click(await screen.findByRole('button', { name: 'Add Professional' }))
+  await screen.findByRole('button', { name: 'Request sent' })
+  fireEvent.click(screen.getByLabelText('Filter connections'))
+  fireEvent.click(screen.getByText('Professional'))
+  expect(await screen.findByRole('button', { name: 'Request sent' })).toBeDisabled()
+  fireEvent.change(screen.getByLabelText('Search connections'), { target: { value: 'Sample' } })
+  expect(screen.queryByLabelText('Filter connections')).toBeNull()
+  await waitFor(() => expect(getProfileConnections).toHaveBeenLastCalledWith(0, null, 'Sample', 10, 'me'))
+  expect(await screen.findByRole('button', { name: 'Request sent' })).toBeDisabled()
+  expect(sendConnection).toHaveBeenCalledTimes(1)
+})
+
+it('keeps an in-flight upgrade locked when filters remount its row', async () => {
+  let finish
+  sendConnection.mockImplementation(() => new Promise(resolve => { finish = resolve }))
+  mount()
+  fireEvent.click(await screen.findByRole('button', { name: 'Add Professional' }))
+  fireEvent.click(screen.getByLabelText('Filter connections'))
+  fireEvent.click(screen.getByText('Personal'))
+  const pending = await screen.findByRole('button', { name: 'Sending…' })
+  expect(pending).toBeDisabled()
+  fireEvent.click(pending)
+  expect(sendConnection).toHaveBeenCalledTimes(1)
+  await act(async () => finish({ status: true }))
+  expect(await screen.findByRole('button', { name: 'Request sent' })).toBeDisabled()
+})
+
+it('isolates pending request state when the signed-in account changes', async () => {
+  let finishOld
+  sendConnection.mockImplementationOnce(() => new Promise(resolve => { finishOld = resolve }))
+  const view = mount()
+  fireEvent.click(await screen.findByRole('button', { name: 'Add Professional' }))
+  useProfile.mockReturnValue({ profile: { id: 'new-account' }, authToken: 'session-b', refreshProfile: vi.fn() })
+  view.rerender(<MemoryRouter><Connections /></MemoryRouter>)
+  const newButton = await screen.findByRole('button', { name: 'Add Professional' })
+  expect(newButton).toBeEnabled()
+  await act(async () => finishOld({ status: true }))
+  expect(screen.queryByRole('button', { name: 'Request sent' })).toBeNull()
+  expect(newButton).toBeEnabled()
 })

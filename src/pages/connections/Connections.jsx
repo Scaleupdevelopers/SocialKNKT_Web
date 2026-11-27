@@ -16,34 +16,15 @@ const filters = [
   { value: 1, label: 'Professional' },
 ]
 
-function ConnectionRow({ connection, ownList, onManage }) {
+function ConnectionRow({ connection, ownList, onManage, request = {}, onSend }) {
   const navigate = useNavigate()
-  const [pending, setPending] = useState(false)
-  const [sent, setSent] = useState(false)
-  const [error, setError] = useState('')
-  const busy = useRef(false)
   const { userId, personalConnection, professionalConnection } = connection
   const name =
     [connection.fname, connection.lname].filter(Boolean).join(' ') || connection.username
-  const addType = personalConnection ? 'professional' : 'personal'
-  const hasBoth = personalConnection && professionalConnection
-
-  async function add() {
-    if (busy.current) return
-    busy.current = true
-    setPending(true)
-    setError('')
-    try {
-      await sendConnection(userId, addType)
-      setSent(true)
-      connectionsChanged()
-    } catch {
-      setError('Unable to send request. Please try again.')
-    } finally {
-      busy.current = false
-      setPending(false)
-    }
-  }
+  const addType = missingConnectionType(personalConnection, professionalConnection)
+  const pending = request.status === 'pending'
+  const sent = request.status === 'sent'
+  const error = request.error
 
   return (
     <article className="connection-row">
@@ -67,23 +48,20 @@ function ConnectionRow({ connection, ownList, onManage }) {
       </button>
       {ownList && (
         <div className="connection-row-actions">
-          {!hasBoth && (
+          {addType && (
             <button
               className="connection-add"
               type="button"
               disabled={pending || sent}
-              onClick={add}
+              onClick={() => onSend(userId, addType)}
             >
-              {sent
-                ? 'Request sent'
-                : pending
-                  ? 'Sending…'
-                  : 'Add ' + addType[0].toUpperCase() + addType.slice(1)}
+              {connectionActionLabel(request.status, addType)}
             </button>
           )}
           <button
             className="connection-remove"
             type="button"
+            disabled={pending}
             aria-label={'Manage connection with ' + name}
             onClick={onManage}
           >
@@ -94,6 +72,47 @@ function ConnectionRow({ connection, ownList, onManage }) {
       )}
     </article>
   )
+}
+
+function connectionActionLabel(status, type) {
+  if (status === 'sent') return 'Request sent'
+  if (status === 'pending') return 'Sending…'
+  return 'Add ' + type[0].toUpperCase() + type.slice(1)
+}
+
+function useConnectionRequests() {
+  const [items, setItems] = useState({})
+  const locked = useRef(new Set())
+  async function send(userId, type) {
+    if (locked.current.has(userId)) return
+    locked.current.add(userId)
+    setItems((current) => ({ ...current, [userId]: { status: 'pending' } }))
+    try {
+      await sendConnection(userId, type)
+      setItems((current) => ({ ...current, [userId]: { status: 'sent' } }))
+      connectionsChanged()
+    } catch {
+      locked.current.delete(userId)
+      setItems((current) => ({
+        ...current,
+        [userId]: {
+          status: 'error',
+          error: 'Unable to send request. Please try again.',
+        },
+      }))
+    }
+  }
+  function clear(userId) {
+    locked.current.delete(userId)
+    setItems((current) => ({ ...current, [userId]: {} }))
+  }
+  return { items, send, clear }
+}
+
+function missingConnectionType(personal, professional) {
+  if (personal === false) return 'personal'
+  if (professional === false) return 'professional'
+  return null
 }
 
 function ConnectionDetails({ connection }) {
@@ -116,7 +135,7 @@ function ConnectionDetails({ connection }) {
   )
 }
 
-function ConnectionList({ userId, ownList, query, filter }) {
+function ConnectionList({ userId, ownList, query, filter, requests, onSend, onChanged }) {
   const [selected, setSelected] = useState(null)
   const loadPage = useCallback(
     (page) => getProfileConnections(page, filter, query, 10, userId),
@@ -131,6 +150,8 @@ function ConnectionList({ userId, ownList, query, filter }) {
             key={connection.userId}
             connection={connection}
             ownList={ownList}
+            request={requests[connection.userId]}
+            onSend={onSend}
             onManage={() => setSelected(connection)}
           />
         ))}
@@ -161,7 +182,10 @@ function ConnectionList({ userId, ownList, query, filter }) {
         <ConnectionManager
           userId={selected.userId}
           onClose={() => setSelected(null)}
-          onChanged={list.reload}
+          onChanged={() => {
+            onChanged(selected.userId)
+            list.reload()
+          }}
         />
       )}
     </>
@@ -169,7 +193,16 @@ function ConnectionList({ userId, ownList, query, filter }) {
 }
 
 export function Connections() {
-  const { profile } = useProfile()
+  const { profile, authToken } = useProfile()
+  return (
+    <ConnectionsView
+      key={authToken || profile?.id || profile?._id || 'anonymous'}
+      profile={profile}
+    />
+  )
+}
+
+function ConnectionsView({ profile }) {
   const [params] = useSearchParams()
   const currentId = profile?.id || profile?._id
   const userId = params.get('userId') || currentId
@@ -178,8 +211,12 @@ export function Connections() {
   const [debounced, setDebounced] = useState('')
   const [filter, setFilter] = useState(null)
   const [filterOpen, setFilterOpen] = useState(false)
+  const requests = useConnectionRequests()
   useEffect(() => {
-    const timer = setTimeout(() => setDebounced(query.trim()), 300)
+    const timer = setTimeout(() => {
+      setDebounced(query.trim())
+      if (query.trim()) setFilter(null)
+    }, 300)
     return () => clearTimeout(timer)
   }, [query])
 
@@ -192,40 +229,45 @@ export function Connections() {
           <input
             aria-label="Search connections"
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => {
+              setQuery(event.target.value)
+              setFilterOpen(false)
+            }}
             placeholder="Search users"
           />
         </div>
         <div className="connections-heading">
           <h1>Connections</h1>
-          <div className="connections-filter-wrap">
-            <button
-              className="connections-filter-button"
-              type="button"
-              aria-label="Filter connections"
-              aria-expanded={filterOpen}
-              onClick={() => setFilterOpen(!filterOpen)}
-            >
-              <img src="/assets/logo_icons/solar_sort-linear.svg" alt="" />
-            </button>
-            {filterOpen && (
-              <div className="connections-filter-menu">
-                {filters.map((option) => (
-                  <button
-                    key={option.label}
-                    className={filter === option.value ? 'active' : ''}
-                    type="button"
-                    onClick={() => {
-                      setFilter(option.value)
-                      setFilterOpen(false)
-                    }}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          {!query.trim() && (
+            <div className="connections-filter-wrap">
+              <button
+                className="connections-filter-button"
+                type="button"
+                aria-label="Filter connections"
+                aria-expanded={filterOpen}
+                onClick={() => setFilterOpen(!filterOpen)}
+              >
+                <img src="/assets/logo_icons/solar_sort-linear.svg" alt="" />
+              </button>
+              {filterOpen && (
+                <div className="connections-filter-menu">
+                  {filters.map((option) => (
+                    <button
+                      key={option.label}
+                      className={filter === option.value ? 'active' : ''}
+                      type="button"
+                      onClick={() => {
+                        setFilter(option.value)
+                        setFilterOpen(false)
+                      }}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
         {userId ? (
           <ConnectionList
@@ -234,6 +276,9 @@ export function Connections() {
             ownList={ownList}
             query={debounced}
             filter={filter}
+            requests={requests.items}
+            onSend={requests.send}
+            onChanged={requests.clear}
           />
         ) : (
           <LoadingSkeleton label="Loading profile…" />
