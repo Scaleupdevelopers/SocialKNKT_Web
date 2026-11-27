@@ -46,8 +46,7 @@ test('connection requests accept and reset the panel', async ({ page }, info) =>
     await expect(buttons.nth(index)).toBeInViewport()
     if (index) expect(boxes[index].top).toBeGreaterThanOrEqual(boxes[index - 1].bottom)
   }
-  const footer = await page.getByRole('button', { name: 'View connections', exact: true }).boundingBox()
-  expect(footer.y).toBeGreaterThanOrEqual(boxes[2].bottom)
+  await expect(page.getByRole('button', { name: 'View connections', exact: true })).toHaveCount(0)
   await page.getByRole('button', { name: 'Accept', exact: true }).focus()
   await page.keyboard.press('Tab')
   await expect(page.getByRole('button', { name: 'Decline', exact: true })).toBeFocused()

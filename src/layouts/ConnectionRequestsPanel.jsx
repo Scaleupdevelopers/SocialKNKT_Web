@@ -1,5 +1,4 @@
 import { useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { answerConnection, getConnectionRequests } from '../action/action'
 import { connectionsChanged } from '../utils/helper'
 import { usePagedList } from '../utils/usePagedList'
@@ -75,7 +74,6 @@ function RequestRow({ request, onAnswered }) {
 export function ConnectionRequestsPanel({ onClose }) {
   const list = usePagedList(getConnectionRequests)
   const { refreshProfile } = useProfile()
-  const navigate = useNavigate()
   function answered() {
     list.reload()
     refreshProfile()
@@ -112,15 +110,6 @@ export function ConnectionRequestsPanel({ onClose }) {
         onLoadMore={list.loadMore}
         label="Connection requests pagination"
       />
-      <button
-        className="panel-more"
-        onClick={() => {
-          navigate('/connections')
-          onClose()
-        }}
-      >
-        View connections
-      </button>
     </aside>
   )
 }
