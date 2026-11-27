@@ -3,8 +3,11 @@ import { getRequest, putRequest, mergeResults, postLink } from '../src/utils/hel
 import { mergeItems, mergeMessages } from '../src/pages/chat/chatModel'
 import {
   getPost,
+  getPostComment,
+  getPopularTopics,
   getThread,
   getSavedPosts,
+  getThreadLocations,
   recordPostShare,
   searchContent,
 } from '../src/action/action'
@@ -17,6 +20,33 @@ vi.mock('../src/utils/helper', async (original) => ({
 const id = '0123456789abcdef01234567'
 beforeEach(() => vi.clearAllMocks())
 describe('discovery API contracts', () => {
+  it('loads popularity-ranked topics through the dedicated endpoint', async () => {
+    await getPopularTopics()
+    expect(getRequest).toHaveBeenLastCalledWith('user/popular/topics')
+  })
+  it('resolves a notification comment and preserves missing-content responses', async () => {
+    const response = { data: { _id: id, postId: 'abcdef0123456789abcdef01' } }
+    getRequest.mockResolvedValueOnce(response)
+    expect(await getPostComment(id)).toBe(response)
+    expect(getRequest).toHaveBeenLastCalledWith(`user/post/comment/${id}`)
+    getRequest.mockResolvedValueOnce({ data: null })
+    expect(await getPostComment(id)).toEqual({ data: null })
+    getRequest.mockClear()
+    await expect(getPostComment('../post')).rejects.toThrow('Invalid comment link')
+    expect(getRequest).not.toHaveBeenCalled()
+  })
+  it.each(['[', 'St. Louis', 'City (North)', 'A+B'])(
+    'searches location %s literally',
+    async (query) => {
+      await getThreadLocations(query, 2, 5)
+      const [path, params] = getRequest.mock.lastCall
+      expect(path).toBe('user/threads/locations')
+      expect(params).toMatchObject({ page: 2, limit: 5 })
+      const prefix = new RegExp('^' + params.q, 'i')
+      expect(prefix.test(query)).toBe(true)
+      if (query === 'St. Louis') expect(prefix.test('StX Louis')).toBe(false)
+    },
+  )
   it('preserves chat ID normalization, filtering and chronological order', () => {
     const current = [{ id: 1, _id: 'other', createdAt: 2 }, { createdAt: 0 }]
     const updated = { id: '1', createdAt: 3 }
@@ -72,7 +102,10 @@ describe('discovery API contracts', () => {
   })
   it('records shares with explicit true and pages saved records', async () => {
     await recordPostShare(id)
-    expect(putRequest).toHaveBeenCalledWith('user/post/share', { postId: id, shareStatus: true })
+    expect(putRequest).toHaveBeenCalledWith('user/post/share', {
+      postId: id,
+      shareStatus: true,
+    })
     await getSavedPosts(2)
     expect(getRequest).toHaveBeenCalledWith('user/post/get-saved-posts', { page: 2, limit: 10 })
     expect(new URL(postLink(id)).searchParams.get('postId')).toBe(id)

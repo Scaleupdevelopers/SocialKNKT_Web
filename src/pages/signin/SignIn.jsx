@@ -11,8 +11,19 @@ function isVerifiedSocialSession(response) {
   return (
     response.status === true &&
     response.data?.isEmailVerified === true &&
-    Boolean(response.data?.token)
+    typeof response.data?.token === 'string' &&
+    response.data.token.length > 0
   )
+}
+
+function validateSocialResponse(response) {
+  const user = response?.data
+  if (!user || Array.isArray(user) || typeof user.id !== 'string' || !user.id) {
+    throw new Error('Unable to sign in. Please try again.')
+  }
+  if (isVerifiedSocialSession(response)) return
+  if (response.status === false && user.isEmailVerified === false) return
+  throw new Error('Unable to sign in. Please try again.')
 }
 
 function storeSocialSession(user, email, image) {
@@ -105,6 +116,7 @@ export function SignIn() {
       const result = await signInWithPopup(firebaseAuth, appleProvider)
       const socialProfile = appleSignupProfile(result)
       const ssoResponse = await ssoCheck(socialProfile)
+      validateSocialResponse(ssoResponse)
       const isExistingVerifiedUser = isVerifiedSocialSession(ssoResponse)
 
       if (!isExistingVerifiedUser) {
@@ -132,6 +144,7 @@ export function SignIn() {
       const ssoPayload = googleSignupProfile(firebaseUser)
 
       const ssoResponse = await ssoCheck(ssoPayload)
+      validateSocialResponse(ssoResponse)
       const isExistingVerifiedUser = isVerifiedSocialSession(ssoResponse)
       if (!isExistingVerifiedUser) {
         navigate('/sign-up', {

@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { AddMedia } from './AddMedia'
@@ -57,7 +57,7 @@ it('saves profile and banner through existing actions preserving unrelated field
     image: 'https://example.com/photo.png',
   })
   expect(updateBannerImage).toHaveBeenCalledWith('https://example.com/banner.jpg')
-  expect(URL.revokeObjectURL).toHaveBeenCalledTimes(2)
+  await waitFor(() => expect(URL.revokeObjectURL).toHaveBeenCalledTimes(2))
 })
 it('retries partial failure without reuploading or resaving the completed photo', async () => {
   updateBannerImage

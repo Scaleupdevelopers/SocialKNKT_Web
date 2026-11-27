@@ -685,6 +685,7 @@ function FlickDialogs(dialogs) {
       {dialogs.isCommentsOpen && (
         <CommentsModal
           post={dialogs.flick}
+          postOwnerId={ownerId(dialogs.flick)}
           onClose={() => dialogs.setIsCommentsOpen(false)}
           onCommentCountChange={(change) =>
             dialogs.setCommentCount((count) => Math.max(0, count + change))

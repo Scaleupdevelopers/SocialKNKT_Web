@@ -374,3 +374,40 @@ describe('comment and reply reads', () => {
     expect(screen.queryByText('stale')).not.toBeInTheDocument()
   })
 })
+
+
+describe('post-owner moderation', () => {
+  it.each(['comments', 'replies'])('lets the post owner delete others %s while retaining Report', async (kind) => {
+    const other = comment('other-comment', { userId: 'another-user' })
+    api.getComments.mockResolvedValue({
+      data: kind === 'comments' ? [other] : [comment('parent', { commentReplies: 1 })],
+      totalCount: 1,
+    })
+    api.getCommentReplies.mockResolvedValue({ data: [other], totalCount: 1 })
+    render(<CommentsModal post={post} postOwnerId="me" />)
+    if (kind === 'replies')
+      fireEvent.click(await screen.findByRole('button', { name: /View 1 Replies/ }))
+    await screen.findByText('other-comment')
+    fireEvent.click(screen.getByLabelText(kind === 'comments' ? 'Comment options' : 'Reply options'))
+    expect(screen.getByRole('button', { name: 'Report', exact: true })).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Comment' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete', exact: true }))
+    await waitFor(() => expect(api.deleteComment).toHaveBeenCalledWith('post', 'other-comment'))
+  })
+
+  it.each(['other-owner', undefined])('keeps others comments report-only without matching post owner context (%s)', async (postOwnerId) => {
+    api.getComments.mockResolvedValue({ data: [comment('other', { userId: 'another-user' })], totalCount: 1 })
+    render(<CommentsModal post={{ ...post, userId: 'me' }} postOwnerId={postOwnerId} />)
+    fireEvent.click(await screen.findByLabelText('Comment options'))
+    expect(screen.getByRole('button', { name: 'Report', exact: true })).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Delete Comment' })).not.toBeInTheDocument()
+  })
+
+  it('keeps an author able to delete their comment on another owners post without self-report', async () => {
+    api.getComments.mockResolvedValue({ data: [comment('mine')], totalCount: 1 })
+    render(<CommentsModal post={post} postOwnerId="another-user" />)
+    fireEvent.click(await screen.findByLabelText('Comment options'))
+    expect(screen.getByRole('button', { name: 'Delete Comment' })).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Report', exact: true })).not.toBeInTheDocument()
+  })
+})

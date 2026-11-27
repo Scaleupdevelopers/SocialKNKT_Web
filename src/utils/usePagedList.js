@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { entityId, mergeResults } from './helper'
 
-// Memoize loadPage in callers. Changing its identity invalidates older results.
-export function usePagedList(loadPage, pageSize = 10) {
+function responseItems(response) {
+  return Array.isArray(response.data) ? response.data : []
+}
+
+// Keep loadPage and custom getId callbacks stable; changing either reloads the list.
+export function usePagedList(loadPage, pageSize = 10, getId = entityId) {
   const [state, setState] = useState({
     items: [],
     page: -1,
@@ -26,9 +31,9 @@ export function usePagedList(loadPage, pageSize = 10) {
       try {
         const response = await loadPage(page)
         if (current !== version.current) return
-        const next = Array.isArray(response.data) ? response.data : []
+        const next = responseItems(response)
         setState((s) => ({
-          items: reset ? next : [...s.items, ...next],
+          items: mergeResults(reset ? [] : s.items, next, getId),
           page,
           loading: false,
           error: '',
@@ -45,7 +50,7 @@ export function usePagedList(loadPage, pageSize = 10) {
         if (current === version.current) busy.current = false
       }
     },
-    [loadPage, pageSize],
+    [loadPage, pageSize, getId],
   )
   const reload = useCallback(() => load(0, true), [load])
   useEffect(() => {

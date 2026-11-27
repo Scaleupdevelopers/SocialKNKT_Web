@@ -129,11 +129,13 @@ it.each(['Apple', 'Google'])(
       profile: { firstName: 'Apple', lastName: 'Member' },
     })
     ssoCheck.mockResolvedValue({
-      status: true,
-      data: { token: 'unverified-test-token', isEmailVerified: false },
+      status: false,
+      data: { id: 'partial-user', isEmailVerified: false },
     })
     flow('/login')
-    fireEvent.click(screen.getByRole('button', { name: `Sign in with ${provider}` }))
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: `Sign in with ${provider}` }))
+    })
     await screen.findByText('Go ahead and sign up')
     expect(screen.getByPlaceholderText('Enter your email')).toHaveValue('member@example.com')
     expect(screen.getByPlaceholderText('Enter your First Name')).toHaveValue(
@@ -342,4 +344,26 @@ it('normalizes email at password login', async () => {
     email: 'test@example.com',
     password: 'Example-password1!',
   })
+})
+
+it.each([
+  ['Apple', { status: false, data: [] }],
+  ['Google', { status: false, data: [] }],
+  ['Apple', { status: false }],
+  ['Google', { status: false, data: {} }],
+  ['Apple', { status: true, data: { id: 'user', isEmailVerified: true } }],
+  ['Google', { status: true, data: { id: 'user', isEmailVerified: true, token: 123 } }],
+])('keeps malformed %s responses on sign-in (%j)', async (provider, response) => {
+  signInWithPopup.mockResolvedValue({
+    user: { uid: 'synthetic-uid', email: 'member@example.com' },
+  })
+  getAdditionalUserInfo.mockReturnValue({ profile: {} })
+  ssoCheck.mockResolvedValue(response)
+  flow('/login')
+  fireEvent.click(screen.getByRole('button', { name: `Sign in with ${provider}` }))
+  await waitFor(() =>
+    expect(toast.error).toHaveBeenCalledWith('Unable to sign in. Please try again.'),
+  )
+  expect(screen.getByRole('button', { name: 'Login' })).toBeInTheDocument()
+  expect(localStorage.getItem('socialknkt_auth')).toBeNull()
 })

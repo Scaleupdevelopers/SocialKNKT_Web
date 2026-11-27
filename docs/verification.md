@@ -90,3 +90,35 @@ Loading layout fixes: media grids now reserve unoccupied columns (`auto-fill`) s
 Live limitation: `user/post/get-saved-posts` returns HTTP 400 with “Error fetching saved flicks”, including on retry. The web stops its loader, displays retry feedback and shows shimmer while retrying. Successful saved-list and pagination UI were verified with intercepted synthetic data; live successful saved-list loading remains blocked by the backend response. No backend/mobile edits or pushes were made.
 
 Validation: unit suite 224/224 passed; production build and lint passed with existing bundle/lint warnings. Focused Flicks viewport tests failed before the snapping correction and passed afterward. The full Chrome desktop/mobile suite passed 40/40; after the final Flicks height adjustment, both affected desktop/mobile pagination cases passed again (normal and saved modes). Independent agent review covers the implementation and regression checks.
+
+
+## Remaining web API comparison (2026-11-27)
+
+Compared local web baseline `e43268f` with backend `854ad9a7320729a67c9d5e957ee33098dbb33924` and mobile main `bd262ab5e4cecb8bf1057f255e16d1abeb37e6e9`. All changes are web-only on `feature/web-completion`; API calls remain in `src/action/action.js` and transport stays in `src/utils/helper.js`.
+
+| Contract group | Comparison and web corrections |
+| --- | --- |
+| Authentication, signup, OTP, password recovery | Existing methods and fields match. HTTP failures now reject even for the SSO partial-registration flow; successful unfinished-registration responses remain supported. Invalid SSO user data cannot redirect to signup. |
+| Profile, onboarding, geography, uploads, settings | Changed email is normalized consistently with login/recovery. Year-only and date-formatted education/location values compare by year; work dates retain full-date validation. Signed-upload and profile collection contracts retained. |
+| Feed, profile posts, Flicks | Other-profile Flicks use the backend connection-aware default instead of forcing personal-only results. Home deletion restarts offset pagination and invalidates outstanding reads. Overlapping pages deduplicate by the caller's record identity. |
+| Post comments and replies | Post owners can moderate comments/replies, matching backend and mobile; comment authors retain their existing controls. Thread moderation is not expanded. |
+| KNKT, topics, location and search | Location regex metacharacters are escaped for literal prefix searches. Failed topic/location reads support retry and late responses cannot replace newer suggestions. Popular-topic views use the dedicated ranked endpoint while composers retain the full catalog. Location suggestions support offset pagination. Thread creation failures retain drafts, and a successful creation followed by refresh failure is reported separately. Existing comment/reply contracts remain. |
+| Connections, chat, notifications, contact | Existing request and text-chat payloads match inspected callers. Comment-like notifications resolve the comment's parent post; thread notifications use the correct subject. Contact uses the approved admin-contact/email flow. |
+
+Live read-only popular-topic check returned eight distinct topics. Live read-only location check: `[` reproduced HTTP 400 before escaping and returned a successful empty array afterward; `St. Louis` returned two results. Regression tests also cover literal `.`, `(` and `+`. Browser writes, moderation, identity-provider outcomes and error recovery use synthetic accounts/intercepted requests; this does not prove deployed backend behavior or live provider/storage/socket persistence.
+
+Backend findings remain read-only and require the backend owner:
+
+- Saved Flicks: missing `new ObjectId` still blocks the list; its projection also lacks the caller's `isLiked` state (`api/controllers/user/post/savePost/get-all-saved-post.js`).
+- Reply deletion decrements the top-level post comment count although reply creation does not increment it (`api/controllers/user/post/comment/delete.js`).
+- Popular-topic fallback uses string IDs to exclude ObjectId records and may repeat a topic; the web deduplicates IDs while retaining the returned order (`api/controllers/user/topics/get-popular.js`).
+- Chat room listing can reuse another iteration's participant for an empty deleted room (`api/controllers/user/chat/room/get.js`).
+- Source review found missing resource-ownership/membership checks in chat history, connection update/delete, post update and alternate-target account deletion; SSO also needs server-side provider credential verification. These were not tested against other users or exploited live. Client-side guards cannot enforce these server boundaries.
+
+Previously documented text-post search, unstable offset ordering, Add Content product choice, and unverified live socket/media-chat limitations remain. Type-2 thread media stays optional on web because the backend supports it; mobile requires media, which is a product-parity difference rather than a rejected API contract. No backend/mobile changes, GitHub push, deployment or real-user write test is included.
+
+
+Visual evidence: synthetic before/after notification labels and destinations were captured at 1440px and 390px in the private task workspace `work/api-audit-evidence`, with baseline `e43268f` and current runtime-file hashes recorded in `evidence.json`. Browser screenshots also cover lookup shimmer, retry and unavailable content. The temporary baseline snapshot and its servers were removed after capture. No real-user screenshots were committed.
+
+
+Final verification for this local change: `npm test -- --maxWorkers=4` passed **305 tests across 30 files**; `npm run test:e2e` passed **46 Chrome desktop/mobile tests**; `npm run build`, `npm run lint`, and `git diff --check` passed. Lint retains warnings, the production bundle retains its size warning, and synthetic comment fixtures emit existing empty-image-src warnings. Initial async test timing failures were corrected by awaiting navigation/effect completion without weakening assertions. Independent review cleared auth/profile, notification routing, moderation, Home/shared pagination and KNKT after regressions covered session changes, stale read failures and request-lock ownership. Live `/knkt/topics` rendered eight topics with no alert or horizontal overflow. These checks cover local source and controlled test responses, not deployment or live cross-account writes.

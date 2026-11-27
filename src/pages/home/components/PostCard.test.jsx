@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { PostCard } from './PostCard'
-import { recordPostShare, recordPostViews, updatePostLike } from '../../../action/action'
+import { getComments, recordPostShare, recordPostViews, updatePostLike } from '../../../action/action'
 vi.mock('../../../context/ProfileContext', () => ({
   useProfile: () => ({ profile: { id: 'viewer' } }),
 }))
@@ -10,6 +10,7 @@ vi.mock('../../../action/action', async (original) => ({
   recordPostShare: vi.fn().mockResolvedValue({}),
   recordPostViews: vi.fn().mockResolvedValue({}),
   updatePostLike: vi.fn(),
+  getComments: vi.fn(),
 }))
 const post = { id: '0123456789abcdef01234567', fname: 'Author', description: 'Test post' }
 beforeEach(() => vi.clearAllMocks())
@@ -83,4 +84,17 @@ it('keeps documents accessible through the existing direct link', () => {
   const link = screen.getByRole('link', { name: "Open Author's post" })
   expect(link.getAttribute('href')).toBe('https://example.com/resume.pdf')
   expect(link.getAttribute('target')).toBe('_blank')
+})
+
+
+it('passes post ownership to comment moderation while preserving reporting', async () => {
+  getComments.mockResolvedValue({
+    data: [{ id: 'comment', userId: 'other', comment: 'Other member comment' }],
+    totalCount: 1,
+  })
+  render(<PostCard post={{ ...post, userId: 'viewer' }} />)
+  fireEvent.click(screen.getByRole('button', { name: /Comment/ }))
+  fireEvent.click(await screen.findByLabelText('Comment options'))
+  expect(screen.getByRole('button', { name: 'Delete Comment' })).toBeVisible()
+  expect(screen.getByRole('button', { name: 'Report', exact: true })).toBeVisible()
 })

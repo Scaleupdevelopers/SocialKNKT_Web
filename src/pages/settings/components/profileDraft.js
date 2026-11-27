@@ -85,6 +85,9 @@ export function buildPayload(section, draft, profile) {
         ([key, value]) => JSON.stringify(value) !== JSON.stringify(initial[key]),
       ),
     )
+    if (section === 'basic' && typeof changes.email === 'string') {
+      changes.email = changes.email.trim().toLowerCase()
+    }
     return { ...preserved, ...changes }
   }
   const keys = [
@@ -125,8 +128,14 @@ export function validateDraft(section, draft, profile) {
     draft.some((item) => !item.countryId || !item.stateId || !item.cityId)
   )
     return 'Choose country, state and city for each location.'
-  const invalidDates = draft.some(
-    (item) => item[config.start] && item[config.end] && item[config.end] < item[config.start],
-  )
+  const invalidDates = draft.some((item) => hasReversedDates(section, config, item))
   return invalidDates ? 'End date must be on or after start date.' : ''
+}
+
+function hasReversedDates(section, config, item) {
+  const start = item[config.start]
+  const end = item[config.end]
+  if (!start || !end) return false
+  if (section === 'work') return end < start
+  return String(end).slice(0, 4) < String(start).slice(0, 4)
 }

@@ -29,6 +29,7 @@ export function CommentsModal(props) {
 
 function CommentsContent({
   post,
+  postOwnerId,
   onClose,
   onCommentCountChange,
   getCommentsAction,
@@ -231,6 +232,9 @@ function CommentsContent({
     }
   }
 
+  const isPostOwner = Boolean(
+    currentUserId && postOwnerId && String(postOwnerId) === String(currentUserId),
+  )
   const isOwnComment = (item) =>
     Boolean(currentUserId && item.userId && String(item.userId) === String(currentUserId))
 
@@ -283,6 +287,7 @@ function CommentsContent({
     setReplyTarget,
     handleCommentLike,
     isOwnComment,
+    isPostOwner,
   }
   const list = {
     comments,
@@ -603,7 +608,8 @@ function CommentControls({ item, actions, isReply }) {
       </button>
       {actions.openMenuId === id && (
         <CommentMenu
-          canDelete={actions.isOwnComment(item)}
+          canDelete={actions.isPostOwner || actions.isOwnComment(item)}
+          canReport={!actions.isOwnComment(item)}
           onReport={() => {
             actions.setReportTarget(id)
             actions.setOpenMenuId(null)
@@ -788,15 +794,16 @@ function replaceComment(items, tempId, saved) {
   })
 }
 
-function CommentMenu({ canDelete, onReport, onDelete }) {
+function CommentMenu({ canDelete, canReport, onReport, onDelete }) {
   return (
     <div className="comment-options-menu">
-      {canDelete ? (
+      {canDelete && (
         <button type="button" onClick={onDelete}>
           <img src="/assets/logo_icons/red_delete_icon.svg" alt="" />
           <span>Delete Comment</span>
         </button>
-      ) : (
+      )}
+      {canReport && (
         <button type="button" onClick={onReport}>
           <img src="/assets/logo_icons/report.svg" alt="" />
           <span>Report</span>

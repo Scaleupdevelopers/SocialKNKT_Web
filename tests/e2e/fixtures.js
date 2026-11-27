@@ -61,7 +61,7 @@ export async function mockApi(page) {
         personalConnection: relationId,
         connectionId: relationId,
       }
-    else if (path === 'user/topics')
+    else if (path === 'user/topics' || path === 'user/popular/topics')
       data = [{ id: '555555555555555555555555', topic: 'Technology' }]
     else if (path === 'user/profile/connections') data = [connection]
     else if (path === 'user/connection-request' && method === 'GET') data = requests

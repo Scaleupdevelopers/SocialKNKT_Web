@@ -13,6 +13,7 @@ import {
   getThreadLocations,
   getThreads,
   getTopics,
+  getPopularTopics,
   uploadFile,
   reportThread,
   reportThreadComment,
@@ -23,7 +24,8 @@ import {
 import { CommentsModal } from '../../components/modals/CommentsModal/CommentsModal'
 import { ReportPostModal } from '../../components/modals/ReportPostModal/ReportPostModal'
 import { useProfile } from '../../context/ProfileContext'
-import { mergeResults } from '../../utils/helper'
+import { LoadingSkeleton } from '../../components/common/RequestState'
+import { mergeResults, readAuth } from '../../utils/helper'
 import './Knkt.css'
 
 const threadLabels = {
@@ -118,11 +120,67 @@ function ownsThread(thread, profile) {
   return Boolean(ownerId && currentUserId && String(ownerId) === String(currentUserId))
 }
 
+function currentSession() {
+  const auth = readAuth()
+  return JSON.stringify([auth?.token, auth?.user?.id])
+}
+
+async function uploadThreadMedia(file, isCurrent) {
+  if (!file) return { media: '', thumbnail: '', mediaType: '' }
+  const mediaType = file.type.startsWith('video/') ? 'video' : 'image'
+  const extension = file.name.includes('.')
+    ? file.name.split('.').pop().toLowerCase()
+    : mediaType === 'video'
+      ? 'mp4'
+      : 'jpg'
+  const media = await uploadFile(file, extension)
+  if (!isCurrent()) return null
+  const thumbnail = await uploadThreadThumbnail(file, media, isCurrent)
+  return { media, thumbnail, mediaType }
+}
+
+async function uploadThreadThumbnail(file, media, isCurrent) {
+  if (!file.type.startsWith('video/')) return media
+  const thumbnail = await createVideoThumbnail(file)
+  if (!isCurrent()) return null
+  return uploadFile(thumbnail, 'jpg', 'image/jpeg')
+}
+
+function threadPayload(form, media) {
+  return {
+    question: form.question.trim() || form.body.trim() || form.title.trim(),
+    title: form.title.trim(),
+    body: form.body.trim(),
+    location: form.location.trim(),
+    topic: form.topic,
+    type: 2,
+    ...media,
+  }
+}
+
 export function Knkt() {
+  const { authToken } = useProfile()
+  return <KnktContent key={authToken || 'anonymous'} />
+}
+
+function KnktContent() {
   const [isComposerOpen, setIsComposerOpen] = useState(false)
   const [topics, setTopics] = useState([])
   const [topicsLoading, setTopicsLoading] = useState(true)
+  const [topicsError, setTopicsError] = useState(false)
+  const [topicsRetry, setTopicsRetry] = useState(0)
+  const [popularTopics, setPopularTopics] = useState([])
+  const [popularLoading, setPopularLoading] = useState(true)
+  const [popularError, setPopularError] = useState(false)
+  const [popularRetry, setPopularRetry] = useState(0)
   const [locationSuggestions, setLocationSuggestions] = useState([])
+  const [locationsLoading, setLocationsLoading] = useState(false)
+  const [locationsError, setLocationsError] = useState(false)
+  const [locationsRetry, setLocationsRetry] = useState(0)
+  const [locationPage, setLocationPage] = useState(0)
+  const [hasMoreLocations, setHasMoreLocations] = useState(false)
+  const locationsRequest = useRef(0)
+  const locationsBusy = useRef(false)
   const [threadFilter, setThreadFilter] = useState(1)
   const [threadFilterOpen, setThreadFilterOpen] = useState(false)
   const [threadData, setThreadData] = useState([])
@@ -141,6 +199,12 @@ export function Knkt() {
   const [likingThreadIds, setLikingThreadIds] = useState(new Set())
   const [submitAttempted, setSubmitAttempted] = useState(false)
   const [threadSubmitting, setThreadSubmitting] = useState(false)
+  const [threadCreateError, setThreadCreateError] = useState(false)
+  const [createRefreshError, setCreateRefreshError] = useState(false)
+  const threadSubmitBusy = useRef(false)
+  const submissionRef = useRef(null)
+  const mounted = useRef(false)
+  const threadPageRequest = useRef(null)
   const [selectedMedia, setSelectedMedia] = useState(null)
   const [mediaPreviewUrl, setMediaPreviewUrl] = useState('')
   const threadLikeStateRef = useRef(new Map())
@@ -158,6 +222,15 @@ export function Knkt() {
   const { profile } = useProfile()
 
   useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+      submissionRef.current = null
+      threadPageRequest.current = null
+    }
+  }, [])
+
+  useEffect(() => {
     if (!selectedMedia) {
       setMediaPreviewUrl('')
       return undefined
@@ -170,8 +243,7 @@ export function Knkt() {
 
   useEffect(() => {
     const closeOpenPanels = (event) => {
-      if (event.target.closest('.knkt-filter-wrap, .knkt-thread-composer, .knkt-new-post'))
-        return
+      if (event.target.closest('.knkt-filter-wrap, .knkt-thread-composer, .knkt-new-post')) return
       setThreadFilterOpen(false)
       setIsComposerOpen(false)
     }
@@ -180,31 +252,85 @@ export function Knkt() {
   }, [])
 
   useEffect(() => {
+    let active = true
     getTopics()
-      .then((response) => setTopics(response.data))
-      .finally(() => setTopicsLoading(false))
-  }, [])
+      .then((response) => {
+        if (active) setTopics(response.data || [])
+      })
+      .catch(() => {
+        if (active) setTopicsError(true)
+      })
+      .finally(() => {
+        if (active) setTopicsLoading(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [topicsRetry])
+
+  useEffect(() => {
+    let active = true
+    getPopularTopics()
+      .then((response) => {
+        if (active) setPopularTopics(mergeResults([], response.data || []))
+      })
+      .catch(() => {
+        if (active) setPopularError(true)
+      })
+      .finally(() => {
+        if (active) setPopularLoading(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [popularRetry])
 
   useEffect(() => {
     const query = threadForm.location.trim()
-    if (!query) {
-      setLocationSuggestions([])
-      return
-    }
+    let active = true
+    locationsRequest.current++
+    locationsBusy.current = Boolean(query)
+    setLocationPage(0)
+    setHasMoreLocations(false)
+    setLocationSuggestions([])
+    setLocationsError(false)
+    setLocationsLoading(Boolean(query))
+    if (!query) return
 
     const timeoutId = window.setTimeout(() => {
-      getThreadLocations(query).then((response) => setLocationSuggestions(response.data || []))
+      getThreadLocations(query)
+        .then((response) => {
+          if (!active) return
+          const results = response.data || []
+          setLocationSuggestions(mergeResults([], results))
+          setHasMoreLocations(results.length >= 10)
+        })
+        .catch(() => {
+          if (active) setLocationsError(true)
+        })
+        .finally(() => {
+          if (!active) return
+          locationsBusy.current = false
+          setLocationsLoading(false)
+        })
     }, 350)
 
-    return () => window.clearTimeout(timeoutId)
-  }, [threadForm.location])
+    return () => {
+      active = false
+      locationsRequest.current++
+      window.clearTimeout(timeoutId)
+    }
+  }, [threadForm.location, locationsRetry])
 
   useEffect(() => {
     const requestId = threadRequestIdRef.current + 1
     threadRequestIdRef.current = requestId
     let isActive = true
     setThreadsLoading(true)
+    threadPageRequest.current = null
+    setIsLoadingMoreThreads(false)
     setThreadError(false)
+    setCreateRefreshError(false)
     setThreadPage(0)
     setThreadData([])
     setHasMoreThreads(false)
@@ -219,7 +345,7 @@ export function Knkt() {
         setHasMoreThreads(selectedThreadId === null && threads.length >= 10)
       })
       .catch(() => {
-        if (isActive) setThreadError(true)
+        if (isActive && threadRequestIdRef.current === requestId) setThreadError(true)
       })
       .finally(() => {
         if (isActive && threadRequestIdRef.current === requestId) {
@@ -240,7 +366,9 @@ export function Knkt() {
       hasMoreThreads &&
       !threadError
     const loadMoreThreads = async () => {
-      if (!canLoadMore) return
+      if (!canLoadMore || threadPageRequest.current) return
+      const pageRequest = {}
+      threadPageRequest.current = pageRequest
       setIsLoadingMoreThreads(true)
       const requestId = threadRequestIdRef.current
       try {
@@ -254,7 +382,10 @@ export function Knkt() {
       } catch {
         if (threadRequestIdRef.current === requestId) setThreadError(true)
       } finally {
-        setIsLoadingMoreThreads(false)
+        if (threadPageRequest.current === pageRequest) {
+          threadPageRequest.current = null
+          setIsLoadingMoreThreads(false)
+        }
       }
     }
 
@@ -424,61 +555,189 @@ export function Knkt() {
     event.target.value = ''
   }
 
-  const handleThreadSubmit = async (event) => {
+  function submissionIsCurrent(submission) {
+    return (
+      mounted.current &&
+      submissionRef.current === submission &&
+      submission.session === currentSession()
+    )
+  }
+
+  async function refreshCreatedThreadList(expectedRequest, submission) {
+    if (threadRequestIdRef.current !== expectedRequest || selectedThreadId !== null) {
+      setThreadRetry((current) => current + 1)
+      return
+    }
+    const requestId = ++threadRequestIdRef.current
+    threadPageRequest.current = null
+    setIsLoadingMoreThreads(false)
+    setThreadsLoading(true)
+    setThreadError(false)
+    setCreateRefreshError(false)
+    setHasMoreThreads(false)
+    try {
+      const response = await getThreads(0, threadFilter, 10, selectedTopicId)
+      if (!createdRefreshIsCurrent(requestId, submission)) return
+      const threads = response.data || []
+      setThreadPage(0)
+      setThreadData(mergeResults([], threads))
+      setHasMoreThreads(threads.length >= 10)
+    } catch {
+      if (!createdRefreshIsCurrent(requestId, submission)) return
+      setCreateRefreshError(true)
+      setThreadError(true)
+    } finally {
+      if (createdRefreshIsCurrent(requestId, submission)) setThreadsLoading(false)
+    }
+  }
+
+  function createdRefreshIsCurrent(requestId, submission) {
+    return threadRequestIdRef.current === requestId && submissionIsCurrent(submission)
+  }
+
+  async function handleThreadSubmit(event) {
     event.preventDefault()
+    if (threadSubmitBusy.current) return
     setSubmitAttempted(true)
-    const missingRequiredField =
-      !threadForm.title.trim() || !threadForm.body.trim() || !threadForm.location.trim()
-    if (missingRequiredField) return
+    if (![threadForm.title, threadForm.body, threadForm.location].every((value) => value.trim()))
+      return
     if (!threadForm.topic.length) {
       setTopicMenuOpen(true)
       return
     }
+    threadSubmitBusy.current = true
+    const submission = { session: currentSession() }
+    submissionRef.current = submission
     setThreadSubmitting(true)
+    setThreadCreateError(false)
+    const readRequest = threadRequestIdRef.current
     try {
-      let media = ''
-      let thumbnail = ''
-      let mediaType = ''
-      if (selectedMedia) {
-        mediaType = selectedMedia.type.startsWith('video/') ? 'video' : 'image'
-        const extension = selectedMedia.name.includes('.')
-          ? selectedMedia.name.split('.').pop().toLowerCase()
-          : mediaType === 'video'
-            ? 'mp4'
-            : 'jpg'
-        media = await uploadFile(selectedMedia, extension)
-        thumbnail =
-          mediaType === 'video'
-            ? await uploadFile(await createVideoThumbnail(selectedMedia), 'jpg', 'image/jpeg')
-            : media
-      }
-      await createThread({
-        question:
-          threadForm.question.trim() || threadForm.body.trim() || threadForm.title.trim(),
-        location: threadForm.location.trim(),
-        topic: threadForm.topic,
-        title: threadForm.title.trim(),
-        body: threadForm.body.trim(),
-        media,
-        type: 2,
-        thumbnail,
-        mediaType,
-      })
+      // Type-2 media remains optional on web; mobile requires it before submission.
+      const media = await uploadThreadMedia(selectedMedia, () => submissionIsCurrent(submission))
+      if (!submissionIsCurrent(submission)) return
+      await createThread(threadPayload(threadForm, media))
+      if (!submissionIsCurrent(submission)) return
       setThreadForm(emptyThreadForm)
       setSubmitAttempted(false)
       setTopicMenuOpen(false)
       setSelectedMedia(null)
       setIsComposerOpen(false)
-      const response = await getThreads(0, threadFilter, 10, selectedTopicId)
-      const threads = response.data || []
-      setThreadPage(0)
-      setThreadData(threads)
-      setHasMoreThreads(threads.length >= 10)
-    } catch (error) {
-      console.error(error)
+      toast.success('Thread posted successfully.')
+      await refreshCreatedThreadList(readRequest, submission)
+    } catch {
+      if (submissionIsCurrent(submission)) setThreadCreateError(true)
     } finally {
-      setThreadSubmitting(false)
+      threadSubmitBusy.current = false
+      if (submissionIsCurrent(submission)) setThreadSubmitting(false)
     }
+  }
+
+  async function loadMoreLocations() {
+    if (locationsBusy.current || !hasMoreLocations) return
+    locationsBusy.current = true
+    const requestId = locationsRequest.current
+    setLocationsLoading(true)
+    setLocationsError(false)
+    try {
+      const response = await getThreadLocations(threadForm.location.trim(), locationPage + 1, 10)
+      if (locationsRequest.current !== requestId) return
+      const results = response.data || []
+      setLocationSuggestions((current) => mergeResults(current, results))
+      setLocationPage((current) => current + 1)
+      setHasMoreLocations(results.length >= 10)
+    } catch {
+      if (locationsRequest.current === requestId) setLocationsError(true)
+    } finally {
+      if (locationsRequest.current === requestId) {
+        locationsBusy.current = false
+        setLocationsLoading(false)
+      }
+    }
+  }
+
+  function retryLocations() {
+    if (hasMoreLocations) loadMoreLocations()
+    else setLocationsRetry((current) => current + 1)
+  }
+
+  function renderThreadReadError() {
+    if (!threadError) return null
+    return (
+      <p role="alert">
+        {createRefreshError
+          ? 'Thread posted, but the feed could not refresh. Retry loading the feed.'
+          : 'Unable to load thread. It may no longer be available.'}{' '}
+        <button onClick={() => setThreadRetry((value) => value + 1)}>Retry</button>
+      </p>
+    )
+  }
+
+  function renderPopularFeedback() {
+    if (popularError) {
+      return (
+        <p role="alert">
+          Unable to load popular topics.{' '}
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation()
+              setPopularError(false)
+              setPopularLoading(true)
+              setPopularRetry((current) => current + 1)
+            }}
+          >
+            Retry popular topics
+          </button>
+        </p>
+      )
+    }
+    if (popularLoading || popularTopics.length) return null
+    return <p role="status">No popular topics available.</p>
+  }
+
+  function retryTopics(event) {
+    event.stopPropagation()
+    setTopicsError(false)
+    setTopicsLoading(true)
+    setTopicsRetry((current) => current + 1)
+  }
+
+  function renderTopicsFeedback() {
+    if (topicsError) {
+      return (
+        <p role="alert">
+          Unable to load categories.{' '}
+          <button type="button" onClick={retryTopics}>
+            Retry categories
+          </button>
+        </p>
+      )
+    }
+    if (topicsLoading || topics.length) return null
+    return <p role="status">No categories available.</p>
+  }
+
+  function renderLocationFeedback() {
+    if (locationsError) {
+      return (
+        <p role="alert">
+          Location suggestions unavailable. Enter a location or{' '}
+          <button type="button" onClick={retryLocations}>
+            Retry locations
+          </button>
+          .
+        </p>
+      )
+    }
+    if (locationsLoading) {
+      return <LoadingSkeleton label="Loading locations…" variant="field" count={2} />
+    }
+    if (!hasMoreLocations) return null
+    return (
+      <button type="button" onClick={loadMoreLocations}>
+        Load more locations
+      </button>
+    )
   }
 
   function renderPopularTopics() {
@@ -492,14 +751,14 @@ export function Knkt() {
             </button>
           </div>
           <div className="knkt-topic-list">
-            {topicsLoading
+            {popularLoading
               ? Array.from({ length: 12 }, (_, index) => (
                   <div className="knkt-topic knkt-topic-skeleton" key={index}>
                     <span className="topic-skeleton-circle" />
                     <span className="topic-skeleton-label" />
                   </div>
                 ))
-              : topics.slice(0, 10).map((topic) => (
+              : popularTopics.map((topic) => (
                   <button
                     className={`knkt-topic${selectedTopicId === topicIdentifier(topic) ? ' selected' : ''}`}
                     type="button"
@@ -510,7 +769,7 @@ export function Knkt() {
                     <span>{topic.topic || topic.title}</span>
                   </button>
                 ))}
-            {!topicsLoading && topics.length > 10 && (
+            {!popularLoading && popularTopics.length > 10 && (
               <button
                 className="knkt-topic-see-all"
                 type="button"
@@ -520,6 +779,7 @@ export function Knkt() {
               </button>
             )}
           </div>
+          {renderPopularFeedback()}
         </section>
       </>
     )
@@ -577,6 +837,7 @@ export function Knkt() {
               required
             />
           </label>
+          {renderLocationFeedback()}
           {locationSuggestions.length > 0 && (
             <div className="knkt-location-suggestions">
               {locationSuggestions.map((location) => (
@@ -641,13 +902,12 @@ export function Knkt() {
             </span>
             <img src="/assets/logo_icons/postadddropdown.svg" alt="" aria-hidden="true" />
           </button>
+          {renderTopicsFeedback()}
           {topicMenuOpen && (
             <div className="knkt-topic-menu">
               {topics.map((topic) => (
                 <button
-                  className={
-                    threadForm.topic.includes(topicIdentifier(topic)) ? 'selected' : ''
-                  }
+                  className={threadForm.topic.includes(topicIdentifier(topic)) ? 'selected' : ''}
                   type="button"
                   key={topicIdentifier(topic)}
                   onClick={() => toggleTopic(topicIdentifier(topic))}
@@ -731,6 +991,11 @@ export function Knkt() {
               </button>
             </div>
             {renderComposerPreview()}
+            {threadCreateError && (
+              <p role="alert">
+                Unable to create thread. Your draft is kept. Select Create Thread to retry.
+              </p>
+            )}
             <button className="knkt-create-thread" type="submit" disabled={threadSubmitting}>
               {threadSubmitting ? 'Creating...' : 'Create Thread'}
             </button>
@@ -875,7 +1140,7 @@ export function Knkt() {
   function renderThreadList() {
     return (
       <>
-        {threadsLoading ? (
+        {threadsLoading && !threadData.length ? (
           Array.from({ length: 3 }, (_, index) => (
             <article className="knkt-thread knkt-thread-skeleton" key={index} />
           ))
@@ -887,6 +1152,9 @@ export function Knkt() {
             <h2>No threads found</h2>
             <p>There are no threads available for this topic yet.</p>
           </div>
+        )}
+        {threadsLoading && threadData.length > 0 && (
+          <LoadingSkeleton label="Refreshing threads…" variant="card" count={1} />
         )}
       </>
     )
@@ -1088,12 +1356,7 @@ export function Knkt() {
             {selectedThreadId !== null && (
               <button onClick={() => navigate('/knkt')}>Back to threads</button>
             )}
-            {threadError && (
-              <p role="alert">
-                Unable to load thread. It may no longer be available.{' '}
-                <button onClick={() => setThreadRetry((value) => value + 1)}>Retry</button>
-              </p>
-            )}
+            {renderThreadReadError()}
             {renderThreadList()}
             {renderThreadReport()}
             {renderThreadShare()}

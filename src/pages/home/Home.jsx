@@ -11,8 +11,11 @@ import { SidebarMenu } from './components/SidebarMenu'
 import './Home.css'
 import { useProfile } from '../../context/ProfileContext'
 import { Link, useSearchParams } from 'react-router-dom'
+import { mergeResults } from '../../utils/helper'
 
 const FEED_PAGE_SIZE = 10
+
+const postIdentity = (post) => post._id || post.id || post
 
 const professionalIcon = '/assets/logo_icons/Professional.svg'
 const connectionIcon = '/assets/logo_icons/connection.svg'
@@ -93,6 +96,7 @@ export function Home() {
   const [feedError, setFeedError] = useState(false)
   const [retry, setRetry] = useState(0)
   const feedRequest = useRef(0)
+  const moreRequest = useRef(null)
   const [feedPosts, setFeedPosts] = useState([])
   const [isLoadingFeed, setIsLoadingFeed] = useState(true)
   const [feedPage, setFeedPage] = useState(0)
@@ -105,6 +109,9 @@ export function Home() {
   useEffect(() => {
     const requestId = ++feedRequest.current
     let active = true
+    const isCurrent = () => active && requestId === feedRequest.current
+    moreRequest.current = null
+    setIsLoadingMoreFeed(false)
     setIsLoadingFeed(true)
     setFeedError(false)
     setFeedPosts([])
@@ -112,16 +119,16 @@ export function Home() {
       try {
         const response =
           postId !== null ? await getPost(postId) : await getPosts(0, FEED_PAGE_SIZE)
-        if (!active || requestId !== feedRequest.current) return
+        if (!isCurrent()) return
         const posts = postId !== null ? [response.data] : response.data || []
 
-        setFeedPosts(posts)
+        setFeedPosts(mergeResults([], posts, postIdentity))
         setFeedPage(0)
         setHasMoreFeed(postId === null && posts.length >= FEED_PAGE_SIZE)
       } catch {
-        if (active) setFeedError(true)
+        if (isCurrent()) setFeedError(true)
       } finally {
-        if (active) setIsLoadingFeed(false)
+        if (isCurrent()) setIsLoadingFeed(false)
       }
     }
 
@@ -132,28 +139,33 @@ export function Home() {
     }
   }, [postId, retry])
 
+  const canLoadMore = postId === null && !isLoadingFeed && !isLoadingMoreFeed && hasMoreFeed
   useEffect(() => {
     const loadMoreFeed = async () => {
-      if (postId !== null || isLoadingFeed || isLoadingMoreFeed || !hasMoreFeed) {
-        return
-      }
-
+      if (!canLoadMore || moreRequest.current) return
+      const request = {}
+      moreRequest.current = request
+      const requestId = feedRequest.current
+      const isCurrent = () =>
+        requestId === feedRequest.current && moreRequest.current === request
       setIsLoadingMoreFeed(true)
 
       try {
         const nextPage = feedPage + 1
-        const requestId = feedRequest.current
         const response = await getPosts(nextPage, FEED_PAGE_SIZE)
-        if (requestId !== feedRequest.current) return
+        if (!isCurrent()) return
         const nextPosts = response.data || []
 
-        setFeedPosts((currentPosts) => [...currentPosts, ...nextPosts])
+        setFeedPosts((currentPosts) => mergeResults(currentPosts, nextPosts, postIdentity))
         setFeedPage(nextPage)
         setHasMoreFeed(nextPosts.length >= FEED_PAGE_SIZE)
-      } catch (error) {
-        toast.error(error.message || 'Unable to load more posts.')
+      } catch {
+        if (isCurrent()) toast.error('Unable to load more posts. Please try again.')
       } finally {
-        setIsLoadingMoreFeed(false)
+        if (isCurrent()) {
+          moreRequest.current = null
+          setIsLoadingMoreFeed(false)
+        }
       }
     }
 
@@ -171,7 +183,19 @@ export function Home() {
     }
 
     return () => observer.disconnect()
-  }, [postId, feedPage, hasMoreFeed, isLoadingFeed, isLoadingMoreFeed])
+  }, [canLoadMore, feedPage])
+
+  const handleDeleted = (deletedId) => {
+    feedRequest.current++
+    moreRequest.current = null
+    setIsLoadingMoreFeed(false)
+    setFeedPosts((posts) => posts.filter((post) => (post._id || post.id) !== deletedId))
+    if (postId !== null) return
+    setIsLoadingFeed(true)
+    setFeedPage(0)
+    setHasMoreFeed(false)
+    setRetry((value) => value + 1)
+  }
 
   useEffect(() => {
     const loadFlicks = async () => {
@@ -201,26 +225,13 @@ export function Home() {
         <section className="home-feed" aria-label="Home feed">
           {postId === null ? <CreatePost /> : <Link to="/home">Back to feed</Link>}
           <div className="feed-posts">
-            {isLoadingFeed && <PostSkeleton />}
-            {feedError && (
-              <div role="alert">
-                Unable to load this post or feed. It may no longer be available.{' '}
-                <button onClick={() => setRetry((value) => value + 1)}>Retry</button>
-              </div>
-            )}
-            {!isLoadingFeed && !feedError && feedPosts.length === 0 && <EmptyFeedState />}
-            {!isLoadingFeed &&
-              feedPosts.map((post) => (
-                <PostCard
-                  key={post._id || post.id}
-                  post={post}
-                  onDeleted={(postId) =>
-                    setFeedPosts((currentPosts) =>
-                      currentPosts.filter((item) => (item._id || item.id) !== postId),
-                    )
-                  }
-                />
-              ))}
+            <FeedPosts
+              loading={isLoadingFeed}
+              error={feedError}
+              posts={feedPosts}
+              onRetry={() => setRetry((value) => value + 1)}
+              onDeleted={handleDeleted}
+            />
             <div ref={feedEndRef} className="feed-end-marker" aria-hidden="true" />
             {isLoadingMoreFeed && <PostSkeleton />}
           </div>
@@ -231,6 +242,24 @@ export function Home() {
         </section>
       </div>
     </main>
+  )
+}
+
+function FeedPosts({ loading, error, posts, onRetry, onDeleted }) {
+  return (
+    <>
+      {loading && <PostSkeleton />}
+      {error && (
+        <div role="alert">
+          Unable to load this post or feed. It may no longer be available.{' '}
+          <button onClick={onRetry}>Retry</button>
+        </div>
+      )}
+      {!loading && !error && posts.length === 0 && <EmptyFeedState />}
+      {!loading && posts.map((post) => (
+        <PostCard key={post._id || post.id} post={post} onDeleted={onDeleted} />
+      ))}
+    </>
   )
 }
 

@@ -76,6 +76,126 @@ test('notifications open a real post detail link', async ({ page }) => {
   await expect(page).toHaveURL(new RegExp('postId=' + postId))
   await expect(page.getByText('Shared post detail', { exact: true })).toBeVisible()
 })
+
+const notificationCommentId = '666666666666666666666666'
+async function mockCommentNotifications(page) {
+  await page.route('**/user/notifications?*', (route) =>
+    route.fulfill({
+      json: {
+        status: true,
+        data: [
+          {
+            _id: 'comment-notice',
+            type: 'comment-like',
+            entityId: notificationCommentId,
+            user1: { fname: 'Sample', lname: 'Member' },
+          },
+          {
+            _id: 'thread-notice',
+            type: 'thread-like',
+            entityId: '777777777777777777777777',
+            user1: { fname: 'Thread', lname: 'Member' },
+          },
+        ],
+      },
+    }),
+  )
+  await page.goto('/connections')
+  await page.getByLabel('Notifications', { exact: true }).click()
+}
+
+test('comment notification resolves parent post and labels thread accurately', async ({
+  page,
+}, info) => {
+  await mockApi(page)
+  let release
+  let lookups = 0
+  const pending = new Promise((resolve) => {
+    release = resolve
+  })
+  await page.route('**/user/post/comment/' + notificationCommentId, async (route) => {
+    lookups++
+    expect(route.request().method()).toBe('GET')
+    await pending
+    await route.fulfill({
+      json: { status: true, data: { id: notificationCommentId, postId, isBlocked: false } },
+    })
+  })
+  await mockCommentNotifications(page)
+  await expect(
+    page.getByRole('button', { name: 'Thread Member liked your thread.' }),
+  ).toBeVisible()
+  await page.screenshot({
+    path: info.outputPath('notification-labels-after.png'),
+    fullPage: true,
+  })
+  const row = page.getByRole('button', { name: 'Sample Member liked your comment.' })
+  await row.click()
+  await expect(row).toBeDisabled()
+  await expect(page.getByRole('status', { name: 'Opening notification…' })).toHaveClass(
+    /loading-skeleton/,
+  )
+  await page.screenshot({
+    path: info.outputPath('notification-lookup-shimmer-after.png'),
+    fullPage: true,
+  })
+  release()
+  await expect(page).toHaveURL(new RegExp('postId=' + postId))
+  await expect(page.getByText('Shared post detail', { exact: true })).toBeVisible()
+  expect(lookups).toBe(1)
+  await page.screenshot({
+    path: info.outputPath('notification-parent-post-after.png'),
+    fullPage: true,
+  })
+})
+
+test('comment notification retries an HTTP lookup failure', async ({ page }, info) => {
+  await mockApi(page)
+  let attempts = 0
+  await page.route('**/user/post/comment/' + notificationCommentId, (route) => {
+    attempts++
+    return route.fulfill(
+      attempts === 1
+        ? { status: 503, json: { status: false, message: 'Synthetic internal failure' } }
+        : { json: { status: true, data: { postId } } },
+    )
+  })
+  await mockCommentNotifications(page)
+  const row = page.getByRole('button', { name: /Sample Member liked your comment/ })
+  await row.click()
+  await expect(page.getByRole('alert')).toHaveText(
+    'Unable to open notification. Select it to retry.',
+  )
+  await expect(page).toHaveURL(/\/connections$/)
+  await expect(row).toBeEnabled()
+  await page.screenshot({
+    path: info.outputPath('notification-retry-after.png'),
+    fullPage: true,
+  })
+  await row.click()
+  await expect(page.getByText('Shared post detail', { exact: true })).toBeVisible()
+  expect(attempts).toBe(2)
+})
+
+test('comment notification keeps deleted content unavailable without navigating', async ({
+  page,
+}, info) => {
+  await mockApi(page)
+  await page.route('**/user/post/comment/' + notificationCommentId, (route) =>
+    route.fulfill({ json: { status: true } }),
+  )
+  await mockCommentNotifications(page)
+  const row = page.getByRole('button', { name: /Sample Member liked your comment/ })
+  await row.click()
+  await expect(row).toContainText('Content is no longer available.')
+  await expect(row).toBeDisabled()
+  await expect(page).toHaveURL(/\/connections$/)
+  await page.screenshot({
+    path: info.outputPath('notification-unavailable-after.png'),
+    fullPage: true,
+  })
+})
+
 test('chat history and offline recovery render', async ({ page }, info) => {
   await mockApi(page)
   await page.goto('/chat')

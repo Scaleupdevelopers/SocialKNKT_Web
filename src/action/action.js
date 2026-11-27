@@ -91,7 +91,7 @@ export const getOtherUserFlicks = async (userId, page = 0, limit = 10) => {
     userId,
     page,
     limit,
-    postType: 1,
+    postType: 0,
   })
 }
 
@@ -136,6 +136,13 @@ export const commentPost = async (postId, comment) => {
 
 export const getComments = async (postId, page = 0) => {
   return getRequest('user/post/comment', { page, postId })
+}
+
+export const getPostComment = async (commentId) => {
+  if (typeof commentId !== 'string' || !/^[a-f\d]{24}$/i.test(commentId)) {
+    throw new Error('Invalid comment link.')
+  }
+  return getRequest(`user/post/comment/${commentId}`)
 }
 
 export const updateCommentLike = async (commentId, postId, likeStatus) => {
@@ -222,8 +229,13 @@ export const getTopics = async () => {
   return getRequest('user/topics')
 }
 
+export const getPopularTopics = async () => {
+  return getRequest('user/popular/topics')
+}
+
 export const getThreadLocations = async (query, page = 0, limit = 10) => {
-  return getRequest('user/threads/locations', { page, q: query, limit })
+  const q = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return getRequest('user/threads/locations', { page, q, limit })
 }
 
 export const getThreads = async (page = 0, filter = 1, limit = 10, topicId) => {

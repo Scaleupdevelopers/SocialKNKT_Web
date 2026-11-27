@@ -86,3 +86,41 @@ describe('profile replacement payloads', () => {
     ).toContain('cannot be cleared')
   })
 })
+
+it('normalizes changed email without mutating the draft or other basic fields', () => {
+  const draft = {
+    ...createDraft(profile, 'basic'),
+    email: ' Member@Example.COM ',
+    fname: ' Sam ',
+  }
+  expect(buildPayload('basic', draft, profile)).toMatchObject({
+    email: 'member@example.com',
+    fname: ' Sam ',
+  })
+  expect(draft.email).toBe(' Member@Example.COM ')
+})
+
+it.each([
+  ['2020-01-01', '2020'],
+  ['2020', '2020-01-01'],
+  ['2020', '2020'],
+])('accepts equal location years %s and %s', (startYear, endYear) => {
+  const draft = [{ countryId: 'c', stateId: 's', cityId: 't', startYear, endYear }]
+  expect(validateDraft('location', draft, profile)).toBe('')
+  expect(buildPayload('location', draft, profile).placesLived[0]).toMatchObject({ startYear, endYear })
+})
+
+it.each(['location', 'education'])('rejects reversed %s years across stored formats', (section) => {
+  const draft = [{
+    school: 'College', degree: 'BA', countryId: 'c', stateId: 's', cityId: 't',
+    startYear: '2021', endYear: '2020-01-01',
+  }]
+  expect(validateDraft(section, draft, profile)).toContain('End date')
+})
+
+it('keeps work date validation precise within a year', () => {
+  expect(validateDraft('work', [{
+    jobTitle: 'Designer', companyName: 'A',
+    startDate: '2024-12-01', endDate: '2024-01-01',
+  }], profile)).toContain('End date')
+})

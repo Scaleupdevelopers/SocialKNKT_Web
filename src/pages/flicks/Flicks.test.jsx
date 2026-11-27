@@ -205,3 +205,18 @@ it('reads saved records without calling the ordinary feed or inventing an unsave
   expect(getFlicks).not.toHaveBeenCalled()
   expect(await screen.findByText('No saved flicks on this page.')).toBeTruthy()
 })
+
+
+it('passes flick ownership to comment moderation while preserving reporting', async () => {
+  getFlicks.mockResolvedValue({ data: [{ id: 'mine', userId: 'viewer', description: 'Owned flick' }] })
+  getComments.mockResolvedValue({
+    data: [{ id: 'comment', userId: 'other', comment: 'Other member comment' }],
+    totalCount: 1,
+  })
+  render(<MemoryRouter><Flicks /></MemoryRouter>)
+  await screen.findByText('Owned flick')
+  fireEvent.click(screen.getByRole('button', { name: 'Comments', exact: true }))
+  fireEvent.click(await screen.findByLabelText('Comment options'))
+  expect(screen.getByRole('button', { name: 'Delete Comment' })).toBeVisible()
+  expect(screen.getByRole('button', { name: 'Report', exact: true })).toBeVisible()
+})

@@ -209,6 +209,7 @@ export function PostCard({
       {isCommentsOpen && (
         <CommentsModal
           post={post}
+          postOwnerId={postOwnerId(post)}
           onClose={() => setIsCommentsOpen(false)}
           onCommentCountChange={(change) =>
             setCommentCount((count) => Math.max(0, count + change))
@@ -243,8 +244,12 @@ function getPostCounts(post) {
 function getCurrentUserId(profile, auth) {
   return profile?.id || auth?.user?.id || auth?.data?.id
 }
+function postOwnerId(post) {
+  return post.userId || post.user?.id
+}
+
 function ownsPost(post, userId) {
-  return Boolean(userId && (post.userId || post.user?.id) === userId)
+  return Boolean(userId && postOwnerId(post) === userId)
 }
 function getAuthorName(post) {
   return (

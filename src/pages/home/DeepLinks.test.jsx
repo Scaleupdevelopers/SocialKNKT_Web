@@ -17,6 +17,7 @@ vi.mock('../../action/action', async (original) => ({
   getFlicks: vi.fn().mockResolvedValue({ data: [] }),
   getThreads: vi.fn().mockResolvedValue({ data: [] }),
   getTopics: vi.fn().mockResolvedValue({ data: [] }),
+  getPopularTopics: vi.fn().mockResolvedValue({ data: [] }),
 }))
 
 beforeEach(() => {

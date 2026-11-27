@@ -9,12 +9,23 @@ import {
   sendConnection,
   recordPostViews,
   reportUser,
+  getOtherUserFlicks,
 } from '../src/action/action'
 import { pendingConnection } from '../src/utils/helper'
 beforeEach(() => {
   vi.stubGlobal(
     'fetch',
     vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ status: true }) }),
+  )
+})
+it('lets the backend select other-profile flicks for the current connection', async () => {
+  await getOtherUserFlicks('user-a', 2, 5)
+  expect(fetch).toHaveBeenLastCalledWith(
+    '/api/v1/user/flick/get-all-other-user-flick',
+    expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ userId: 'user-a', page: 2, limit: 5, postType: 0 }),
+    }),
   )
 })
 it('uses the verified view and user-report contracts', async () => {
