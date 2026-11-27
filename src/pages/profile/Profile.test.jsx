@@ -379,3 +379,48 @@ it('reads profile lists once during StrictMode effect replay', async () => {
   expect(api.getAllMyFeed).toHaveBeenCalledTimes(1)
   expect(api.getAllMyFlicks).toHaveBeenCalledTimes(1)
 })
+
+it.each([
+  { profileType: 2 },
+  { profileType: '2', personalConnection: 'accepted' },
+  { profileType: 2, professionalConnection: 'accepted' },
+  { profileType: 2, connectionStatus: 0, connectionId: 'pending' },
+])('shows the private state without requesting protected content: %j', async (privacy) => {
+  api.getOtherUserProfile.mockResolvedValue({ data: {
+    id: 'a', fname: 'Private member', username: 'private_member', bio: 'Visible bio', ...privacy,
+  } })
+  mount('/profile?userId=a')
+  await screen.findByRole('region', { name: 'Private account' })
+  expect(screen.getByText('Visible bio')).toBeVisible()
+  expect(screen.getByText('This account is private, to see the content connect with @private_member')).toBeVisible()
+  for (const tab of ['Media', 'Posts', 'All']) {
+    fireEvent.click(screen.getByRole('button', { name: tab, exact: true }))
+    expect(screen.getByRole('region', { name: 'Private account' })).toBeVisible()
+  }
+  expect(api.getOtherUserPosts).not.toHaveBeenCalled()
+  expect(api.getOtherUserFeed).not.toHaveBeenCalled()
+  expect(api.getOtherUserFlicks).not.toHaveBeenCalled()
+  expect(screen.queryByText('Retry posts')).toBeNull()
+})
+
+it('allows the owner to read their own private posts and media', async () => {
+  useProfile.mockReturnValue({ profile: { ...own, profileType: 2 }, authToken: 'session' })
+  mount()
+  await waitFor(() => expect(api.getMyAllPosts).toHaveBeenCalled())
+  fireEvent.click(screen.getByRole('button', { name: 'Media', exact: true }))
+  await waitFor(() => expect(api.getAllMyFeed).toHaveBeenCalled())
+  expect(api.getAllMyFlicks).toHaveBeenCalled()
+  expect(screen.queryByRole('region', { name: 'Private account' })).toBeNull()
+})
+
+it('does not restore old public posts when a refreshed profile becomes private', async () => {
+  let finishPosts
+  api.getOtherUserPosts.mockImplementation(() => new Promise((resolve) => { finishPosts = resolve }))
+  mount('/profile?userId=a')
+  await waitFor(() => expect(finishPosts).toBeTypeOf('function'))
+  api.getOtherUserProfile.mockResolvedValue({ data: { id: 'a', profileType: 2, username: 'private_member' } })
+  fireEvent.click(screen.getByText('Relationship changed'))
+  await screen.findByRole('region', { name: 'Private account' })
+  await act(async () => finishPosts({ data: [{ id: 'old', title: 'Stale private post' }] }))
+  expect(screen.queryByText('Stale private post')).toBeNull()
+})

@@ -64,6 +64,25 @@ function ProfileEmptyPostsState({ isOwnProfile }) {
   )
 }
 
+function PrivateProfileState({ profile }) {
+  return (
+    <section className="profile-private-state" aria-label="Private account">
+      <img src="/assets/logo_icons/profile-private-lock.svg" alt="" />
+      <h2>Private account</h2>
+      <p>
+        This account is private, to see the content connect with{' '}
+        {profile.username ? `@${profile.username}` : 'this user'}
+      </p>
+    </section>
+  )
+}
+
+function isPrivateProfileLocked(profile) {
+  // The current backend denies all other-user private-profile media reads,
+  // including accepted connections. Do not fetch through an alternate route.
+  return Number(profile.profileType) === 2
+}
+
 function ProfileMediaSkeleton({ count = 5, className = '' }) {
   return Array.from({ length: count }, (_, index) => (
     <span
@@ -198,6 +217,14 @@ function ProfileView({ context, viewedUserId, isOwnProfile }) {
 }
 
 function ProfileTabContent({ activeTab, profile, isOwnProfile, viewedUserId }) {
+  if (!isOwnProfile && isPrivateProfileLocked(profile)) {
+    return activeTab === 'all' ? (
+      <div className="profile-content profile-content-private">
+        <ProfileSummary profile={profile} />
+        <PrivateProfileState profile={profile} />
+      </div>
+    ) : <PrivateProfileState profile={profile} />
+  }
   return (
     <>
       {' '}

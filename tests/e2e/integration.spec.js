@@ -380,3 +380,28 @@ test('onboarding media saves profile photo and banner without publishing feed co
   })
   expect(calls.some((call) => call.path === 'user/post' && call.method === 'POST')).toBe(false)
 })
+
+test('private profile shows the mobile lock state without content requests', async ({ page }, info) => {
+  const { calls } = await mockApi(page)
+  await page.route('**/user/profile/get-other-user-profile**', route => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({ status: true, data: {
+      id: other, fname: 'Private', lname: 'Member', username: 'private_member',
+      profileType: 2, bio: 'Profile bio stays visible', personalConnection: relationId,
+    } }),
+  }))
+  await page.goto(`/profile?userId=${other}`)
+  const locked = page.getByRole('region', { name: 'Private account' })
+  await expect(locked).toBeVisible()
+  await expect(locked).toContainText('This account is private, to see the content connect with @private_member')
+  const icon = locked.locator('img')
+  expect(await icon.evaluate(img => img.complete && img.naturalWidth > 0)).toBe(true)
+  for (const tab of ['Media', 'Posts', 'All']) {
+    await page.getByRole('button', { name: tab, exact: true }).click()
+    await expect(locked).toBeVisible()
+  }
+  expect(calls.filter(call => /get-all-other/.test(call.path))).toHaveLength(0)
+  await expect(page.getByText('Retry posts', { exact: true })).toHaveCount(0)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  await page.screenshot({ path: info.outputPath('private-profile.png'), fullPage: true })
+})
